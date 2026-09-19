@@ -1,7 +1,9 @@
 // Falls back to the page's own hostname (not a hardcoded "localhost") so the app
 // also works when loaded from a phone/other device over the LAN, where
 // "localhost" would otherwise resolve to that device instead of the API host.
-const API_BASE = import.meta.env["VITE_API_URL"] ?? `http://${window.location.hostname}:4000/api`;
+const API_BASE =
+  import.meta.env["VITE_API_URL"] ??
+  (import.meta.env.PROD ? "/api" : `http://${window.location.hostname}:4000/api`);
 
 export class ApiError extends Error {
   status: number;
@@ -67,8 +69,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, data?: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(data ?? {}) }),
-  patch: <T>(path: string, data?: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(data ?? {}) }),
-  put: <T>(path: string, data?: unknown) => request<T>(path, { method: "PUT", body: JSON.stringify(data ?? {}) }),
+  post: <T>(path: string, data?: unknown) =>
+    request<T>(path, { method: "POST", body: JSON.stringify(data ?? {}) }),
+  patch: <T>(path: string, data?: unknown) =>
+    request<T>(path, { method: "PATCH", body: JSON.stringify(data ?? {}) }),
+  put: <T>(path: string, data?: unknown) =>
+    request<T>(path, { method: "PUT", body: JSON.stringify(data ?? {}) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };

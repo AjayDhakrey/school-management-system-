@@ -32,7 +32,7 @@ function RecordPaymentForm({ onDone }: { onDone: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!schoolId) return toast.error("Select a school");
+    if (!schoolId) { toast.error("Select a school"); return; }
     setSubmitting(true);
     try {
       await api.post("/payments", { schoolId, amount: Number(amount), method });

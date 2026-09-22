@@ -236,7 +236,7 @@ export default function ParentPayFeesPage() {
   const [receipt, setReceipt] = useState<{
     fee: ApiFee;
     receiptNo: string;
-    paidAmount?: number;
+    paidAmount?: number | undefined;
   } | null>(null);
 
   const rows = (fees ?? []).filter((f) => f.status !== "Paid");

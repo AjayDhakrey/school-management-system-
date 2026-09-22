@@ -29,8 +29,8 @@ function ApplyLeaveForm({ onDone }: { onDone: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!fromDate || !toDate) return toast.error("Select start and end dates");
-    if (new Date(toDate) < new Date(fromDate)) return toast.error("End date must be after start date");
+    if (!fromDate || !toDate) { toast.error("Select start and end dates"); return; }
+    if (new Date(toDate) < new Date(fromDate)) { toast.error("End date must be after start date"); return; }
     setSubmitting(true);
     try {
       await api.post("/leave", { fromDate, toDate, reason: `${type}: ${reason}` });

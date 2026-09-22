@@ -414,6 +414,11 @@ export default function Page() {
   const { user } = useAuth();
   if (user?.role === "STUDENT") return <StudentResultsView />;
   if (user?.role === "TEACHER") return <TeacherResultsView />;
+  return <AdminResultsView />;
+}
+
+function AdminResultsView() {
+  const { user } = useAuth();
   const { data: results, isLoading } = useResults();
   // A Student account can't list all students (only its own record via /results),
   // so skip the full roster fetch and fall back to the logged-in user's own name below.

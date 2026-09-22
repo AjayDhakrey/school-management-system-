@@ -1,5 +1,18 @@
 # SchoolSphere Hub
 
+## Repository layout
+
+The active React application lives in `src/`, with static assets in `public/`.
+The root `supabase/` folder contains the current database files, while
+`deploy/` and `ecosystem.config.cjs` serve the built frontend. An older API and
+its deployment files are preserved under `legacy/postgres-backend/` and are not
+part of the current build. Generated folders such as `dist/` and
+`supabase/.temp/` are ignored by Git.
+
+The original UI-only project brief follows below. The current implementation
+has since added Supabase authentication and data access, so the brief does not
+fully describe the running application.
+
 # CREATE A COMPLETE PREMIUM SCHOOL MANAGEMENT SYSTEM — UI ONLY
 
 Build a complete, premium, modern, fully responsive **School Management System / School ERP frontend UI** with all major school management modules.

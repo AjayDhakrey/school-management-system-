@@ -1333,7 +1333,6 @@ function DocumentsTab({
             <DialogDescription>{preview?.doc_type ?? "Document"}</DialogDescription>
           </DialogHeader>
           {preview?.file_mime?.startsWith("image/") ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img src={preview.file_data ?? ""} alt={preview.name} className="max-h-[60vh] w-full rounded-lg object-contain" />
           ) : (
             <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">

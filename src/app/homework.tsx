@@ -188,7 +188,7 @@ function TeacherAssignDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!classId) return toast.error("You have no assigned classes");
+    if (!classId) { toast.error("You have no assigned classes"); return; }
     setSubmitting(true);
     try {
       await api.post("/homework", { classId, subject, title, description, dueDate });
@@ -443,7 +443,7 @@ function StudentSubmitDialog({ h, onClose }: { h: ApiHomework; onClose: () => vo
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!fileName.trim()) return toast.error("Attach a file name for your submission");
+    if (!fileName.trim()) { toast.error("Attach a file name for your submission"); return; }
     setSubmitting(true);
     try {
       await api.post("/homework-submissions", { homeworkId: h.id, fileName, note });
@@ -942,7 +942,7 @@ function AdminAssignDialog({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!classId) return toast.error("No classes available");
+    if (!classId) { toast.error("No classes available"); return; }
     setSubmitting(true);
     try {
       await api.post("/homework", { classId, subject, title, description, dueDate, assignedDate });

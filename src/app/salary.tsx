@@ -78,11 +78,11 @@ type SalaryRow = {
   status: PayrollStatus;
   employeeId?: string;
   employeeType?: "TEACHER" | "STAFF";
-  payrollId?: string;
-  rawStatus?: string;
-  basic?: number;
-  hra?: number;
-  allowance?: number;
+  payrollId?: string | undefined;
+  rawStatus?: string | undefined;
+  basic?: number | undefined;
+  hra?: number | undefined;
+  allowance?: number | undefined;
   effectiveFrom?: string;
 };
 
@@ -483,7 +483,7 @@ function AdminPayroll() {
     row: SalaryRow,
     action: "review" | "approve" | "hold" | "release" | "pay",
   ) {
-    if (!row.payrollId) return toast.error("Calculate payroll before changing its status");
+    if (!row.payrollId) { toast.error("Calculate payroll before changing its status"); return; }
     try {
       await api.patch(`/payroll/${row.payrollId}`, {
         action,

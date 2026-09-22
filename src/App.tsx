@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from "react";
+import { lazy, Suspense, useState, type ReactElement } from "react";
 import { Routes, Route, Outlet } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AppProvider } from "@/lib/app-context";
@@ -12,75 +12,75 @@ import { AppShell } from "@/components/layout/AppShell";
 import { Toaster } from "@/components/ui/sonner";
 import { ErrorBoundary } from "@/pages/ErrorFallback";
 
-import Login from "@/pages/Login";
-import Dashboard from "@/pages/Dashboard";
-import StudentsPage from "@/pages/StudentsPage";
-import StudentProfile from "@/pages/StudentProfile";
-import SubjectsPage from "@/pages/SubjectsPage";
-import NotFound from "@/pages/NotFound";
+const Login = lazy(() => import("@/pages/Login"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const StudentsPage = lazy(() => import("@/pages/StudentsPage"));
+const StudentProfile = lazy(() => import("@/pages/StudentProfile"));
+const SubjectsPage = lazy(() => import("@/pages/SubjectsPage"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
 
-import Admissions from "@/app/admissions";
-import Attendance from "@/app/attendance";
-import Classes from "@/app/classes";
-import Events from "@/app/events";
-import Examinations from "@/app/examinations";
-import Fees from "@/app/fees";
-import Homework from "@/app/homework";
-import Leave from "@/app/leave";
-import Library from "@/app/library";
-import Notices from "@/app/notices";
-import Announcements from "@/app/announcements";
-import Notifications from "@/app/notifications";
-import Parents from "@/app/parents";
-import Reports from "@/app/reports";
-import Results from "@/app/results";
-import RolesPage from "@/app/roles";
-import SettingsPage from "@/app/settings";
-import Teachers from "@/app/teachers";
-import Certificates from "@/app/certificates";
-import Timetable from "@/app/timetable";
-import Transport from "@/app/transport";
-import Users from "@/app/users";
-import Profile from "@/app/profile";
-import MySubjects from "@/app/my-subjects";
-import MyLeave from "@/app/my-leave";
-import Holidays from "@/app/holidays";
-import MyFees from "@/app/my-fees";
-import TeacherProfile from "@/app/teacher/profile";
-import TeacherClasses from "@/app/teacher/classes";
-import TeacherStudents from "@/app/teacher/students";
-import TeacherSubjects from "@/app/teacher/subjects";
-import TeacherMyAttendance from "@/app/teacher/my-attendance";
-import TeacherClassLeave from "@/app/teacher/class-leave";
-import StaffMyAttendance from "@/app/my-attendance";
-import Salary from "@/app/salary";
+const Admissions = lazy(() => import("@/app/admissions"));
+const Attendance = lazy(() => import("@/app/attendance"));
+const Classes = lazy(() => import("@/app/classes"));
+const Events = lazy(() => import("@/app/events"));
+const Examinations = lazy(() => import("@/app/examinations"));
+const Fees = lazy(() => import("@/app/fees"));
+const Homework = lazy(() => import("@/app/homework"));
+const Leave = lazy(() => import("@/app/leave"));
+const Library = lazy(() => import("@/app/library"));
+const Notices = lazy(() => import("@/app/notices"));
+const Announcements = lazy(() => import("@/app/announcements"));
+const Notifications = lazy(() => import("@/app/notifications"));
+const Parents = lazy(() => import("@/app/parents"));
+const Reports = lazy(() => import("@/app/reports"));
+const Results = lazy(() => import("@/app/results"));
+const RolesPage = lazy(() => import("@/app/roles"));
+const SettingsPage = lazy(() => import("@/app/settings"));
+const Teachers = lazy(() => import("@/app/teachers"));
+const Certificates = lazy(() => import("@/app/certificates"));
+const Timetable = lazy(() => import("@/app/timetable"));
+const Transport = lazy(() => import("@/app/transport"));
+const Users = lazy(() => import("@/app/users"));
+const Profile = lazy(() => import("@/app/profile"));
+const MySubjects = lazy(() => import("@/app/my-subjects"));
+const MyLeave = lazy(() => import("@/app/my-leave"));
+const Holidays = lazy(() => import("@/app/holidays"));
+const MyFees = lazy(() => import("@/app/my-fees"));
+const TeacherProfile = lazy(() => import("@/app/teacher/profile"));
+const TeacherClasses = lazy(() => import("@/app/teacher/classes"));
+const TeacherStudents = lazy(() => import("@/app/teacher/students"));
+const TeacherSubjects = lazy(() => import("@/app/teacher/subjects"));
+const TeacherMyAttendance = lazy(() => import("@/app/teacher/my-attendance"));
+const TeacherClassLeave = lazy(() => import("@/app/teacher/class-leave"));
+const StaffMyAttendance = lazy(() => import("@/app/my-attendance"));
+const Salary = lazy(() => import("@/app/salary"));
 
-import ParentDashboard from "@/app/parent/dashboard";
-import ParentChildProfile from "@/app/parent/children/child-profile";
-import ParentAttendance from "@/app/parent/children/attendance";
-import ParentTimetable from "@/app/parent/children/timetable";
-import ParentHomework from "@/app/parent/children/homework";
-import ParentExams from "@/app/parent/children/exams";
-import ParentResults from "@/app/parent/children/results";
-import ParentFeeDetails from "@/app/parent/fees/fee-details";
-import ParentPayFees from "@/app/parent/fees/pay-fees";
-import ParentPaymentHistory from "@/app/parent/fees/payment-history";
-import ParentLeave from "@/app/parent/leave";
-import ParentTransport from "@/app/parent/transport";
+const ParentDashboard = lazy(() => import("@/app/parent/dashboard"));
+const ParentChildProfile = lazy(() => import("@/app/parent/children/child-profile"));
+const ParentAttendance = lazy(() => import("@/app/parent/children/attendance"));
+const ParentTimetable = lazy(() => import("@/app/parent/children/timetable"));
+const ParentHomework = lazy(() => import("@/app/parent/children/homework"));
+const ParentExams = lazy(() => import("@/app/parent/children/exams"));
+const ParentResults = lazy(() => import("@/app/parent/children/results"));
+const ParentFeeDetails = lazy(() => import("@/app/parent/fees/fee-details"));
+const ParentPayFees = lazy(() => import("@/app/parent/fees/pay-fees"));
+const ParentPaymentHistory = lazy(() => import("@/app/parent/fees/payment-history"));
+const ParentLeave = lazy(() => import("@/app/parent/leave"));
+const ParentTransport = lazy(() => import("@/app/parent/transport"));
 
-import SuperAdminSchools from "@/app/super-admin/schools/schools";
-import SuperAdminSchoolDetail from "@/app/super-admin/schools/school-detail";
-import SuperAdminSubscriptions from "@/app/super-admin/subscriptions";
-import SuperAdminPlans from "@/app/super-admin/plans";
-import SuperAdminSettings from "@/app/super-admin/settings";
-import SuperAdminSchoolAdmins from "@/app/super-admin/school-admins";
-import SuperAdminLeads from "@/app/super-admin/leads";
-import SuperAdminRevenue from "@/app/super-admin/revenue";
-import SuperAdminRenewals from "@/app/super-admin/renewals";
-import SuperAdminSupport from "@/app/super-admin/support";
-import SuperAdminAnnouncements from "@/app/super-admin/announcements";
-import SuperAdminFeatures from "@/app/super-admin/features";
-import SuperAdminSecurity from "@/app/super-admin/security";
+const SuperAdminSchools = lazy(() => import("@/app/super-admin/schools/schools"));
+const SuperAdminSchoolDetail = lazy(() => import("@/app/super-admin/schools/school-detail"));
+const SuperAdminSubscriptions = lazy(() => import("@/app/super-admin/subscriptions"));
+const SuperAdminPlans = lazy(() => import("@/app/super-admin/plans"));
+const SuperAdminSettings = lazy(() => import("@/app/super-admin/settings"));
+const SuperAdminSchoolAdmins = lazy(() => import("@/app/super-admin/school-admins"));
+const SuperAdminLeads = lazy(() => import("@/app/super-admin/leads"));
+const SuperAdminRevenue = lazy(() => import("@/app/super-admin/revenue"));
+const SuperAdminRenewals = lazy(() => import("@/app/super-admin/renewals"));
+const SuperAdminSupport = lazy(() => import("@/app/super-admin/support"));
+const SuperAdminAnnouncements = lazy(() => import("@/app/super-admin/announcements"));
+const SuperAdminFeatures = lazy(() => import("@/app/super-admin/features"));
+const SuperAdminSecurity = lazy(() => import("@/app/super-admin/security"));
 
 function guarded(path: string, element: ReactElement) {
   return <RequireRole roles={ROUTE_ROLES[path] ?? ROLES}>{element}</RequireRole>;
@@ -101,7 +101,7 @@ export default function App() {
       <AuthProvider>
         <AppProvider>
           <ErrorBoundary>
-            <Routes>
+            <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">Loading page…</div>}><Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<RootRedirect />} />
 
@@ -383,7 +383,7 @@ export default function App() {
 
                 <Route path="*" element={<NotFound />} />
               </Route>
-            </Routes>
+            </Routes></Suspense>
           </ErrorBoundary>
           <Toaster position="top-right" />
         </AppProvider>

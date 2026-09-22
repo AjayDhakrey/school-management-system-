@@ -66,16 +66,16 @@ const AuthContext = createContext<AuthState | null>(null);
 
 function mapProfile(profile: Record<string, unknown>): AuthUser {
   return {
-    id: String(profile.id),
-    role: profile.role as BackendRole,
-    schoolId: (profile.school_id as string | null) ?? null,
-    department: (profile.department as StaffDepartment) ?? null,
-    name: String(profile.name ?? ""),
-    email: String(profile.email ?? ""),
-    linkedTeacherId: (profile.linked_teacher_id as string | null) ?? null,
-    linkedParentId: (profile.linked_parent_id as string | null) ?? null,
-    linkedStudentId: (profile.linked_student_id as string | null) ?? null,
-    linkedStaffId: (profile.linked_staff_id as string | null) ?? null,
+    id: String(profile["id"]),
+    role: profile["role"] as BackendRole,
+    schoolId: (profile["school_id"] as string | null) ?? null,
+    department: (profile["department"] as StaffDepartment) ?? null,
+    name: String(profile["name"] ?? ""),
+    email: String(profile["email"] ?? ""),
+    linkedTeacherId: (profile["linked_teacher_id"] as string | null) ?? null,
+    linkedParentId: (profile["linked_parent_id"] as string | null) ?? null,
+    linkedStudentId: (profile["linked_student_id"] as string | null) ?? null,
+    linkedStaffId: (profile["linked_staff_id"] as string | null) ?? null,
   };
 }
 

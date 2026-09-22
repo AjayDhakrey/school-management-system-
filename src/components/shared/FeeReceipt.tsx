@@ -91,10 +91,10 @@ export function FeeReceipt({
   transactionAmount,
 }: {
   fee: ApiFee;
-  student?: Pick<ApiStudent, "name" | "admission_no" | "class_name" | "section" | "roll"> | null;
-  school?: Partial<ApiSchool> | null;
+  student?: Pick<ApiStudent, "name" | "admission_no" | "class_name" | "section" | "roll"> | null | undefined;
+  school?: Partial<ApiSchool> | null | undefined;
   receiptNo?: string | null;
-  transactionAmount?: number;
+  transactionAmount?: number | undefined;
 }) {
   const assessed = fee.amount;
   const netPayable = Math.max(0, assessed - fee.discount + fee.fine);

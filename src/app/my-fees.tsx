@@ -233,7 +233,7 @@ export default function MyFeesPage() {
   const [receipt, setReceipt] = useState<{
     fee: ApiFee;
     receiptNo: string;
-    paidAmount?: number;
+    paidAmount?: number | undefined;
   } | null>(null);
 
   const rows = useMemo(() => fees ?? [], [fees]);

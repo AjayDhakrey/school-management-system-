@@ -13,7 +13,8 @@ export class ApiError extends Error {
 // The portal pages were written against the retired Express API (`/students`, `/fees/:id/pay`,
 // ...). This module keeps that contract and serves each route from Supabase: plain reads and
 // writes go through PostgREST under RLS, and multi-step rules go through the RPCs in
-// supabase/migrations/40_portal_rpcs.sql.
+// supabase/migrations/ (27_rpc_functions.sql, 32_admission_stage_machine.sql,
+// 33_platform_rpcs.sql).
 
 type Row = Record<string, unknown>;
 type Method = "POST" | "PATCH" | "PUT" | "DELETE";

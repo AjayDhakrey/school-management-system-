@@ -2,18 +2,18 @@ import { Component, type ReactNode } from "react";
 import { reportLovableError } from "@/lib/lovable-error-reporting";
 
 export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
+  override state = { error: null as Error | null };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
   }
 
-  componentDidCatch(error: Error) {
+  override componentDidCatch(error: Error) {
     console.error(error);
     reportLovableError(error, { boundary: "app_error_boundary" });
   }
 
-  render() {
+  override render() {
     if (this.state.error) {
       return <ErrorFallback reset={() => this.setState({ error: null })} />;
     }

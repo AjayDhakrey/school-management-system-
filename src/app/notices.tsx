@@ -126,7 +126,7 @@ function StudentNoticesView() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-semibold">{n.title}</p>
-                    {n.priority && <StatusBadge status={n.priority} />}
+                    {n.priority && <StatusBadge status={n.priority ?? "Normal"} />}
                   </div>
                   <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                     {n.description}
@@ -361,7 +361,7 @@ function AdminNoticesView() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-semibold">{n.title}</p>
-                    <StatusBadge status={n.priority} />
+                    <StatusBadge status={n.priority ?? "Normal"} />
                   </div>
                   <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
                     {n.description}
@@ -390,8 +390,8 @@ function AdminNoticesView() {
               </DialogHeader>
               <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={detail.priority} />
-                  <StatusBadge status={detail.category} tone="neutral" />
+                  <StatusBadge status={detail.priority ?? "Normal"} />
+                  <StatusBadge status={detail.category ?? "General"} tone="neutral" />
                   {detail.class_id && (
                     <StatusBadge status={noticeAudienceLabel(detail)} tone="info" />
                   )}

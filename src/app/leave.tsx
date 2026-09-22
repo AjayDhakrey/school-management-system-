@@ -308,7 +308,10 @@ function splitReason(reason: string | null): { type: string; text: string } {
 export default function Page({ type: leaveType }: { type: LeaveType }) {
   const { user } = useAuth();
   if (user?.role === "TEACHER" && leaveType === "TEACHER") return <TeacherOwnLeaveView />;
+  return <LeaveManagementView type={leaveType} />;
+}
 
+function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
   const queryClient = useQueryClient();
   const { data: requests, isLoading } = useLeaveRequests(leaveType);
   const { data: students } = useStudents(leaveType === "STUDENT");

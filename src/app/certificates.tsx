@@ -30,7 +30,7 @@ function GenerateForm({ onDone }: { onDone: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!studentId) return toast.error("Select a student");
+    if (!studentId) { toast.error("Select a student"); return; }
     setSubmitting(true);
     try {
       await api.post("/certificates", { studentId, type });

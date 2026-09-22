@@ -1,5 +1,0 @@
-node_modules
-dist
-data.sqlite3
-data.sqlite3-*
-.env

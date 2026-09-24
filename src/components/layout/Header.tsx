@@ -26,7 +26,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Initials } from "@/components/shared/ui-kit";
+import { AccountAvatar } from "@/components/shared/AccountAvatar";
+import { useMyPhotoUrl } from "@/hooks/useMyPhotoUrl";
 import { cn } from "@/lib/utils";
 
 type ApiNotification = NonNullable<ReturnType<typeof useNotifications>["data"]>[number];
@@ -206,6 +207,7 @@ export function Header() {
   const { sidebarOpen, setSidebarOpen } = useApp();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const photoUrl = useMyPhotoUrl();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -246,10 +248,10 @@ export function Header() {
     <>
       {/* Phones and tablets get a compact app-style bar: menu, search, notifications. */}
       <header className="relative px-4 pt-[calc(0.6rem+env(safe-area-inset-top))] pb-[32px] text-white lg:hidden">
-        {/* Sky gradient down to the wave, clipped so the glow never spills past it. */}
+        {/* Flat single-tone bar, clipped so it never spills past the wave. */}
         <div
           aria-hidden
-          className="absolute inset-x-0 top-0 bottom-[24px] overflow-hidden bg-[linear-gradient(170deg,var(--hero-sky)_0%,var(--hero)_100%)]"
+          className="absolute inset-x-0 top-0 bottom-[24px] overflow-hidden bg-[#5F9AF8]"
         >
           <div className="absolute -top-24 -left-20 h-[210px] w-[210px] rounded-full bg-white/12" />
         </div>
@@ -261,7 +263,7 @@ export function Header() {
         >
           <path
             d="M0 262L21.5 268.2C43 274.3 86 286.7 128.8 277C171.7 267.3 214.3 235.7 257.2 215C300 194.3 343 184.7 385.8 202.7C428.7 220.7 471.3 266.3 514.2 266.8C557 267.3 600 222.7 642.8 218.2C685.7 213.7 728.3 249.3 771.2 266.3C814 283.3 857 281.7 878.5 280.8L900 280L900 0L878.5 0C857 0 814 0 771.2 0C728.3 0 685.7 0 642.8 0C600 0 557 0 514.2 0C471.3 0 428.7 0 385.8 0C343 0 300 0 257.2 0C214.3 0 171.7 0 128.8 0C86 0 43 0 21.5 0L0 0Z"
-            fill="var(--hero)"
+            fill="#5F9AF8"
           />
         </svg>
         <div className="relative flex items-center gap-2.5">
@@ -337,7 +339,7 @@ export function Header() {
           {/* Desktop only: on phones the account lives in the sidebar sheet and the bottom nav. */}
           <DropdownMenu>
             <DropdownMenuTrigger className="hidden items-center gap-2 rounded-xl border border-border p-1 lg:flex">
-              <Initials name={user?.name ?? "?"} className="h-7 w-7 text-[10px]" />
+              <AccountAvatar name={user?.name ?? "?"} photoUrl={photoUrl} className="h-7 w-7 text-[10px]" />
               <span className="text-left">
                 <span className="block text-xs leading-tight font-semibold">{user?.name}</span>
                 <span className="block text-[10px] leading-tight text-muted-foreground">
@@ -396,7 +398,7 @@ export function Header() {
           </div> */}
           <div className="mt-5 p-5 pt-4">
             <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-2 shadow-sm">
-              <Initials name={user?.name ?? "?"} className="h-9 w-9 text-[11px]" />
+              <AccountAvatar name={user?.name ?? "?"} photoUrl={photoUrl} className="h-9 w-9 text-[11px]" />
               <Link
                 to={profilePath}
                 onClick={() => setSidebarOpen(false)}

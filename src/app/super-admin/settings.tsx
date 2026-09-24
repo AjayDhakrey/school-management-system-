@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
-import { AppearanceSettings } from "@/components/shared/AppearanceSettings";
 import { SignOutCard } from "@/components/shared/SignOutCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +33,6 @@ export default function PlatformSettingsPage() {
         breadcrumb={["Dashboard", "Platform Settings"]}
       />
 
-      <AppearanceSettings />
 
       <SectionCard
         title="Platform Identity"

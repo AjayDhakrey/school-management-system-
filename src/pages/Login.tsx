@@ -43,7 +43,7 @@ export default function Login() {
   return (
     <div className="relative grid min-h-screen place-items-center overflow-hidden bg-[#eef1f6] p-4 [perspective:1800px]">
       {/* ambient depth blobs */}
-      <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#0E5EF9]/25 blur-3xl" />
+      <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#5F9AF8]/25 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-28 -right-16 h-80 w-80 rounded-full bg-[#5F9AF8]/25 blur-3xl" />
       <div className="pointer-events-none absolute bottom-10 left-10 h-40 w-40 rounded-full bg-white/60 blur-2xl" />
 
@@ -51,12 +51,12 @@ export default function Login() {
         className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white [transform:rotateX(2deg)_rotateY(-3deg)] transition-transform duration-500 hover:[transform:rotateX(0deg)_rotateY(0deg)] md:h-[520px] md:flex-row"
         style={{
           boxShadow:
-            "0 2px 0 rgba(255,255,255,0.9) inset, 0 45px 80px -25px rgba(14,94,249,0.45), 0 15px 30px -10px rgba(20,30,60,0.25)",
+            "0 2px 0 rgba(255,255,255,0.9) inset, 0 45px 80px -25px rgba(95,154,248,0.45), 0 15px 30px -10px rgba(20,30,60,0.25)",
         }}
       >
         {/* Brand / left panel */}
         <div
-          className="relative flex shrink-0 flex-col justify-center overflow-hidden bg-gradient-to-br from-[#3f7dfb] via-[#0E5EF9] to-[#0a3fb3] px-7 py-7 text-white md:w-[46%] md:justify-between md:px-10 md:py-10 md:pb-10 md:pt-10 md:rounded-r-[160px]"
+          className="relative flex shrink-0 flex-col justify-center overflow-hidden bg-gradient-to-br from-[#8FB8FB] via-[#5F9AF8] to-[#2F5FC4] px-7 py-7 text-white md:w-[46%] md:justify-between md:px-10 md:py-10 md:pb-10 md:pt-10 md:rounded-r-[160px]"
           style={{ boxShadow: "inset -12px -12px 30px rgba(0,0,0,0.18), inset 8px 8px 20px rgba(255,255,255,0.25)" }}
         >
           {/* glossy highlight */}
@@ -105,7 +105,7 @@ export default function Login() {
 
         {/* Form / right panel */}
         <div className="flex flex-1 flex-col justify-center px-6 py-5 md:px-14 md:py-8">
-          <h2 className="text-center text-[20px] font-extrabold text-[#0E5EF9] md:text-left md:text-[26px]">welcome</h2>
+          <h2 className="text-center text-[20px] font-extrabold text-[#5F9AF8] md:text-left md:text-[26px]">welcome</h2>
           <p className="mt-1 text-center text-[12px] text-gray-400 md:text-left md:text-[13px]">
             Login in to your account to continue
           </p>
@@ -125,7 +125,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="User id"
-                className="w-full rounded-full border-0 bg-[#eef2f9] py-2.5 pl-11 pr-5 text-[13px] text-[#1c1c28] placeholder:text-[#7fa8dd] focus:outline-none focus:ring-2 focus:ring-[#0E5EF9]/40 md:py-3"
+                className="w-full rounded-full border-0 bg-[#eef2f9] py-2.5 pl-11 pr-5 text-[13px] text-[#1c1c28] placeholder:text-[#7fa8dd] focus:outline-none focus:ring-2 focus:ring-[#5F9AF8]/40 md:py-3"
                 style={{ boxShadow: "inset 4px 4px 8px rgba(163,177,198,0.45), inset -4px -4px 8px rgba(255,255,255,0.9)" }}
               />
             </div>
@@ -144,13 +144,13 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                className="w-full rounded-full border-0 bg-[#eef2f9] py-2.5 pl-11 pr-11 text-[13px] text-[#1c1c28] placeholder:text-[#7fa8dd] focus:outline-none focus:ring-2 focus:ring-[#0E5EF9]/40 md:py-3"
+                className="w-full rounded-full border-0 bg-[#eef2f9] py-2.5 pl-11 pr-11 text-[13px] text-[#1c1c28] placeholder:text-[#7fa8dd] focus:outline-none focus:ring-2 focus:ring-[#5F9AF8]/40 md:py-3"
                 style={{ boxShadow: "inset 4px 4px 8px rgba(163,177,198,0.45), inset -4px -4px 8px rgba(255,255,255,0.9)" }}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7fa8dd] hover:text-[#0E5EF9]"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7fa8dd] hover:text-[#5F9AF8]"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -160,7 +160,7 @@ export default function Login() {
             {error && <p className="text-center text-[11px] font-medium text-destructive md:text-left">{error}</p>}
 
             <p className="text-center text-[12px] text-gray-500 md:text-left">
-              <a href="#" className="hover:text-[#0E5EF9]">
+              <a href="#" className="hover:text-[#5F9AF8]">
                 Forgot your password?
               </a>
             </p>
@@ -169,8 +169,8 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex w-40 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#3f7dfb] to-[#0E5EF9] py-2 text-[13px] font-semibold tracking-wide text-white transition-all duration-150 hover:brightness-105 active:translate-y-[2px] disabled:opacity-60 md:py-2.5"
-                style={{ boxShadow: "0 10px 20px rgba(14,94,249,0.4), inset 0 2px 3px rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.15)" }}
+                className="flex w-40 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8FB8FB] to-[#5F9AF8] py-2 text-[13px] font-semibold tracking-wide text-white transition-all duration-150 hover:brightness-105 active:translate-y-[2px] disabled:opacity-60 md:py-2.5"
+                style={{ boxShadow: "0 10px 20px rgba(95,154,248,0.4), inset 0 2px 3px rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.15)" }}
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "LOG IN"}
               </button>

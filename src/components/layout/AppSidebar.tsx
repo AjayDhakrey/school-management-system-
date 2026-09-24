@@ -6,7 +6,8 @@ import { useAuth, toDisplayRole } from "@/lib/auth-context";
 import { navForRole, PROFILE_PATH_FOR_ROLE } from "@/lib/navigation";
 import { useSchoolBranding } from "@/hooks/use-school-branding";
 import { cn } from "@/lib/utils";
-import { Initials } from "@/components/shared/ui-kit";
+import { AccountAvatar } from "@/components/shared/AccountAvatar";
+import { useMyPhotoUrl } from "@/hooks/useMyPhotoUrl";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -167,6 +168,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const role = toDisplayRole(user);
   const profilePath = PROFILE_PATH_FOR_ROLE[role] ?? "/settings";
+  const photoUrl = useMyPhotoUrl();
 
   function handleSignOut() {
     logout();
@@ -185,7 +187,11 @@ export function AppSidebar() {
       {!collapsed && (
         <div className="mt-2 p-3 pt-2">
           <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-2 shadow-sm">
-            <Initials name={user?.name ?? "?"} className="h-9 w-9 text-[11px]" />
+            <AccountAvatar
+              name={user?.name ?? "?"}
+              photoUrl={photoUrl}
+              className="h-9 w-9 text-[11px]"
+            />
             <Link to={profilePath} className="min-w-0 flex-1">
               <span className="block truncate text-xs font-semibold text-foreground">
                 {user?.name}

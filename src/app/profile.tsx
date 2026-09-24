@@ -6,7 +6,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Mail, Phone, MapPin, Droplet, Cake } from "lucide-react";
 import { PageHeader, Initials, EmptyState } from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
-import { AppearanceSettings } from "@/components/shared/AppearanceSettings";
+import { ProfileHero } from "@/components/shared/ProfileHero";
+import { PhotoField } from "@/components/shared/PhotoField";
 import { SignOutCard } from "@/components/shared/SignOutCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -64,26 +65,27 @@ export default function ProfilePage() {
         breadcrumb={["Dashboard", "My Profile"]}
       />
 
-      <div className="panel mb-4 p-4 sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <Initials name={student.name} className="h-16 w-16 text-lg" />
-          <div className="min-w-0 flex-1">
-            <h2 className="font-display text-lg font-bold">{student.name}</h2>
-            <p className="text-xs text-muted-foreground">
+      <ProfileHero
+        name={student.name}
+        photoUrl={photoUrl}
+        onPhotoChange={setPhotoUrl}
+        lines={
+          <>
+            <p className="mt-0.5 text-xs text-white/80">
               {student.id} · {student.admission_no ?? "—"}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-xs text-white/80">
               {student.class_name} - {student.section} · Roll #{student.roll}
             </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <StatusBadge status={student.status ?? "Active"} />
-              <StatusBadge status={student.fee_status ?? "Pending"} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <AppearanceSettings />
+          </>
+        }
+        badges={
+          <>
+            <StatusBadge status={student.status ?? "Active"} />
+            <StatusBadge status={student.fee_status ?? "Pending"} />
+          </>
+        }
+      />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <SectionCard
@@ -147,15 +149,12 @@ export default function ProfilePage() {
                 placeholder="O+"
               />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="p-photo">Photo URL</Label>
-              <Input
-                id="p-photo"
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-                placeholder="https://…"
-              />
-            </div>
+            <PhotoField
+              id="p-photo"
+              name={student.name}
+              photoUrl={photoUrl}
+              onPhotoChange={setPhotoUrl}
+            />
             <Button type="submit" disabled={submitting} className="mt-1">
               Save Changes
             </Button>

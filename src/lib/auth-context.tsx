@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "./api";
 import type { Role } from "./app-context";
 import { supabase } from "./supabase";
@@ -99,6 +100,11 @@ async function loadProfile(userId: string): Promise<AuthUser> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  // Every cached query result (students, fees, transport, ...) is keyed generically, not per
+  // user/school — without clearing it here, switching accounts in the same tab (or even just
+  // logging out and back in) could briefly render the previous session's cached data, or a
+  // stale query that now 403s under the new role's RLS. Always start the next session clean.
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let active = true;
@@ -117,24 +123,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     void restoreSession();
     const { data: listener } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT" && active) setUser(null);
+      if (event === "SIGNED_OUT" && active) {
+        setUser(null);
+        queryClient.clear();
+      }
     });
     return () => {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [queryClient]);
 
   const login = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) throw new ApiError(401, error?.message ?? "Unable to sign in", error);
     const profile = await loadProfile(data.user.id);
+    queryClient.clear();
     setUser(profile);
     return profile;
   };
 
   const logout = () => {
     setUser(null);
+    queryClient.clear();
     void supabase.auth.signOut();
   };
 

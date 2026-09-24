@@ -1,6 +1,6 @@
 import { type ComponentType } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AiFillHome, AiOutlineHome, AiOutlineSchedule } from "react-icons/ai";
+import { AiFillHome, AiOutlineBell, AiOutlineHome, AiOutlineSchedule } from "react-icons/ai";
 import {
   HiNewspaper,
   HiOutlineNewspaper,
@@ -9,6 +9,7 @@ import {
 } from "react-icons/hi2";
 import { PiCalendarDotsDuotone, PiCalendarDotsFill } from "react-icons/pi";
 import { FaChalkboardUser } from "react-icons/fa6";
+import { GoTools } from "react-icons/go";
 import {
   IoBook,
   IoBookOutline,
@@ -16,6 +17,8 @@ import {
   IoBusOutline,
   IoBusiness,
   IoBusinessOutline,
+  IoCash,
+  IoCashOutline,
   IoGrid,
   IoGridOutline,
   IoLibrary,
@@ -47,6 +50,9 @@ type DockItem = {
   /** Path prefixes that count as "inside" this item. */
   match: string[];
   badge?: number;
+  /** When true, only an exact pathname match counts — sub-routes with their own tab
+   *  (e.g. /transport/maintenance) should not also light up a broader /transport tab. */
+  exact?: boolean;
 };
 
 const EXAM_PATHS = ["/examinations", "/results"];
@@ -116,6 +122,7 @@ const WORKSPACE: Record<Role, DockItem> = {
     icon: IoBusOutline,
     activeIcon: IoBus,
     match: ["/transport"],
+    exact: true,
   },
 };
 
@@ -214,7 +221,15 @@ export function MobileBottomNav() {
                   activeIcon: AiOutlineSchedule,
                   match: ["/parent/children/attendance"],
                 }
-              : (ROUTE_ROLES["/notifications"] ?? []).includes(role)
+              : role === "Transport Manager"
+                ? {
+                    label: "Complaints",
+                    to: "/transport/complaints",
+                    icon: AiOutlineBell,
+                    activeIcon: AiOutlineBell,
+                    match: ["/transport/complaints"],
+                  }
+                : (ROUTE_ROLES["/notifications"] ?? []).includes(role)
                 ? {
                     label: "Alerts",
                     to: "/notifications",
@@ -247,8 +262,8 @@ export function MobileBottomNav() {
   };
 
   // Students get their fees in the centre slot, Teachers get their classes, School Admins
-  // get attendance, Parents get fee payment; every other role keeps the menu button there.
-  // The sidebar stays reachable for them from the header's hamburger.
+  // get attendance, Parents get fee payment, Accountants get payroll; every other role keeps
+  // the menu button there. The sidebar stays reachable for them from the header's hamburger.
   const centre: DockItem | null =
     role === "Student"
       ? {
@@ -282,12 +297,28 @@ export function MobileBottomNav() {
                 activeIcon: IoWallet,
                 match: ["/parent/fees/pay", "/parent/fees/details", "/parent/fees/history"],
               }
-            : null;
+            : role === "Accountant"
+              ? {
+                  label: "Payroll",
+                  to: "/payroll",
+                  icon: IoCashOutline,
+                  activeIcon: IoCash,
+                  match: ["/payroll"],
+                }
+              : role === "Transport Manager"
+                ? {
+                    label: "Maintenance",
+                    to: "/transport/maintenance",
+                    icon: GoTools,
+                    activeIcon: GoTools,
+                    match: ["/transport/maintenance"],
+                  }
+                : null;
 
   const left = [home, WORKSPACE[role]];
   const right = [alerts, profile];
   const renderItem = (item: DockItem) => {
-    const active = isWithin(pathname, item.match);
+    const active = item.exact ? pathname === item.to : isWithin(pathname, item.match);
     return (
       <li key={item.to} className="flex items-center justify-center">
         <Link to={item.to} aria-current={active ? "page" : undefined} className={TILE_CLASS}>

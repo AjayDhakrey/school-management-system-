@@ -40,9 +40,12 @@ const TABLES: Record<string, string> = {
   events: "events",
   examinations: "examinations",
   exams: "exams",
+  expenses: "expenses",
+  "expense-categories": "expense_categories",
   "fee-structures": "fee_structures",
   fees: "fees",
   holidays: "holidays",
+  invoices: "invoices",
   homework: "homework",
   "homework-submissions": "homework_submissions",
   leads: "leads",
@@ -65,7 +68,13 @@ const TABLES: Record<string, string> = {
   "teacher-attendance": "teacher_attendance",
   timetable: "timetable_slots",
   transport: "vehicles",
+  "transport-drivers": "transport_drivers",
+  "transport-attendants": "transport_attendants",
+  "transport-attendance": "transport_attendance",
+  "transport-maintenance": "transport_maintenance",
+  "transport-complaints": "transport_complaints",
   users: "user_profiles",
+  vendors: "vendors",
 };
 
 // Rows the platform (not a school) owns; POSTs to these never get a school_id.
@@ -1109,31 +1118,32 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
     }
 
     case "fees": {
+      // Every receipt is just its fee_payments row (receipt_no lives inline there — a
+      // school issues one receipt per payment, so a separate receipts table would only
+      // duplicate the same row). `/fees/receipts` is the full ledger; `/fees/:id/payments`
+      // is one bill's own payment history.
       if (second === "receipts") {
-        if (third) return selectOne("fee_receipts", third);
+        if (third) return selectOne("fee_payments", third);
         return selectAll(() => {
-          let query = supabase.from("fee_receipts").select("*");
+          let query = supabase.from("fee_payments").select("*");
           const studentId = param("studentId");
           if (studentId) query = query.eq("student_id", studentId);
           return query
-            .order("payment_date", { ascending: false })
+            .order("paid_on", { ascending: false })
             .order("created_at", { ascending: false })
             .order("id");
         });
       }
       if (second && third === "payments") {
         await selectOne("fees", second, "id");
-        const rows = await selectAll(() =>
+        return selectAll(() =>
           supabase
             .from("fee_payments")
-            .select("*,fee_receipts(id,receipt_no)")
+            .select("*")
             .eq("fee_id", second)
-            .order("payment_date")
+            .order("paid_on")
             .order("created_at")
             .order("id"),
-        );
-        return rows.map((row) =>
-          flatten(row, "fee_receipts", { id: "receipt_id", receipt_no: "receipt_no" }),
         );
       }
       const today = new Date().toISOString().slice(0, 10);
@@ -1178,6 +1188,66 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
       const status = param("status");
       return rows.map(shape).filter((row) => !status || row["calculated_status"] === status);
     }
+
+    case "fee-refunds":
+      if (second) return selectOne("fee_refunds", second);
+      return selectAll(() => {
+        let query = supabase.from("fee_refunds").select("*");
+        const feePaymentId = param("feePaymentId");
+        if (feePaymentId) query = query.eq("fee_payment_id", feePaymentId);
+        return query.order("refunded_on", { ascending: false }).order("id");
+      });
+
+    case "expenses": {
+      if (second) return selectOne("expenses", second);
+      return selectAll(() => {
+        let query = supabase.from("expenses").select("*");
+        const categoryId = param("categoryId");
+        const vendorId = param("vendorId");
+        if (categoryId) query = query.eq("category_id", categoryId);
+        if (vendorId) query = query.eq("vendor_id", vendorId);
+        return query.order("expense_date", { ascending: false }).order("id");
+      });
+    }
+
+    case "expense-categories":
+      if (second) return selectOne("expense_categories", second);
+      return selectAll(() => supabase.from("expense_categories").select("*").order("name"));
+
+    case "vendors":
+      if (second) return selectOne("vendors", second);
+      return selectAll(() => supabase.from("vendors").select("*").order("name"));
+
+    case "invoices":
+      if (second) return selectOne("invoices", second);
+      return selectAll(() =>
+        supabase.from("invoices").select("*").order("due_date", { nullsFirst: false }).order("id"),
+      );
+
+    case "financial-settings": {
+      const current = await profile();
+      const { data, error } = await supabase
+        .from("school_financial_settings")
+        .select("*")
+        .eq("school_id", current.school_id)
+        .maybeSingle();
+      if (error) fail(error);
+      return (
+        data ?? {
+          school_id: current.school_id,
+          accepted_payment_methods: ["Cash", "UPI", "Card", "Bank Transfer", "Cheque", "Online"],
+        }
+      );
+    }
+
+    case "financial-audit":
+      return selectAll(() =>
+        supabase
+          .from("audit_logs")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      );
 
     case "homework": {
       const current = await profile();
@@ -1409,6 +1479,51 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
         occupied: occupied.get(String(vehicle["id"])) ?? 0,
       }));
     }
+
+    case "transport-drivers":
+      if (second) return selectOne("transport_drivers", second);
+      return selectAll(() =>
+        supabase.from("transport_drivers").select("*").order("name").order("id"),
+      );
+
+    case "transport-attendants":
+      if (second) return selectOne("transport_attendants", second);
+      return selectAll(() =>
+        supabase.from("transport_attendants").select("*").order("name").order("id"),
+      );
+
+    case "transport-attendance": {
+      const date = param("date");
+      const vehicleId = param("vehicleId");
+      const studentId = param("studentId");
+      return selectAll(() => {
+        let query = supabase.from("transport_attendance").select("*");
+        if (date) query = query.eq("date", date);
+        if (vehicleId) query = query.eq("vehicle_id", vehicleId);
+        if (studentId) query = query.eq("student_id", studentId);
+        return query.order("date", { ascending: false }).order("id");
+      });
+    }
+
+    case "transport-maintenance": {
+      if (second) return selectOne("transport_maintenance", second);
+      const vehicleId = param("vehicleId");
+      return selectAll(() => {
+        let query = supabase.from("transport_maintenance").select("*");
+        if (vehicleId) query = query.eq("vehicle_id", vehicleId);
+        return query.order("service_date", { ascending: false }).order("id");
+      });
+    }
+
+    case "transport-complaints":
+      if (second) return selectOne("transport_complaints", second);
+      return selectAll(() =>
+        supabase
+          .from("transport_complaints")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .order("id"),
+      );
 
     case "admissions": {
       if (second) {
@@ -1802,6 +1917,45 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
       }
       break;
 
+    case "fee-refunds":
+      if (method === "POST" && second === "issue") {
+        return rpc("issue_fee_refund", {
+          p_fee_payment_id: body["feePaymentId"],
+          p_amount: body["amount"],
+          p_reason: body["reason"],
+        });
+      }
+      break;
+
+    case "financial-settings": {
+      if (method === "PATCH" || (method === "POST" && !second)) {
+        const current = await profile();
+        const input = values();
+        const methods = Array.isArray(input["accepted_payment_methods"])
+          ? input["accepted_payment_methods"]
+          : undefined;
+        if (!methods || methods.length === 0) {
+          throw new ApiError(400, "At least one payment method must stay enabled");
+        }
+        const { data, error } = await supabase
+          .from("school_financial_settings")
+          .upsert(
+            {
+              school_id: current.school_id,
+              accepted_payment_methods: methods,
+              updated_by: current.id,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "school_id" },
+          )
+          .select()
+          .single();
+        if (error) fail(error);
+        return data;
+      }
+      break;
+    }
+
     case "salary-structures": {
       if (method === "POST") {
         const current = await profile();
@@ -2103,7 +2257,7 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
           resource === "teachers" ? current.linked_teacher_id : current.linked_staff_id;
         if (!linked)
           throw new ApiError(403, resource === "teachers" ? "Teachers only" : "Staff only");
-        const update = pick(values(), resource === "teachers" ? ["phone", "photo_url"] : ["phone"]);
+        const update = pick(values(), ["phone", "photo_url"]);
         if (!Object.keys(update).length) throw new ApiError(400, "No valid fields to update");
         return updateRow(resource, linked, blanksToNull(update));
       }
@@ -2145,6 +2299,136 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
       const result = await mutateAdmission(method, parts, body);
       if (result !== undefined) return result;
       break;
+    }
+
+    case "transport-drivers":
+    case "transport-attendants": {
+      const table = resource === "transport-drivers" ? "transport_drivers" : "transport_attendants";
+      if (method === "DELETE" && second) {
+        const { data: existing } = await supabase
+          .from(table)
+          .select("assigned_vehicle_id")
+          .eq("id", second)
+          .maybeSingle();
+        const { data, error } = await supabase.from(table).delete().eq("id", second).select("id");
+        if (error) fail(error);
+        if (!data?.length) {
+          throw new ApiError(404, "Record not found or you do not have permission to delete it");
+        }
+        if (table === "transport_drivers" && existing?.assigned_vehicle_id) {
+          await syncVehicleDriverFields(existing.assigned_vehicle_id as string);
+        }
+        return { ok: true };
+      }
+      if (method === "POST" || method === "PATCH") {
+        const input = values();
+        let previousVehicleId: string | null = null;
+        if (method === "PATCH" && second) {
+          const { data: existing } = await supabase
+            .from(table)
+            .select("assigned_vehicle_id")
+            .eq("id", second)
+            .maybeSingle();
+          previousVehicleId = (existing?.assigned_vehicle_id as string | null) ?? null;
+        }
+        const row =
+          method === "POST" ? await insertRow(table, input) : await updateRow(table, second!, input);
+        if (table === "transport_drivers") {
+          const newVehicleId = (row["assigned_vehicle_id"] as string | null) ?? null;
+          if (previousVehicleId && previousVehicleId !== newVehicleId) {
+            await syncVehicleDriverFields(previousVehicleId);
+          }
+          if (newVehicleId) await syncVehicleDriverFields(newVehicleId);
+        }
+        return row;
+      }
+      break;
+    }
+
+    case "transport-attendance": {
+      if (method === "POST" && second === "bulk") {
+        const input = values();
+        const date = str(input["date"]);
+        if (!isDate(date)) throw new ApiError(400, "date must be a valid YYYY-MM-DD calendar date");
+        const entries = Array.isArray(input["entries"]) ? (input["entries"] as Row[]) : [];
+        if (!entries.length) throw new ApiError(400, "entries must be a non-empty array");
+        const current = await profile();
+        const rows = entries.map((entry) => {
+          const studentId = str(entry["student_id"]);
+          if (!studentId) throw new ApiError(400, "Each entry requires a student_id");
+          return {
+            school_id: current.school_id,
+            student_id: studentId,
+            vehicle_id: entry["vehicle_id"] ?? input["vehicle_id"] ?? null,
+            date,
+            boarding_status: entry["boarding_status"] ?? "Not Marked",
+            drop_status: entry["drop_status"] ?? "Not Marked",
+            marked_by: current.id,
+            updated_at: new Date().toISOString(),
+          };
+        });
+        const { data, error } = await supabase
+          .from("transport_attendance")
+          .upsert(rows, { onConflict: "student_id,date" })
+          .select();
+        if (error) fail(error);
+        return data as unknown as Row[];
+      }
+      break;
+    }
+
+    case "transport-complaints": {
+      if (method === "POST" && !second) {
+        const input = values();
+        const current = await profile();
+        const description = str(input["description"]).trim();
+        if (!description) throw new ApiError(400, "A description is required");
+        let studentId: string | null = null;
+        if (current.role === "STUDENT") studentId = current.linked_student_id;
+        else if (current.role === "PARENT") {
+          studentId = str(input["student_id"]) || null;
+          if (!studentId) throw new ApiError(400, "A valid studentId (your own child) is required");
+        } else if (input["student_id"]) {
+          studentId = str(input["student_id"]);
+        }
+        return insertRow("transport_complaints", {
+          raised_by_role: current.role,
+          raised_by_id: current.id,
+          student_id: studentId,
+          vehicle_id: input["vehicle_id"] ?? null,
+          category: input["category"] ?? "Other",
+          description,
+        });
+      }
+      if (method === "PATCH" && second) {
+        const input = values();
+        const status = str(input["status"]);
+        const update: Row = {};
+        if (status) {
+          if (!["Open", "In Progress", "Resolved", "Closed"].includes(status)) {
+            throw new ApiError(400, "status must be one of Open, In Progress, Resolved, Closed");
+          }
+          update["status"] = status;
+          if (status === "Resolved" || status === "Closed") {
+            update["resolved_at"] = new Date().toISOString();
+          }
+        }
+        if (input["resolution_notes"] !== undefined) update["resolution_notes"] = input["resolution_notes"];
+        if (!Object.keys(update).length) throw new ApiError(400, "Nothing to update");
+        return updateRow("transport_complaints", second, update);
+      }
+      break;
+    }
+
+    case "transport-assign": {
+      if (method !== "POST") break;
+      const input = values();
+      return rpc("assign_student_transport", {
+        p_student_id: input["student_id"],
+        p_vehicle_id: input["vehicle_id"] ?? null,
+        p_pickup_point: input["pickup_point"] ?? null,
+        p_drop_point: input["drop_point"] ?? null,
+      });
     }
   }
 
@@ -2220,6 +2504,19 @@ async function updateRow(table: string, id: string, values: Row) {
   if (error) fail(error);
   if (!data) throw new ApiError(404, "Record not found or you do not have permission to change it");
   return data as Row;
+}
+
+// Keeps the legacy vehicles.driver/driver_phone text fields (read directly by the
+// pre-existing Fleet view, VehicleDialog and the parent/student "my transport" pages)
+// accurate whenever a transport_drivers row's vehicle assignment changes, so the new
+// Driver Management screen doesn't require touching any of that existing UI.
+async function syncVehicleDriverFields(vehicleId: string) {
+  const { data } = await supabase
+    .from("transport_drivers")
+    .select("name,phone")
+    .eq("assigned_vehicle_id", vehicleId)
+    .maybeSingle();
+  await updateRow("vehicles", vehicleId, { driver: data?.name ?? null, driver_phone: data?.phone ?? null });
 }
 
 function pick(values: Row, keys: string[]) {

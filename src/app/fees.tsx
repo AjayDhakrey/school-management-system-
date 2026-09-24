@@ -36,7 +36,16 @@ import {
   CreditCard,
   Users,
 } from "lucide-react";
-import { useFees, useStudents, useClasses, useFeeStructures, useSchoolProfile, type ApiFee } from "@/hooks/useApi";
+import {
+  useFees,
+  useStudents,
+  useClasses,
+  useFeeStructures,
+  useSchoolProfile,
+  useFinancialSettings,
+  type ApiFee,
+  type PaymentMethod,
+} from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 import { feeTitle } from "@/lib/fees";
 import { FeeStructureTab } from "@/app/fee-structure";
@@ -44,6 +53,15 @@ import { FeeStructureTab } from "@/app/fee-structure";
 const NONE = "__none__";
 const STATUS_OPTIONS = ["Pending", "Paid", "Overdue", "Partial"];
 const OTHER_FEE = "__other__";
+const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = ["Cash", "UPI", "Card", "Bank Transfer", "Cheque", "Online"];
+
+// The stored `status` column only ever becomes 'Paid'/'Partial' (set when a payment is
+// collected) or stays 'Pending' — nothing ever writes 'Overdue' onto it. The backend already
+// computes the real, date-aware status as `calculated_status`; use that everywhere so overdue
+// dues actually show up instead of silently staying "Pending" forever.
+function effectiveStatus(f: ApiFee) {
+  return f.calculated_status ?? f.status;
+}
 
 function payable(f: ApiFee) {
   return Math.max(0, f.amount - f.discount + f.fine);
@@ -267,11 +285,18 @@ function CollectPaymentDialog({
   const alreadyPaid = fee.paid_amount ?? 0;
   const remaining = Math.max(0, total - alreadyPaid);
 
+  const { data: financialSettings } = useFinancialSettings();
+  const paymentMethods = financialSettings?.accepted_payment_methods ?? DEFAULT_PAYMENT_METHODS;
+
   const [paymentType, setPaymentType] = useState<"full" | "partial">(remaining > 0 ? "full" : "full");
   const [partialAmount, setPartialAmount] = useState("");
   const [paidDate, setPaidDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [receiptNo, setReceiptNo] = useState(() => `RCPT-${Date.now().toString().slice(-6)}`);
+  const [method, setMethod] = useState<PaymentMethod>("Cash");
+  const [reference, setReference] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Stable for the dialog's lifetime: a double-click or retried request reuses the same
+  // key so the backend dedupes it into a single payment instead of collecting it twice.
+  const idempotencyKey = useMemo(() => crypto.randomUUID(), []);
 
   const effectiveAmount = paymentType === "full" ? remaining : Math.min(Number(partialAmount) || 0, remaining);
   const newTotalPaid = alreadyPaid + effectiveAmount;
@@ -288,9 +313,9 @@ function CollectPaymentDialog({
       await api.post(`/fees/${fee.id}/pay`, {
         payAmount: effectiveAmount,
         paymentDate: paidDate,
-        method: "Cash",
-        transactionReference: receiptNo.trim() || null,
-        idempotencyKey: crypto.randomUUID(),
+        method,
+        transactionReference: reference.trim() || null,
+        idempotencyKey,
       });
       const label = willBeFullyPaid ? "full payment" : "partial payment";
       toast.success(`₹${effectiveAmount.toLocaleString()} ${label} recorded for ${studentName}`);
@@ -403,9 +428,32 @@ function CollectPaymentDialog({
             <Input id="paidDate" type="date" min={new Date().toISOString().slice(0, 10)} value={paidDate} onChange={(e) => setPaidDate(e.target.value)} />
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="receiptNo">Receipt Number</Label>
-            <Input id="receiptNo" value={receiptNo} onChange={(e) => setReceiptNo(e.target.value)} />
+            <Label htmlFor="method">Payment Method</Label>
+            <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
+              <SelectTrigger id="method" className="bg-surface">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {paymentMethods.map((m) => (
+                  <SelectItem key={m} value={m}>
+                    {m}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="reference">Transaction / Reference No. (optional)</Label>
+          <Input
+            id="reference"
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            placeholder="UPI ref, cheque no, transaction id…"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            The receipt number is generated automatically once the payment is recorded.
+          </p>
         </div>
 
         {/* Summary */}
@@ -761,12 +809,17 @@ function FeesTable({
   );
 }
 
-export default function Page({ tab = "collection" }: { tab?: "structure" | "collection" | "pending" | "reports" }) {
+export default function Page({
+  tab = "collection",
+}: {
+  tab?: "structure" | "collection" | "pending" | "reports" | "discounts";
+}) {
   const TAB_VALUE: Record<string, string> = {
     structure: "structure",
     collection: "recent",
     pending: "pending",
     reports: "reports",
+    discounts: "discounts",
   };
   const { data: fees, isLoading } = useFees();
   const { data: students } = useStudents();
@@ -834,7 +887,7 @@ export default function Page({ tab = "collection" }: { tab?: "structure" | "coll
   const { rows, pageCount } = usePaged(filtered, page, pageSize);
 
   const pendingOverdue = useMemo(
-    () => filtered.filter((f) => f.status === "Pending" || f.status === "Overdue"),
+    () => filtered.filter((f) => effectiveStatus(f) === "Pending" || effectiveStatus(f) === "Overdue"),
     [filtered],
   );
   const { rows: pendingRows, pageCount: pendingPageCount } = usePaged(pendingOverdue, pendingPage, pageSize);
@@ -853,8 +906,8 @@ export default function Page({ tab = "collection" }: { tab?: "structure" | "coll
   const { rows: recordsRows, pageCount: recordsPageCount } = usePaged(recordsFiltered, recordsPage, recordsPageSize);
 
   const totalCollection = enriched.filter((f) => f.status === "Paid").reduce((s, f) => s + payable(f), 0);
-  const pendingFees = enriched.filter((f) => f.status === "Pending").reduce((s, f) => s + payable(f), 0);
-  const overdueFees = enriched.filter((f) => f.status === "Overdue").reduce((s, f) => s + payable(f), 0);
+  const pendingFees = enriched.filter((f) => effectiveStatus(f) === "Pending").reduce((s, f) => s + payable(f), 0);
+  const overdueFees = enriched.filter((f) => effectiveStatus(f) === "Overdue").reduce((s, f) => s + payable(f), 0);
   const today = new Date().toISOString().slice(0, 10);
   const todayCollection = enriched.filter((f) => f.paid_on === today).reduce((s, f) => s + payable(f), 0);
 
@@ -889,7 +942,7 @@ export default function Page({ tab = "collection" }: { tab?: "structure" | "coll
             <TabsTrigger value="structure">Fee Structure</TabsTrigger>
             <TabsTrigger value="recent">Fee Collection ({enriched.length})</TabsTrigger>
             <TabsTrigger value="pending">
-              Pending Fees ({enriched.filter((f) => f.status === "Pending" || f.status === "Overdue").length})
+              Pending Fees ({enriched.filter((f) => effectiveStatus(f) === "Pending" || effectiveStatus(f) === "Overdue").length})
             </TabsTrigger>
             <TabsTrigger value="reports">Fee Reports</TabsTrigger>
             <TabsTrigger value="records">Student Fee Records ({students?.length ?? 0})</TabsTrigger>

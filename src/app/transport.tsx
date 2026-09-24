@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   Bus,
   Route as RouteIcon,
   Users,
@@ -32,9 +33,11 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -43,8 +46,87 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
-import { useMyTransport, useTransport, useStudents, type ApiVehicle } from "@/hooks/useApi";
+import {
+  useMyTransport,
+  useTransport,
+  useStudents,
+  type ApiVehicle,
+  type TransportComplaintCategory,
+} from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+
+const COMPLAINT_CATEGORIES: TransportComplaintCategory[] = [
+  "Safety",
+  "Delay",
+  "Behavior",
+  "Cleanliness",
+  "Emergency",
+  "Other",
+];
+
+function ReportIssueDialog({ vehicleId, onDone }: { vehicleId?: string; onDone: () => void }) {
+  const [category, setCategory] = useState<TransportComplaintCategory>("Other");
+  const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!description.trim()) {
+      toast.error("Please describe the issue");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await api.post("/transport-complaints", {
+        vehicleId: vehicleId ?? null,
+        category,
+        description: description.trim(),
+      });
+      toast.success("Thanks — your report has been sent to the transport office");
+      setDescription("");
+      onDone();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to send report");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <DialogContent className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>Report a Transport Issue</DialogTitle>
+        <DialogDescription>Let the transport office know about a safety concern, delay or complaint.</DialogDescription>
+      </DialogHeader>
+      <form onSubmit={handleSubmit} className="grid gap-3">
+        <div className="grid gap-1.5">
+          <Label>Category</Label>
+          <Select value={category} onValueChange={(v) => setCategory(v as TransportComplaintCategory)}>
+            <SelectTrigger className="bg-surface">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {COMPLAINT_CATEGORIES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Details</Label>
+          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+        </div>
+        <DialogFooter>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "Sending…" : "Send Report"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
 
 type VehiclePayload = {
   number: string;
@@ -54,6 +136,11 @@ type VehiclePayload = {
   capacity: number;
   status: ApiVehicle["status"];
   stops: { name: string; time: string }[];
+  registrationNo: string | null;
+  vehicleType: string | null;
+  insuranceExpiry: string | null;
+  fitnessExpiry: string | null;
+  pollutionExpiry: string | null;
 };
 
 export default function Page() {
@@ -64,6 +151,7 @@ export default function Page() {
 
 function StudentTransportView() {
   const { data: assignment, isLoading } = useMyTransport();
+  const [reportOpen, setReportOpen] = useState(false);
 
   return (
     <div>
@@ -71,6 +159,18 @@ function StudentTransportView() {
         title="Transport"
         description="Your assigned bus and route details."
         breadcrumb={["Dashboard", "Transport"]}
+        actions={
+          assignment ? (
+            <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <AlertTriangle className="h-3.5 w-3.5" /> Report Issue
+                </Button>
+              </DialogTrigger>
+              <ReportIssueDialog vehicleId={assignment.id} onDone={() => setReportOpen(false)} />
+            </Dialog>
+          ) : undefined
+        }
       />
 
       {isLoading ? (
@@ -470,6 +570,11 @@ function VehicleDialog({
   const [capacity, setCapacity] = useState(vehicle?.capacity ?? 40);
   const [status, setStatus] = useState<ApiVehicle["status"]>(vehicle?.status ?? "Idle");
   const [stops, setStops] = useState<ApiVehicle["stops"]>(vehicle?.stops ?? []);
+  const [registrationNo, setRegistrationNo] = useState(vehicle?.registration_no ?? "");
+  const [vehicleType, setVehicleType] = useState(vehicle?.vehicle_type ?? "");
+  const [insuranceExpiry, setInsuranceExpiry] = useState(vehicle?.insurance_expiry ?? "");
+  const [fitnessExpiry, setFitnessExpiry] = useState(vehicle?.fitness_expiry ?? "");
+  const [pollutionExpiry, setPollutionExpiry] = useState(vehicle?.pollution_expiry ?? "");
   const [saving, setSaving] = useState(false);
 
   function addStop() {
@@ -494,6 +599,11 @@ function VehicleDialog({
         capacity,
         status,
         stops: stops.filter((s) => s.name.trim()),
+        registrationNo: registrationNo.trim() || null,
+        vehicleType: vehicleType.trim() || null,
+        insuranceExpiry: insuranceExpiry || null,
+        fitnessExpiry: fitnessExpiry || null,
+        pollutionExpiry: pollutionExpiry || null,
       });
       onOpenChange(false);
     } catch (err) {
@@ -574,6 +684,34 @@ function VehicleDialog({
                   <SelectItem value="Maintenance">Maintenance</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5 rounded-xl border border-border p-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase">
+              Registration & Documents
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label>Registration No.</Label>
+                <Input value={registrationNo} onChange={(e) => setRegistrationNo(e.target.value)} placeholder="RC number" />
+              </div>
+              <div className="space-y-1">
+                <Label>Vehicle Type</Label>
+                <Input value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} placeholder="Bus, Van, Car…" />
+              </div>
+              <div className="space-y-1">
+                <Label>Insurance Expiry</Label>
+                <Input type="date" value={insuranceExpiry ?? ""} onChange={(e) => setInsuranceExpiry(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Fitness Cert. Expiry</Label>
+                <Input type="date" value={fitnessExpiry ?? ""} onChange={(e) => setFitnessExpiry(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Pollution Cert. Expiry</Label>
+                <Input type="date" value={pollutionExpiry ?? ""} onChange={(e) => setPollutionExpiry(e.target.value)} />
+              </div>
             </div>
           </div>
 

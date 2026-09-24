@@ -34,6 +34,7 @@ import {
   Clock,
   UserSquare2,
   BadgeIndianRupee,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { Role } from "./app-context";
@@ -74,6 +75,12 @@ export const NAV: NavGroup[] = [
       { label: "Dashboard", to: "/", icon: LayoutDashboard, roles: ALL },
       { label: "My Profile", to: "/profile", icon: UserCircle, roles: ["Student"] },
       { label: "My Profile", to: "/teacher/profile", icon: UserCircle, roles: ["Teacher"] },
+      {
+        label: "My Profile",
+        to: "/staff/profile",
+        icon: UserCircle,
+        roles: ["Staff", "Accountant", "Librarian", "Transport Manager"],
+      },
     ],
   },
   {
@@ -175,7 +182,7 @@ export const NAV: NavGroup[] = [
         to: "/leave/staff",
         icon: PlaneTakeoff,
         roles: [...admins, "Staff", "Accountant", "Librarian", "Transport Manager"],
-        hideFromSidebar: ["School Admin"],
+        hideFromSidebar: ["School Admin", "Transport Manager"],
       },
       {
         label: "My Attendance",
@@ -272,24 +279,18 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Fees & Finance",
+    label: "Fees",
     items: [
       {
-        label: "Payroll Management",
-        to: "/payroll",
-        icon: BadgeIndianRupee,
-        roles: [...admins, "Accountant"],
-      },
-      {
-        label: "Fee Structure",
-        to: "/fees/structure",
+        label: "Fee Collection",
+        to: "/fees/collection",
         icon: Wallet,
         roles: [...admins, "Accountant"],
         hideFromSidebar: ["School Admin"],
       },
       {
-        label: "Fee Collection",
-        to: "/fees/collection",
+        label: "Fee Structure",
+        to: "/fees/structure",
         icon: Wallet,
         roles: [...admins, "Accountant"],
         hideFromSidebar: ["School Admin"],
@@ -302,13 +303,175 @@ export const NAV: NavGroup[] = [
         hideFromSidebar: ["School Admin"],
       },
       {
-        label: "Fee Reports",
-        to: "/fees/reports",
+        label: "Overdue Fees",
+        // Same page as Pending Fees — that tab already lists both Pending and
+        // Overdue dues with a Status filter, so this isn't a second data view,
+        // just a direct shortcut into it pre-filtered by intent.
+        to: "/fees/pending",
         icon: Wallet,
         roles: [...admins, "Accountant"],
         hideFromSidebar: ["School Admin"],
       },
+      {
+        label: "Discounts & Concessions",
+        // The Fees page's own "Discounts & Scholarships" tab — reused, not duplicated.
+        to: "/fees/discounts",
+        icon: Wallet,
+        roles: [...admins, "Accountant"],
+        hideFromSidebar: ["School Admin"],
+      },
+      {
+        label: "Refunds",
+        to: "/payments/refunds",
+        icon: RefreshCw,
+        roles: [...admins, "Accountant"],
+      },
       { label: "Fees", to: "/my-fees", icon: Wallet, roles: ["Student"] },
+    ],
+  },
+  {
+    label: "Payments",
+    items: [
+      {
+        label: "Transactions",
+        to: "/payments/transactions",
+        icon: CreditCard,
+        roles: [...admins, "Accountant"],
+      },
+      {
+        label: "Payment History",
+        // Same ledger as Transactions, viewed the same way — an accountant's
+        // "payment history" and "transactions" are the same table, not two
+        // separate features.
+        to: "/payments/transactions",
+        icon: CreditCard,
+        roles: [...admins, "Accountant"],
+      },
+      {
+        label: "Receipts",
+        to: "/payments/transactions",
+        icon: FileCheck2,
+        roles: [...admins, "Accountant"],
+      },
+    ],
+  },
+  {
+    label: "Expenses",
+    items: [
+      {
+        label: "Expenses",
+        to: "/expenses",
+        icon: IndianRupee,
+        roles: [...admins, "Accountant"],
+      },
+      {
+        label: "Expense Categories",
+        to: "/expenses/categories",
+        icon: Layers,
+        roles: [...admins, "Accountant"],
+      },
+      {
+        label: "Vendors",
+        to: "/expenses/vendors",
+        icon: Building2,
+        roles: [...admins, "Accountant"],
+      },
+    ],
+  },
+  {
+    label: "Payroll",
+    items: [
+      { label: "Salary", to: "/payroll", icon: BadgeIndianRupee, roles: [...admins, "Accountant"] },
+      {
+        label: "Salary Payments",
+        // The Payroll page's own review -> approve -> pay lifecycle IS salary
+        // payments; not a separate screen.
+        to: "/payroll",
+        icon: BadgeIndianRupee,
+        roles: [...admins, "Accountant"],
+      },
+      {
+        label: "Payslips",
+        // Each payroll row's "View payslip" action opens the same breakdown.
+        to: "/payroll",
+        icon: BadgeIndianRupee,
+        roles: [...admins, "Accountant"],
+      },
+    ],
+  },
+  {
+    label: "Invoices",
+    items: [
+      { label: "Invoices", to: "/invoices", icon: FileText, roles: [...admins, "Accountant"] },
+    ],
+  },
+  {
+    label: "Reports",
+    items: [
+      {
+        label: "Financial Reports",
+        to: "/financial-reports",
+        icon: FileSpreadsheet,
+        roles: [...admins, "Accountant"],
+      },
+    ],
+  },
+  {
+    label: "Settings",
+    items: [
+      {
+        label: "Financial Settings",
+        to: "/financial-settings",
+        icon: Settings,
+        roles: [...admins, "Accountant"],
+      },
+    ],
+  },
+  {
+    label: "Transport Manager",
+    items: [
+      {
+        label: "Drivers & Attendants",
+        to: "/transport/drivers",
+        icon: UserSquare2,
+        roles: [...admins, "Transport Manager"],
+      },
+      {
+        label: "Student Transport",
+        to: "/transport/students",
+        icon: Users,
+        roles: [...admins, "Transport Manager"],
+      },
+      {
+        label: "Transport Attendance",
+        to: "/transport/attendance",
+        icon: ClipboardCheck,
+        roles: [...admins, "Transport Manager"],
+      },
+      {
+        label: "Maintenance",
+        to: "/transport/maintenance",
+        icon: Wrench,
+        roles: [...admins, "Transport Manager"],
+      },
+      {
+        label: "Complaints & Safety",
+        to: "/transport/complaints",
+        icon: ShieldCheck,
+        roles: [...admins, "Transport Manager"],
+      },
+      {
+        label: "Transport Fees",
+        to: "/transport/fees",
+        icon: IndianRupee,
+        roles: [...admins, "Transport Manager"],
+      },
+      {
+        label: "Transport Reports",
+        to: "/transport/reports",
+        icon: FileText,
+        roles: [...admins, "Transport Manager"],
+      },
     ],
   },
   {
@@ -341,6 +504,7 @@ export const NAV: NavGroup[] = [
           "Accountant",
           "Transport Manager",
         ],
+        hideFromSidebar: ["Transport Manager"],
       },
       {
         label: "Transport",
@@ -361,7 +525,13 @@ export const NAV: NavGroup[] = [
         roles: [...admins, "Teacher"],
         hideFromSidebar: ["Teacher"],
       },
-      { label: "Events", to: "/events", icon: CalendarDays, roles: ALL_SCHOOL },
+      {
+        label: "Events",
+        to: "/events",
+        icon: CalendarDays,
+        roles: ALL_SCHOOL,
+        hideFromSidebar: ["Transport Manager"],
+      },
     ],
   },
   {
@@ -548,6 +718,10 @@ export const PROFILE_PATH_FOR_ROLE: Partial<Record<Role, string>> = {
   Teacher: "/teacher/profile",
   Parent: "/parent/children/profile",
   "Super Admin": "/super-admin/settings",
+  Staff: "/staff/profile",
+  Accountant: "/staff/profile",
+  Librarian: "/staff/profile",
+  "Transport Manager": "/staff/profile",
 };
 
 export const SETTINGS_PATH_FOR_ROLE: Partial<Record<Role, string>> = {

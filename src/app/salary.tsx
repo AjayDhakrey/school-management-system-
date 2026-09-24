@@ -157,7 +157,7 @@ const payroll: SalaryRow[] = [
 
 const money = (value: number) => `₹${value.toLocaleString("en-IN")}`;
 
-function StatusPill({ status }: { status: PayrollStatus }) {
+function StatusPill({ status, className }: { status: PayrollStatus; className?: string }) {
   return (
     <Badge
       variant="outline"
@@ -166,6 +166,7 @@ function StatusPill({ status }: { status: PayrollStatus }) {
         status === "Paid" && "bg-success-soft text-success",
         status === "Ready" && "bg-info-soft text-info",
         status === "On hold" && "bg-warning-soft text-warning",
+        className,
       )}
     >
       {status}

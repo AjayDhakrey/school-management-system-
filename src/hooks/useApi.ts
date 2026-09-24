@@ -69,6 +69,7 @@ export interface ApiStaff {
   designation: string | null;
   email: string | null;
   phone: string | null;
+  photo_url: string | null;
   employment_status: string;
   employee_id: string | null;
   joining_date: string | null;
@@ -273,6 +274,98 @@ export interface ApiFeeStructure {
   due_date?: string | null;
   status?: string;
   description?: string | null;
+}
+
+export type PaymentMethod = "Cash" | "UPI" | "Card" | "Bank Transfer" | "Cheque" | "Online";
+
+export interface ApiFeePayment {
+  id: string;
+  school_id: string;
+  fee_id: string;
+  student_id: string;
+  amount: number;
+  method: PaymentMethod;
+  transaction_reference: string | null;
+  receipt_no: string;
+  collected_by: string | null;
+  collected_by_name: string | null;
+  paid_on: string;
+  refunded_amount: number;
+  status: "Completed" | "Partially Refunded" | "Refunded";
+  created_at: string;
+}
+
+export interface ApiFeeRefund {
+  id: string;
+  school_id: string;
+  fee_payment_id: string;
+  amount: number;
+  reason: string;
+  refunded_by: string | null;
+  refunded_by_name: string | null;
+  refunded_on: string;
+}
+
+export interface ApiExpenseCategory {
+  id: string;
+  school_id: string;
+  name: string;
+}
+
+export interface ApiVendor {
+  id: string;
+  school_id: string;
+  name: string;
+  contact_person: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  status: "Active" | "Inactive";
+}
+
+export interface ApiExpense {
+  id: string;
+  school_id: string;
+  category_id: string | null;
+  vendor_id: string | null;
+  title: string;
+  amount: number;
+  expense_date: string;
+  payment_method: PaymentMethod | null;
+  notes: string | null;
+  created_by: string | null;
+  created_by_name: string | null;
+  created_at: string;
+}
+
+export interface ApiInvoice {
+  id: string;
+  school_id: string;
+  vendor_id: string | null;
+  invoice_no: string;
+  title: string;
+  amount: number;
+  status: "Unpaid" | "Paid" | "Overdue" | "Cancelled";
+  due_date: string | null;
+  paid_on: string | null;
+  notes: string | null;
+}
+
+export interface ApiFinancialSettings {
+  school_id: string;
+  accepted_payment_methods: PaymentMethod[];
+}
+
+export interface ApiFinancialAuditEntry {
+  id: string;
+  school_id: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  details: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export interface ApiSalaryStructure {
@@ -539,6 +632,97 @@ export interface ApiVehicle {
   status: "On Route" | "Idle" | "Maintenance";
   stops: { name: string; time: string }[];
   occupied: number;
+  registration_no?: string | null;
+  vehicle_type?: string | null;
+  rc_expiry?: string | null;
+  insurance_no?: string | null;
+  insurance_expiry?: string | null;
+  fitness_expiry?: string | null;
+  pollution_expiry?: string | null;
+  purchase_date?: string | null;
+  last_lat?: number | null;
+  last_lng?: number | null;
+  last_location_at?: string | null;
+}
+
+export type TransportPersonStatus = "Active" | "Inactive" | "On Leave";
+
+export interface ApiTransportDriver {
+  id: string;
+  school_id: string;
+  name: string;
+  phone: string | null;
+  license_no: string | null;
+  license_expiry: string | null;
+  id_proof_no: string | null;
+  address: string | null;
+  photo_url: string | null;
+  status: TransportPersonStatus;
+  assigned_vehicle_id: string | null;
+  created_at: string;
+}
+
+export interface ApiTransportAttendant {
+  id: string;
+  school_id: string;
+  name: string;
+  phone: string | null;
+  id_proof_no: string | null;
+  address: string | null;
+  photo_url: string | null;
+  status: TransportPersonStatus;
+  assigned_vehicle_id: string | null;
+  created_at: string;
+}
+
+export interface ApiTransportAttendance {
+  id: string;
+  school_id: string;
+  student_id: string;
+  vehicle_id: string | null;
+  date: string;
+  boarding_status: "Boarded" | "Absent" | "Not Marked";
+  drop_status: "Dropped" | "Absent" | "Not Marked";
+  marked_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApiTransportMaintenance {
+  id: string;
+  school_id: string;
+  vehicle_id: string;
+  service_date: string;
+  service_type: string | null;
+  description: string | null;
+  cost: number;
+  vendor: string | null;
+  odometer_reading: number | null;
+  next_service_date: string | null;
+  created_at: string;
+}
+
+export type TransportComplaintCategory =
+  | "Safety"
+  | "Delay"
+  | "Behavior"
+  | "Cleanliness"
+  | "Emergency"
+  | "Other";
+
+export interface ApiTransportComplaint {
+  id: string;
+  school_id: string;
+  raised_by_role: "PARENT" | "STUDENT" | "STAFF" | "SCHOOL_ADMIN";
+  raised_by_id: string;
+  student_id: string | null;
+  vehicle_id: string | null;
+  category: TransportComplaintCategory;
+  description: string;
+  status: "Open" | "In Progress" | "Resolved" | "Closed";
+  resolution_notes: string | null;
+  created_at: string;
+  resolved_at: string | null;
 }
 
 export interface ApiHoliday {
@@ -877,6 +1061,8 @@ export const useHasPermission = (permission: string, enabled = true) =>
   useApiQuery<boolean>(`permission-${permission}`, `/permissions/${permission}`, enabled);
 export const useMyTeacherProfile = (enabled = true) =>
   useApiQuery<ApiTeacher>("teacher-me", "/teachers/me", enabled);
+export const useMyStaffProfile = (enabled = true) =>
+  useApiQuery<ApiStaff>("staff-me", "/staff/me", enabled);
 export const useHomeworkSubmissions = (homeworkId: string | undefined) =>
   useApiQuery<ApiHomeworkSubmission[]>(
     `homework-submissions-all-${homeworkId}`,
@@ -1021,6 +1207,27 @@ export const useLibraryBorrowers = (query: string, type: string, enabled = true)
   );
 export const useTransport = (enabled = true) =>
   useApiQuery<ApiVehicle[]>("transport", "/transport", enabled);
+export const useTransportDrivers = (enabled = true) =>
+  useApiQuery<ApiTransportDriver[]>("transport-drivers", "/transport-drivers", enabled);
+export const useTransportAttendants = (enabled = true) =>
+  useApiQuery<ApiTransportAttendant[]>("transport-attendants", "/transport-attendants", enabled);
+export const useTransportAttendance = (
+  filters?: { date?: string; vehicleId?: string; studentId?: string },
+  enabled = true,
+) =>
+  useApiQuery<ApiTransportAttendance[]>(
+    `transport-attendance-${filters?.date ?? "all"}-${filters?.vehicleId ?? "all"}-${filters?.studentId ?? "all"}`,
+    `/transport-attendance${qs(filters)}`,
+    enabled,
+  );
+export const useTransportMaintenance = (vehicleId?: string, enabled = true) =>
+  useApiQuery<ApiTransportMaintenance[]>(
+    `transport-maintenance-${vehicleId ?? "all"}`,
+    `/transport-maintenance${qs({ vehicleId })}`,
+    enabled,
+  );
+export const useTransportComplaints = (enabled = true) =>
+  useApiQuery<ApiTransportComplaint[]>("transport-complaints", "/transport-complaints", enabled);
 export const useAdmissions = (enabled = true) =>
   useApiQuery<ApiAdmission[]>("admissions", "/admissions", enabled);
 export const useAdmissionDetail = (id: string | undefined, enabled = true) =>
@@ -1045,6 +1252,29 @@ export const useLeaveRequests = (type?: "STUDENT" | "TEACHER" | "STAFF", enabled
   );
 export const useFeeStructures = (enabled = true) =>
   useApiQuery<ApiFeeStructure[]>("fee-structures", "/fee-structures", enabled);
+export const useFeePayments = (studentId?: string, enabled = true) =>
+  useApiQuery<ApiFeePayment[]>(
+    `fee-payments-${studentId ?? "all"}`,
+    `/fees/receipts${studentId ? `?studentId=${studentId}` : ""}`,
+    enabled,
+  );
+export const useFeePaymentsForFee = (feeId?: string) =>
+  useApiQuery<ApiFeePayment[]>(`fee-payments-for-${feeId ?? "none"}`, `/fees/${feeId}/payments`, !!feeId);
+export const useFeeRefunds = (feePaymentId?: string, enabled = true) =>
+  useApiQuery<ApiFeeRefund[]>(
+    `fee-refunds-${feePaymentId ?? "all"}`,
+    `/fee-refunds${feePaymentId ? `?feePaymentId=${feePaymentId}` : ""}`,
+    enabled,
+  );
+export const useExpenseCategories = (enabled = true) =>
+  useApiQuery<ApiExpenseCategory[]>("expense-categories", "/expense-categories", enabled);
+export const useVendors = (enabled = true) => useApiQuery<ApiVendor[]>("vendors", "/vendors", enabled);
+export const useExpenses = (enabled = true) => useApiQuery<ApiExpense[]>("expenses", "/expenses", enabled);
+export const useInvoices = (enabled = true) => useApiQuery<ApiInvoice[]>("invoices", "/invoices", enabled);
+export const useFinancialSettings = (enabled = true) =>
+  useApiQuery<ApiFinancialSettings>("financial-settings", "/financial-settings", enabled);
+export const useFinancialAuditLog = (enabled = true) =>
+  useApiQuery<ApiFinancialAuditEntry[]>("financial-audit", "/financial-audit", enabled);
 export const useSalaryStructures = (enabled = true) =>
   useApiQuery<ApiSalaryStructure[]>("salary-structures", "/salary-structures", enabled);
 export const usePayroll = (month?: string, enabled = true) =>

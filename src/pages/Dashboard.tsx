@@ -24,10 +24,10 @@ import {
   Bus,
   CalendarHeart,
   Bell,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { SectionCard } from "@/components/shared/SectionCard";
-import { Badge } from "@/components/shared/Badge";
 import { SchoolCalendar } from "@/components/shared/SchoolCalendar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Initials, PageHeader } from "@/components/shared/ui-kit";
@@ -54,6 +54,11 @@ import feesIcon from "@/icons/pay-fees-icon.png"
 import leaveIcon from "@/icons/staff-leave-icon.png"
 import transportIcon from "@/icons/transport-icon.png"
 import holidaysIcon from "@/icons/holidays-icon.png"
+import feeStructureIcon from "@/icons/Add-fees-icon.png"
+import payrollIcon from "@/icons/Add-staff-icon.png"
+import addNoticeIcon from "@/icons/add-notice-icon.png"
+import driversIcon from "@/icons/drivers.png"
+import maintenanceIcon from "@/icons/maintenance.png"
 import { cn } from "@/lib/utils";
 import { QUICK_ACTION_ASSETS } from "@/lib/siteData";
 import { useAuth, toDisplayRole } from "@/lib/auth-context";
@@ -76,6 +81,8 @@ import {
   useTeacherAttendance,
   useLeaveRequests,
   useHolidays,
+  useTransport,
+  useTransportComplaints,
   isUpcomingExam,
   type ApiNotice,
 } from "@/hooks/useApi";
@@ -92,6 +99,8 @@ export default function Dashboard() {
   if (user?.role === "SUPER_ADMIN") return <SuperAdminDashboard />;
   if (user?.role === "STUDENT") return <StudentDashboard />;
   if (user?.role === "TEACHER") return <TeacherDashboard />;
+  if (toDisplayRole(user) === "Accountant") return <AccountantDashboard />;
+  if (toDisplayRole(user) === "Transport Manager") return <TransportManagerDashboard />;
   return <SchoolDashboard />;
 }
 
@@ -136,12 +145,6 @@ function StudentDashboard() {
   const pendingFeeTotal = pendingFees.reduce((sum, f) => sum + Math.max(0, f.amount - f.discount + f.fine), 0);
   const unreadCount = (notifications ?? []).filter((n) => !n.read).length;
 
-  const studentShortcutBadges: Record<string, number | undefined> = {
-    Homework: pendingHomework.length,
-    Exams: upcomingExamsAll.length,
-    "Pay Fees": pendingFees.length,
-  };
-
   return (
     <div>
       <PageHeader
@@ -167,13 +170,11 @@ function StudentDashboard() {
                   decoding="async"
                   className="h-12 w-12 object-contain [image-rendering:-webkit-optimize-contrast] sm:h-11 sm:w-11"
                 />
-                <Badge count={studentShortcutBadges[a.label]} />
               </span>
             ) : (
               a.icon && (
                 <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#3882F6]/80 text-white">
                   <a.icon className="h-5 w-5" />
-                  <Badge count={studentShortcutBadges[a.label]} />
                 </span>
               )
             )}
@@ -342,17 +343,7 @@ function TeacherDashboard() {
   const upcomingExams = upcomingExamsAll.slice(0, 4);
   const todayAttendance = (myAttendance ?? []).find((a) => a.date === new Date().toISOString().slice(0, 10));
   const latestLeave = [...(leaveRequests ?? [])].sort((a, b) => (a.from_date ?? "").localeCompare(b.from_date ?? "")).at(-1);
-  const pendingLeaveCount = (leaveRequests ?? []).filter((l) => l.status === "Pending").length;
   const unreadCount = (notifications ?? []).filter((n) => !n.read).length;
-
-  const teacherShortcutBadges: Record<string, number | undefined> = {
-    Classes: assignedClassCount,
-    Students: (students ?? []).length,
-    Timetable: today.length,
-    Homework: myHomework.length,
-    Exams: upcomingExamsAll.length,
-    Leave: pendingLeaveCount,
-  };
 
   return (
     <div>
@@ -382,13 +373,11 @@ function TeacherDashboard() {
                   decoding="async"
                   className="h-12 w-12 object-contain [image-rendering:-webkit-optimize-contrast] sm:h-11 sm:w-11"
                 />
-                <Badge count={teacherShortcutBadges[a.label]} />
               </span>
             ) : (
               a.icon && (
                 <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#3882F6]/80 text-white">
                   <a.icon className="h-5 w-5" />
-                  <Badge count={teacherShortcutBadges[a.label]} />
                 </span>
               )
             )}
@@ -487,6 +476,254 @@ function TeacherDashboard() {
         <SectionCard
           title="Notices"
           subtitle="Latest updates"
+          action={
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/notices">
+                All notices <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          }
+          bodyClassName="space-y-2"
+        >
+          {(notices ?? []).length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">No notices yet.</p>
+          ) : (
+            (notices ?? []).slice(0, 4).map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => setOpenNotice(n)}
+                className="block w-full rounded-xl border border-border px-3 py-2 text-left transition-colors hover:bg-accent"
+              >
+                <p className="truncate text-sm font-semibold">{n.title}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{n.date}</p>
+              </button>
+            ))
+          )}
+        </SectionCard>
+        <NoticeDetailDialog notice={openNotice} onClose={() => setOpenNotice(null)} />
+      </div>
+    </div>
+  );
+}
+
+type AccountantShortcut = { label: string; to: string; image: string };
+
+const ACCOUNTANT_SHORTCUTS: AccountantShortcut[] = [
+  { label: "Collect Fees", image: feesIcon, to: "/fees/collection" },
+  { label: "Fee Structure", image: feeStructureIcon, to: "/fees/structure" },
+  { label: "Pending Fees", image: feesIcon, to: "/fees/pending" },
+  { label: "Fee Reports", image: feeStructureIcon, to: "/fees/reports" },
+  { label: "Payroll", image: payrollIcon, to: "/payroll" },
+  { label: "My Salary", image: feesIcon, to: "/my-salary" },
+  { label: "Staff Leave", image: leaveIcon, to: "/leave/staff" },
+  { label: "My Attendance", image: attendanceIcon, to: "/staff/my-attendance" },
+];
+
+function AccountantDashboard() {
+  const { user } = useAuth();
+  const { data: fees } = useFees();
+  const { data: leaveRequests } = useLeaveRequests("STAFF");
+  const { data: notices } = useNotices();
+  const [openNotice, setOpenNotice] = useState<ApiNotice | null>(null);
+  const { data: notifications } = useNotifications();
+
+  const pendingFees = (fees ?? []).filter((f) => f.status !== "Paid");
+  const pendingFeeTotal = pendingFees.reduce(
+    (sum, f) => sum + Math.max(0, f.amount - f.discount + f.fine),
+    0,
+  );
+  const pendingLeaveCount = (leaveRequests ?? []).filter((l) => l.status === "Pending").length;
+  const unreadCount = (notifications ?? []).filter((n) => !n.read).length;
+
+  return (
+    <div>
+      <PageHeader
+        title={`Welcome, ${user?.name ?? "Accountant"}`}
+        description="Manage fee collection, payroll and financial reporting."
+      />
+
+      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-3 lg:grid-cols-9 md:grid-cols-6">
+        {ACCOUNTANT_SHORTCUTS.map((a) => (
+          <Link
+            key={a.label}
+            to={a.to}
+            className="panel bg-card group flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center shadow-md shadow-gray-300 transition-all hover:-translate-y-0.5"
+          >
+            <span className="relative grid h-12 w-12 shrink-0 place-items-center sm:h-11 sm:w-11">
+              <img
+                src={a.image}
+                alt=""
+                width={48}
+                height={48}
+                decoding="async"
+                className="h-12 w-12 object-contain [image-rendering:-webkit-optimize-contrast] sm:h-11 sm:w-11"
+              />
+            </span>
+            <span className="max-w-[80px] break-words text-[12px] leading-[1.2] font-semibold sm:max-w-none sm:text-xs">
+              {a.label}
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-destructive/80 text-white">
+            <Wallet className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-display text-lg leading-tight font-bold">
+              ₹{pendingFeeTotal.toLocaleString()}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">Pending Fee Amount</span>
+          </span>
+        </div>
+        <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warning/80 text-white">
+            <Hourglass className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-display text-lg leading-tight font-bold">{pendingLeaveCount}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">Pending Staff Leave</span>
+          </span>
+        </div>
+        <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/80 text-white">
+            <Bell className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-display text-lg leading-tight font-bold">{unreadCount}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">Unread Notifications</span>
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <SectionCard
+          title="Notices"
+          subtitle="Latest updates"
+          className="lg:col-span-2"
+          action={
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/notices">
+                All notices <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          }
+          bodyClassName="space-y-2"
+        >
+          {(notices ?? []).length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">No notices yet.</p>
+          ) : (
+            (notices ?? []).slice(0, 4).map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => setOpenNotice(n)}
+                className="block w-full rounded-xl border border-border px-3 py-2 text-left transition-colors hover:bg-accent"
+              >
+                <p className="truncate text-sm font-semibold">{n.title}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{n.date}</p>
+              </button>
+            ))
+          )}
+        </SectionCard>
+        <NoticeDetailDialog notice={openNotice} onClose={() => setOpenNotice(null)} />
+      </div>
+    </div>
+  );
+}
+
+const TRANSPORT_SHORTCUTS: ImageAction[] = [
+  { label: "Transport", icon: transportIcon, to: "/transport" },
+  { label: "Drivers", icon: driversIcon, to: "/transport/drivers" },
+  { label: "Attendance", icon: attendanceIcon, to: "/transport/attendance" },
+  { label: "Maintenance", icon: maintenanceIcon, to: "/transport/maintenance" },
+  { label: "Complaints", icon: addNoticeIcon, to: "/transport/complaints" },
+  { label: "T-Fees", icon: feesIcon, to: "/transport/fees" },
+];
+
+function TransportManagerDashboard() {
+  const { user } = useAuth();
+  const { data: vehicles } = useTransport();
+  const { data: complaints } = useTransportComplaints();
+  const { data: notices } = useNotices();
+  const [openNotice, setOpenNotice] = useState<ApiNotice | null>(null);
+
+  const vehicleRows = vehicles ?? [];
+  const onRoute = vehicleRows.filter((v) => v.status === "On Route").length;
+  const studentsOnTransport = vehicleRows.reduce((sum, v) => sum + v.occupied, 0);
+  const openComplaints = (complaints ?? []).filter(
+    (c) => c.status === "Open" || c.status === "In Progress",
+  ).length;
+
+  return (
+    <div>
+      <PageHeader
+        title={`Welcome, ${user?.name ?? "Transport Manager"}`}
+        description="Manage the fleet, drivers, student transport and safety records."
+      />
+
+      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-3 lg:grid-cols-8 md:grid-cols-4">
+        {TRANSPORT_SHORTCUTS.map((a) => (
+          <Link
+            key={a.label}
+            to={a.to ?? "/"}
+            className="panel bg-card group flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center shadow-md shadow-gray-300 transition-all hover:-translate-y-0.5"
+          >
+            <span className="relative grid h-12 w-12 shrink-0 place-items-center sm:h-11 sm:w-11">
+              <img
+                src={a.icon}
+                alt=""
+                width={48}
+                height={48}
+                decoding="async"
+                className="h-12 w-12 object-contain [image-rendering:-webkit-optimize-contrast] sm:h-11 sm:w-11"
+              />
+            </span>
+            <span className="max-w-[80px] break-words text-[12px] leading-[1.2] font-semibold sm:max-w-none sm:text-xs">
+              {a.label}
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-success/80 text-white">
+            <Bus className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-display text-lg leading-tight font-bold">{onRoute}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">Vehicles On Route</span>
+          </span>
+        </div>
+        <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/80 text-white">
+            <Users className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-display text-lg leading-tight font-bold">{studentsOnTransport}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">Students on Transport</span>
+          </span>
+        </div>
+        <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-destructive/80 text-white">
+            <ShieldCheck className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-display text-lg leading-tight font-bold">{openComplaints}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">Open Complaints</span>
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <SectionCard
+          title="Notices"
+          subtitle="Latest updates"
+          className="lg:col-span-2"
           action={
             <Button variant="ghost" size="sm" asChild>
               <Link to="/notices">
@@ -653,7 +890,6 @@ function SchoolDashboard() {
   const canNotices = canView(user, "notices");
   const canExams = canView(user, "results") || canView(user, "homework");
   const canTimetable = canView(user, "timetable");
-  const canLeaveAction = quickActions.some((a) => a.label === "Leave");
 
   const { data: admissions } = useAdmissions(canAdmissions);
   const { data: homework } = useHomework(canHomework && !canAdmissions);
@@ -663,17 +899,6 @@ function SchoolDashboard() {
   const { data: exams } = useExams(canExams);
   const { data: todaySlots } = useTimetable(canTimetable);
   const { data: holidays } = useHolidays();
-  const { data: leaveRequests } = useLeaveRequests(undefined, canLeaveAction);
-
-  const pendingAdmissionsCount = (admissions ?? []).filter((a) => a.status === "Pending").length;
-  const pendingFeesCount = (fees ?? []).filter((f) => f.status !== "Paid").length;
-  const pendingLeaveCount = (leaveRequests ?? []).filter((l) => l.status === "Pending").length;
-
-  const schoolShortcutBadges: Record<string, number | undefined> = {
-    Admissions: canAdmissions ? pendingAdmissionsCount : undefined,
-    Fees: canFees ? pendingFeesCount : undefined,
-    Leave: canLeaveAction ? pendingLeaveCount : undefined,
-  };
 
   const todayDay = DAYS[2] as string;
   const today = (todaySlots ?? []).filter((s) => s.day === todayDay).sort((a, b) => a.period - b.period);
@@ -715,7 +940,6 @@ function SchoolDashboard() {
                 decoding="async"
                 className="h-12 w-12 object-contain [image-rendering:-webkit-optimize-contrast] sm:h-11 sm:w-11"
               />
-              <Badge count={schoolShortcutBadges[a.label]} />
             </span>
             <span className="max-w-[80px] break-words text-[12px] leading-[1.2] font-semibold sm:max-w-none sm:text-xs">
               {a.label}

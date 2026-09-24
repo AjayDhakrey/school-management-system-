@@ -40,6 +40,13 @@ const Teachers = lazy(() => import("@/app/teachers"));
 const Certificates = lazy(() => import("@/app/certificates"));
 const Timetable = lazy(() => import("@/app/timetable"));
 const Transport = lazy(() => import("@/app/transport"));
+const TransportDrivers = lazy(() => import("@/app/transport-drivers"));
+const TransportStudents = lazy(() => import("@/app/transport-students"));
+const TransportAttendance = lazy(() => import("@/app/transport-attendance"));
+const TransportMaintenance = lazy(() => import("@/app/transport-maintenance"));
+const TransportComplaints = lazy(() => import("@/app/transport-complaints"));
+const TransportFees = lazy(() => import("@/app/transport-fees"));
+const TransportReports = lazy(() => import("@/app/transport-reports"));
 const Users = lazy(() => import("@/app/users"));
 const Profile = lazy(() => import("@/app/profile"));
 const MySubjects = lazy(() => import("@/app/my-subjects"));
@@ -47,6 +54,7 @@ const MyLeave = lazy(() => import("@/app/my-leave"));
 const Holidays = lazy(() => import("@/app/holidays"));
 const MyFees = lazy(() => import("@/app/my-fees"));
 const TeacherProfile = lazy(() => import("@/app/teacher/profile"));
+const StaffProfile = lazy(() => import("@/app/staff/profile"));
 const TeacherClasses = lazy(() => import("@/app/teacher/classes"));
 const TeacherStudents = lazy(() => import("@/app/teacher/students"));
 const TeacherSubjects = lazy(() => import("@/app/teacher/subjects"));
@@ -54,6 +62,11 @@ const TeacherMyAttendance = lazy(() => import("@/app/teacher/my-attendance"));
 const TeacherClassLeave = lazy(() => import("@/app/teacher/class-leave"));
 const StaffMyAttendance = lazy(() => import("@/app/my-attendance"));
 const Salary = lazy(() => import("@/app/salary"));
+const Payments = lazy(() => import("@/app/payments"));
+const Expenses = lazy(() => import("@/app/expenses"));
+const Invoices = lazy(() => import("@/app/invoices"));
+const FinancialReports = lazy(() => import("@/app/financial-reports"));
+const FinancialSettings = lazy(() => import("@/app/financial-settings"));
 
 const ParentDashboard = lazy(() => import("@/app/parent/dashboard"));
 const ParentChildProfile = lazy(() => import("@/app/parent/children/child-profile"));
@@ -196,6 +209,36 @@ export default function App() {
                   path="/fees/reports"
                   element={guarded("/fees/reports", <Fees tab="reports" />)}
                 />
+                <Route
+                  path="/fees/discounts"
+                  element={guarded("/fees/discounts", <Fees tab="discounts" />)}
+                />
+                <Route
+                  path="/payments/transactions"
+                  element={guarded("/payments/transactions", <Payments mode="transactions" />)}
+                />
+                <Route
+                  path="/payments/refunds"
+                  element={guarded("/payments/refunds", <Payments mode="refunds" />)}
+                />
+                <Route path="/expenses" element={guarded("/expenses", <Expenses tab="expenses" />)} />
+                <Route
+                  path="/expenses/categories"
+                  element={guarded("/expenses/categories", <Expenses tab="categories" />)}
+                />
+                <Route
+                  path="/expenses/vendors"
+                  element={guarded("/expenses/vendors", <Expenses tab="vendors" />)}
+                />
+                <Route path="/invoices" element={guarded("/invoices", <Invoices />)} />
+                <Route
+                  path="/financial-reports"
+                  element={guarded("/financial-reports", <FinancialReports />)}
+                />
+                <Route
+                  path="/financial-settings"
+                  element={guarded("/financial-settings", <FinancialSettings />)}
+                />
                 <Route path="/homework" element={guarded("/homework", <Homework />)} />
                 <Route
                   path="/leave/students"
@@ -235,6 +278,38 @@ export default function App() {
                 />
                 <Route path="/timetable" element={guarded("/timetable", <Timetable />)} />
                 <Route path="/transport" element={guarded("/transport", <Transport />)} />
+                <Route
+                  path="/transport/drivers"
+                  element={guarded("/transport/drivers", <TransportDrivers tab="drivers" />)}
+                />
+                <Route
+                  path="/transport/attendants"
+                  element={guarded("/transport/drivers", <TransportDrivers tab="attendants" />)}
+                />
+                <Route
+                  path="/transport/students"
+                  element={guarded("/transport/students", <TransportStudents />)}
+                />
+                <Route
+                  path="/transport/attendance"
+                  element={guarded("/transport/attendance", <TransportAttendance />)}
+                />
+                <Route
+                  path="/transport/maintenance"
+                  element={guarded("/transport/maintenance", <TransportMaintenance />)}
+                />
+                <Route
+                  path="/transport/complaints"
+                  element={guarded("/transport/complaints", <TransportComplaints />)}
+                />
+                <Route
+                  path="/transport/fees"
+                  element={guarded("/transport/fees", <TransportFees />)}
+                />
+                <Route
+                  path="/transport/reports"
+                  element={guarded("/transport/reports", <TransportReports />)}
+                />
                 <Route path="/users" element={guarded("/users", <Users />)} />
                 <Route path="/profile" element={guarded("/profile", <Profile />)} />
                 <Route path="/my-subjects" element={guarded("/my-subjects", <MySubjects />)} />
@@ -244,6 +319,10 @@ export default function App() {
                 <Route
                   path="/teacher/profile"
                   element={guarded("/teacher/profile", <TeacherProfile />)}
+                />
+                <Route
+                  path="/staff/profile"
+                  element={guarded("/staff/profile", <StaffProfile />)}
                 />
                 <Route
                   path="/teacher/classes"

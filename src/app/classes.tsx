@@ -167,28 +167,53 @@ export default function Page() {
           {classRows.length === 0 ? (
             <EmptyState title="No classes yet" description="Classes you create will appear here." />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-2.5 font-medium">Class</th>
-                    <th className="px-4 py-2.5 font-medium">Section</th>
-                    <th className="px-4 py-2.5 font-medium">Class Teacher</th>
-                    <th className="px-4 py-2.5 font-medium">Students</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {classRows.map((c) => (
-                    <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                      <td className="px-4 py-2.5 font-medium">{c.name}</td>
-                      <td className="px-4 py-2.5">{c.section}</td>
-                      <td className="px-4 py-2.5">{teacherName(c.class_teacher_id)}</td>
-                      <td className="px-4 py-2.5">{studentCount(c.id)}</td>
+            <>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2.5 font-medium">Class</th>
+                      <th className="px-4 py-2.5 font-medium">Section</th>
+                      <th className="px-4 py-2.5 font-medium">Class Teacher</th>
+                      <th className="px-4 py-2.5 font-medium">Students</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {classRows.map((c) => (
+                      <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                        <td className="px-4 py-2.5 font-medium">{c.name}</td>
+                        <td className="px-4 py-2.5">{c.section}</td>
+                        <td className="px-4 py-2.5">{teacherName(c.class_teacher_id)}</td>
+                        <td className="px-4 py-2.5">{studentCount(c.id)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid gap-2.5 p-4 md:hidden">
+                {classRows.map((c) => (
+                  <div key={c.id} className="panel flex items-center gap-3 p-3">
+                    <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-sm font-bold text-primary">
+                      {c.section}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {c.name} <span className="font-normal text-muted-foreground">· Section {c.section}</span>
+                      </p>
+                      <div className="mt-1.5 flex min-w-0 items-center gap-1.5">
+                        <Initials name={teacherName(c.class_teacher_id)} tone="navy" className="h-5 w-5 text-[9px]" />
+                        <p className="truncate text-xs text-muted-foreground">{teacherName(c.class_teacher_id)}</p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-center rounded-xl bg-muted px-2.5 py-1.5">
+                      <span className="text-sm leading-tight font-bold">{studentCount(c.id)}</span>
+                      <span className="text-[9px] leading-tight tracking-wide text-muted-foreground uppercase">Students</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </SectionCard>
       </div>

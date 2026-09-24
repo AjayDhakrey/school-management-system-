@@ -435,8 +435,8 @@ export default function Page() {
 
             <div className="grid gap-3 p-4 sm:hidden">
               {paged.map((u) => (
-                <div key={u.id} className="rounded-xl border border-border p-3">
-                  <div className="flex items-start justify-between gap-2">
+                <div key={u.id} className="min-w-0 overflow-hidden rounded-xl border border-border p-3">
+                  <div className="flex min-w-0 items-start justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <Initials name={u.name} tone="navy" />
                       <div className="min-w-0">
@@ -444,7 +444,9 @@ export default function Page() {
                         <p className="truncate text-xs text-muted-foreground">{u.email}</p>
                       </div>
                     </div>
-                    <UserActions user={u} onToggle={toggleSuspend} onReset={setResetTarget} onDelete={deleteUser} />
+                    <div className="shrink-0">
+                      <UserActions user={u} onToggle={toggleSuspend} onReset={setResetTarget} onDelete={deleteUser} />
+                    </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Badge variant="secondary">{roleLabel(u.role)}</Badge>

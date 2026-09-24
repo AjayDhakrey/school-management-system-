@@ -7,7 +7,14 @@ import { PageHeader, EmptyState, CardSkeleton } from "@/components/shared/ui-kit
 import { InfoCard } from "@/components/shared/InfoCard";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { Badge } from "@/components/shared/Badge";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
+import timeIcon from "@/icons/time-table-icon.png";
+import homeworkIcon from "@/icons/homework-icon.png";
+import attendanceIcon from "@/icons/mark-attendance-icon.png";
+import feesIcon from "@/icons/pay-fees-icon.png";
+import transportIcon from "@/icons/transport-icon.png";
+import leaveIcon from "@/icons/staff-leave-icon.png";
 import {
   useAttendanceFor,
   useFeesFor,
@@ -19,6 +26,17 @@ import {
 } from "@/hooks/useApi";
 import { NoticeDetailDialog } from "@/components/shared/NoticeDetailDialog";
 import { useParentChild } from "@/lib/parent-child-context";
+
+type ParentShortcut = { label: string; to: string; image: string };
+
+const PARENT_SHORTCUTS: ParentShortcut[] = [
+  { label: "Attendance", image: attendanceIcon, to: "/parent/children/attendance" },
+  { label: "Timetable", image: timeIcon, to: "/parent/children/timetable" },
+  { label: "Homework", image: homeworkIcon, to: "/parent/children/homework" },
+  { label: "Pay Fees", image: feesIcon, to: "/parent/fees/pay" },
+  { label: "Transport", image: transportIcon, to: "/parent/transport" },
+  { label: "Leave", image: leaveIcon, to: "/parent/leave" },
+];
 
 export default function ParentDashboardPage() {
   const { selectedChild, selectedChildId, isLoading: childrenLoading } = useParentChild();
@@ -44,7 +62,13 @@ export default function ParentDashboardPage() {
     .slice(0, 5);
   const recentNotices = (notices ?? []).slice(0, 5);
 
+  const pendingFeesCount = (fees ?? []).filter((f) => f.status !== "Paid").length;
   const loading = childrenLoading || attendanceLoading || feesLoading || homeworkLoading || examsLoading;
+
+  const parentShortcutBadges: Record<string, number | undefined> = {
+    Homework: dueHomework.length,
+    "Pay Fees": pendingFeesCount,
+  };
 
   return (
     <div>
@@ -55,10 +79,37 @@ export default function ParentDashboardPage() {
       />
       <ChildSwitcher />
 
+      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-8">
+        {PARENT_SHORTCUTS.map((a) => (
+          <Link
+            key={a.label}
+            to={a.to}
+            className="panel bg-card group flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center shadow-md shadow-gray-300 transition-all hover:-translate-y-0.5"
+          >
+            <span className="relative grid h-12 w-12 shrink-0 place-items-center sm:h-11 sm:w-11">
+              <img
+                src={a.image}
+                alt=""
+                width={48}
+                height={48}
+                decoding="async"
+                className="h-12 w-12 object-contain [image-rendering:-webkit-optimize-contrast] sm:h-11 sm:w-11"
+              />
+              <Badge count={parentShortcutBadges[a.label]} />
+            </span>
+            <span className="max-w-[80px] break-words text-[12px] leading-[1.2] font-semibold sm:max-w-none sm:text-xs">
+              {a.label}
+            </span>
+          </Link>
+        ))}
+      </div>
+
       {loading ? (
-        <CardSkeleton count={4} />
+        <div className="mt-3">
+          <CardSkeleton count={4} />
+        </div>
       ) : (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3 mb-4 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <InfoCard label="Attendance" value={attendancePct !== null ? `${attendancePct}%` : "—"} icon={CalendarCheck} tone="navy" />
           <InfoCard label="Pending Fees" value={`₹${pendingFees.toLocaleString()}`} icon={Wallet} tone={pendingFees > 0 ? "warning" : "success"} />
           <InfoCard label="Homework Due" value={dueHomework.length} icon={NotebookPen} tone="info" />

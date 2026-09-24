@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -10,12 +10,12 @@ import {
   ErrorState,
   SearchInput,
   FilterSelect,
-  Initials,
   Pager,
   usePaged,
   TableSkeleton,
 } from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
+import { AccountAvatar } from "@/components/shared/AccountAvatar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { InfoCard } from "@/components/shared/InfoCard";
 import { Button } from "@/components/ui/button";
@@ -299,52 +299,96 @@ export default function Page() {
             icon={FileText}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">Applicant</th>
-                  <th className="px-4 py-2.5 font-medium">Application No.</th>
-                  <th className="px-4 py-2.5 font-medium">Class Applied</th>
-                  <th className="px-4 py-2.5 font-medium">Parent / Guardian</th>
-                  <th className="px-4 py-2.5 font-medium">Applied On</th>
-                  <th className="px-4 py-2.5 font-medium">Stage</th>
-                  <th className="px-4 py-2.5 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paged.map((a) => (
-                  <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/40">
-                    <td className="px-4 py-2.5">
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <Initials name={a.applicant} className="h-8 w-8" />
-                        <div className="min-w-0">
-                          <p className="truncate font-medium">{a.applicant}</p>
-                          {a.stage === "CONVERTED" && a.admission_no && (
-                            <p className="truncate text-[11px] text-success">Admission No. {a.admission_no}</p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap font-mono text-xs text-muted-foreground">{a.application_no ?? "—"}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">
-                      {a.class_applied ?? "—"}{a.section_applied ? `-${a.section_applied}` : ""}
-                    </td>
-                    <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{a.parent_name ?? "—"}</td>
-                    <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{a.applied_on ?? "—"}</td>
-                    <td className="px-4 py-2.5">
-                      <StatusBadge status={STAGE_LABEL[a.stage]} />
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setReviewingId(a.id)}>
-                        <Eye className="h-3.5 w-3.5" /> Review
-                      </Button>
-                    </td>
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="px-4 py-2.5 font-medium">Applicant</th>
+                    <th className="px-4 py-2.5 font-medium">Application No.</th>
+                    <th className="px-4 py-2.5 font-medium">Class Applied</th>
+                    <th className="px-4 py-2.5 font-medium">Parent / Guardian</th>
+                    <th className="px-4 py-2.5 font-medium">Applied On</th>
+                    <th className="px-4 py-2.5 font-medium">Stage</th>
+                    <th className="px-4 py-2.5 font-medium">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {paged.map((a) => (
+                    <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                      <td className="px-4 py-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <AccountAvatar name={a.applicant} photoUrl={a.photo_url} className="h-9 w-9" />
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{a.applicant}</p>
+                            {a.stage === "CONVERTED" && a.admission_no && (
+                              <p className="truncate text-[11px] text-success">Admission No. {a.admission_no}</p>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap font-mono text-xs text-muted-foreground">{a.application_no ?? "—"}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                        {a.class_applied ?? "—"}{a.section_applied ? `-${a.section_applied}` : ""}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{a.parent_name ?? "—"}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{a.applied_on ?? "—"}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={STAGE_LABEL[a.stage]} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => setReviewingId(a.id)}>
+                          <Eye className="h-3.5 w-3.5" /> Review
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="grid gap-2.5 p-4 md:hidden">
+              {paged.map((a) => (
+                <div key={a.id} className="panel p-3.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <AccountAvatar name={a.applicant} photoUrl={a.photo_url} className="h-10 w-10" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{a.applicant}</p>
+                        <p className="truncate font-mono text-[11px] text-muted-foreground">{a.application_no ?? "—"}</p>
+                      </div>
+                    </div>
+                    <StatusBadge status={STAGE_LABEL[a.stage]} className="shrink-0" />
+                  </div>
+
+                  {a.stage === "CONVERTED" && a.admission_no && (
+                    <p className="mt-1.5 truncate text-[11px] font-medium text-success">Admission No. {a.admission_no}</p>
+                  )}
+
+                  <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                    <div className="min-w-0">
+                      <p className="text-muted-foreground">Class Applied</p>
+                      <p className="truncate font-medium">
+                        {a.class_applied ?? "—"}{a.section_applied ? `-${a.section_applied}` : ""}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-muted-foreground">Parent / Guardian</p>
+                      <p className="truncate font-medium">{a.parent_name ?? "—"}</p>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-muted-foreground">Applied On</p>
+                      <p className="truncate font-medium">{a.applied_on ?? "—"}</p>
+                    </div>
+                  </div>
+
+                  <Button size="sm" variant="outline" className="mt-3 w-full gap-1.5" onClick={() => setReviewingId(a.id)}>
+                    <Eye className="h-3.5 w-3.5" /> Review
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </>
         )}
         <Pager page={page} pageCount={pageCount} onPage={setPage} total={sorted.length} />
       </SectionCard>
@@ -767,11 +811,11 @@ function AdmissionReviewPanel({
         <PipelineTracker stage={detail.stage} />
 
         <Tabs defaultValue="overview">
-          <TabsList className="w-full">
-            <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
-            <TabsTrigger value="documents" className="flex-1">Documents ({detail.documentsList.length})</TabsTrigger>
-            <TabsTrigger value="notes" className="flex-1">Notes ({detail.notesList.length})</TabsTrigger>
-            <TabsTrigger value="history" className="flex-1">History</TabsTrigger>
+          <TabsList className="scrollbar-slim w-full justify-start overflow-x-auto">
+            <TabsTrigger value="overview" className="shrink-0">Overview</TabsTrigger>
+            <TabsTrigger value="documents" className="shrink-0">Docs ({detail.documentsList.length})</TabsTrigger>
+            <TabsTrigger value="notes" className="shrink-0">Notes ({detail.notesList.length})</TabsTrigger>
+            <TabsTrigger value="history" className="shrink-0">History</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -956,7 +1000,18 @@ function RemarksForm({
   );
 }
 
+/** Shorter labels for the compact tracker only — badges/text elsewhere keep the full STAGE_LABEL. */
+const TRACKER_STAGE_LABEL: Partial<Record<AdmissionStage, string>> = {
+  DOCUMENT_VERIFICATION: "Documents",
+};
+
 function PipelineTracker({ stage }: { stage: AdmissionStage }) {
+  const activeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [stage]);
+
   if (stage === "REJECTED" || stage === "WAITLISTED") {
     return (
       <div
@@ -973,35 +1028,44 @@ function PipelineTracker({ stage }: { stage: AdmissionStage }) {
 
   const idx = PIPELINE_STEPS.indexOf(stage);
   return (
-    <div className="flex items-center overflow-x-auto pb-1">
-      {PIPELINE_STEPS.map((step, i) => {
-        const done = i < idx;
-        const active = i === idx;
-        return (
-          <div key={step} className="flex shrink-0 items-center">
-            <div className="flex flex-col items-center gap-1">
-              <span
-                className={cn(
-                  "grid h-7 w-7 place-items-center rounded-full border text-[11px] font-bold",
-                  done
-                    ? "border-success bg-success text-success-foreground"
-                    : active
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-muted text-muted-foreground",
-                )}
-              >
-                {i + 1}
-              </span>
-              <span className={cn("w-20 text-center text-[10px] leading-tight", done || active ? "font-medium text-foreground" : "text-muted-foreground")}>
-                {STAGE_LABEL[step]}
-              </span>
+    <div className="relative">
+      <div className="scrollbar-slim flex items-start overflow-x-auto pb-1">
+        {PIPELINE_STEPS.map((step, i) => {
+          const done = i < idx;
+          const active = i === idx;
+          return (
+            <div key={step} ref={active ? activeRef : undefined} className="flex shrink-0 items-start">
+              <div className="flex w-14 flex-col items-center gap-1">
+                <span
+                  className={cn(
+                    "grid h-6 w-6 shrink-0 place-items-center rounded-full border text-[10px] font-bold",
+                    done
+                      ? "border-success bg-success text-success-foreground"
+                      : active
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-muted text-muted-foreground",
+                  )}
+                >
+                  {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : i + 1}
+                </span>
+                <span
+                  className={cn(
+                    "text-center text-[9px] leading-tight text-balance",
+                    done || active ? "font-semibold text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {TRACKER_STAGE_LABEL[step] ?? STAGE_LABEL[step]}
+                </span>
+              </div>
+              {i < PIPELINE_STEPS.length - 1 && (
+                <span className={cn("mt-3 h-px w-4 shrink-0", done ? "bg-success" : "bg-border")} />
+              )}
             </div>
-            {i < PIPELINE_STEPS.length - 1 && (
-              <span className={cn("mx-1 h-px w-8 shrink-0", done ? "bg-success" : "bg-border")} />
-            )}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-5 bg-gradient-to-r from-background to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-5 bg-gradient-to-l from-background to-transparent" />
     </div>
   );
 }

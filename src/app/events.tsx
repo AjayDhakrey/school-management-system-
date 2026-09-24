@@ -48,7 +48,7 @@ const CATEGORY_TONE: Record<
 
 export default function Page() {
   const { user } = useAuth();
-  const isStudent = user?.role === "STUDENT";
+  const canManage = user?.role === "SCHOOL_ADMIN";
   const { data: events = [] } = useEvents();
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -80,11 +80,11 @@ export default function Page() {
         description="Plan, track and browse upcoming school events."
         breadcrumb={["Dashboard", "Events"]}
         actions={
-          isStudent ? undefined : (
+          canManage ? (
             <Button size="sm" className="h-9" onClick={() => setCreateOpen(true)}>
               <Plus className="mr-1.5 h-4 w-4" /> Create Event
             </Button>
-          )
+          ) : undefined
         }
       />
 

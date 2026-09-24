@@ -430,9 +430,21 @@ async function addDerivedColumns(table: string, rows: Row[]) {
   }
 
   if (table === "admissions") {
+    // Once converted, show the enrolled student's own profile photo instead of initials.
+    const studentIds = rows
+      .map((row) => row["converted_student_id"])
+      .filter((id): id is string => typeof id === "string");
+    const photos = new Map<string, string | null>();
+    if (studentIds.length) {
+      const { data } = await supabase.from("students").select("id,photo_url").in("id", studentIds);
+      for (const student of data ?? []) photos.set(student.id, student.photo_url);
+    }
     // The Dashboard still counts the legacy `status` mirror of `stage`.
-    for (const row of rows)
+    for (const row of rows) {
       row["status"] = ADMISSION_STATUS_FOR_STAGE[String(row["stage"])] ?? "Pending";
+      const studentId = row["converted_student_id"];
+      row["photo_url"] = typeof studentId === "string" ? (photos.get(studentId) ?? null) : null;
+    }
     return rows;
   }
 

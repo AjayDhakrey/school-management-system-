@@ -611,6 +611,7 @@ export interface ApiAdmission {
   notes: string | null;
   admission_no: string | null;
   converted_student_id: string | null;
+  photo_url: string | null;
   created_by: string | null;
   created_by_name: string | null;
   created_at: string;

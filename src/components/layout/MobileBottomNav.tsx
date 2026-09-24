@@ -61,10 +61,10 @@ const WORKSPACE: Record<Role, DockItem> = {
     match: ["/super-admin/schools"],
   },
   "School Admin": {
-    label: "Academics",
+    label: "Classes",
     to: "/classes",
-    icon: IoBookOutline,
-    activeIcon: IoBook,
+    icon: FaChalkboardUser,
+    activeIcon: FaChalkboardUser,
     match: ["/classes"],
   },
   Teacher: {
@@ -83,10 +83,10 @@ const WORKSPACE: Record<Role, DockItem> = {
     match: ["/timetable"],
   },
   Parent: {
-    label: "Academics",
+    label: "Timetable",
     to: "/parent/children/timetable",
-    icon: IoBookOutline,
-    activeIcon: IoBook,
+    icon: PiCalendarDotsDuotone,
+    activeIcon: PiCalendarDotsFill,
     match: ["/parent/children/timetable"],
   },
   Staff: {
@@ -198,22 +198,38 @@ export function MobileBottomNav() {
               activeIcon: AiOutlineSchedule,
               match: ["/attendance"],
             }
-          : (ROUTE_ROLES["/notifications"] ?? []).includes(role)
+          : role === "School Admin"
             ? {
-                label: "Alerts",
-                to: "/notifications",
-                icon: IoNotificationsOutline,
-                activeIcon: IoNotifications,
-                match: ["/notifications"],
-                badge: unread,
+                label: "Subjects",
+                to: "/subjects",
+                icon: IoBookOutline,
+                activeIcon: IoBook,
+                match: ["/subjects"],
               }
-            : {
-                label: "Notices",
-                to: "/notices",
-                icon: IoMegaphoneOutline,
-                activeIcon: IoMegaphone,
-                match: ["/notices"],
-              };
+            : role === "Parent"
+              ? {
+                  label: "Attendance",
+                  to: "/parent/children/attendance",
+                  icon: AiOutlineSchedule,
+                  activeIcon: AiOutlineSchedule,
+                  match: ["/parent/children/attendance"],
+                }
+              : (ROUTE_ROLES["/notifications"] ?? []).includes(role)
+                ? {
+                    label: "Alerts",
+                    to: "/notifications",
+                    icon: IoNotificationsOutline,
+                    activeIcon: IoNotifications,
+                    match: ["/notifications"],
+                    badge: unread,
+                  }
+                : {
+                    label: "Notices",
+                    to: "/notices",
+                    icon: IoMegaphoneOutline,
+                    activeIcon: IoMegaphone,
+                    match: ["/notices"],
+                  };
 
   const home: DockItem = {
     label: "Home",
@@ -230,9 +246,9 @@ export function MobileBottomNav() {
     match: [profilePath],
   };
 
-  // Students get their fees in the centre slot, Teachers get their classes; every other
-  // role keeps the menu button there. The sidebar stays reachable for them from the
-  // header's hamburger.
+  // Students get their fees in the centre slot, Teachers get their classes, School Admins
+  // get attendance, Parents get fee payment; every other role keeps the menu button there.
+  // The sidebar stays reachable for them from the header's hamburger.
   const centre: DockItem | null =
     role === "Student"
       ? {
@@ -250,7 +266,23 @@ export function MobileBottomNav() {
             activeIcon: FaChalkboardUser,
             match: ["/teacher/classes"],
           }
-        : null;
+        : role === "School Admin"
+          ? {
+              label: "Attendance",
+              to: "/attendance",
+              icon: AiOutlineSchedule,
+              activeIcon: AiOutlineSchedule,
+              match: ["/attendance"],
+            }
+          : role === "Parent"
+            ? {
+                label: "Fees",
+                to: "/parent/fees/pay",
+                icon: IoWalletOutline,
+                activeIcon: IoWallet,
+                match: ["/parent/fees/pay", "/parent/fees/details", "/parent/fees/history"],
+              }
+            : null;
 
   const left = [home, WORKSPACE[role]];
   const right = [alerts, profile];

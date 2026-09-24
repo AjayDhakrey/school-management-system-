@@ -19,7 +19,7 @@ export function SectionCard({
   return (
     <section className={cn("panel overflow-hidden shadow-md shadow-gray-300", className)}>
       {(title || action) && (
-        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
+        <header className="grid grid-cols-1 items-start gap-3 border-b border-border px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
           <div className="min-w-0">
             {title && <h3 className="truncate text-sm font-semibold sm:text-base">{title}</h3>}
             {subtitle && (

@@ -235,12 +235,12 @@ export default function SubjectsPage() {
       <div className="mt-5">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "allocations" | "catalog")}>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-            <TabsList>
-              <TabsTrigger value="allocations" className="gap-2">
+            <TabsList className="grid w-full grid-cols-1 gap-1 sm:inline-flex sm:w-auto">
+              <TabsTrigger value="allocations" className="w-full justify-start gap-2 sm:w-auto sm:justify-center">
                 <FolderSync className="h-4 w-4" />
                 Class-Subject Allocations ({totalAllocations})
               </TabsTrigger>
-              <TabsTrigger value="catalog" className="gap-2">
+              <TabsTrigger value="catalog" className="w-full justify-start gap-2 sm:w-auto sm:justify-center">
                 <BookOpen className="h-4 w-4" />
                 Subject Master Catalog ({totalSubjects})
               </TabsTrigger>

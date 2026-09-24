@@ -373,6 +373,59 @@ function SalaryStructureDialog({
   );
 }
 
+function PayrollActionsMenu({
+  row,
+  role,
+  onEdit,
+  onView,
+  onAction,
+}: {
+  row: SalaryRow;
+  role: string | undefined;
+  onEdit: () => void;
+  onView: () => void;
+  onAction: (action: "review" | "approve" | "hold" | "release" | "pay") => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={`Actions for ${row.name}`}>
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={onEdit}>
+          <Pencil className="mr-2 h-4 w-4" /> Edit salary structure
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onView}>
+          <Eye className="mr-2 h-4 w-4" /> View payslip
+        </DropdownMenuItem>
+        {row.rawStatus === "CALCULATED" && (
+          <DropdownMenuItem onClick={() => onAction("review")}>Mark reviewed</DropdownMenuItem>
+        )}
+        {role === "SCHOOL_ADMIN" && row.rawStatus === "REVIEWED" && (
+          <DropdownMenuItem onClick={() => onAction("approve")}>Approve salary</DropdownMenuItem>
+        )}
+        {role === "SCHOOL_ADMIN" &&
+          row.rawStatus &&
+          row.rawStatus !== "PAID" &&
+          row.rawStatus !== "ON_HOLD" && (
+            <DropdownMenuItem onClick={() => onAction("hold")}>Place on hold</DropdownMenuItem>
+          )}
+        {role === "SCHOOL_ADMIN" && row.rawStatus === "ON_HOLD" && (
+          <DropdownMenuItem onClick={() => onAction("release")}>Release hold</DropdownMenuItem>
+        )}
+        {row.rawStatus === "APPROVED" && (
+          <DropdownMenuItem onClick={() => onAction("pay")}>Record bank payment</DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => toast.success(`Payslip sent to ${row.name}`)}>
+          <Send className="mr-2 h-4 w-4" /> Send payslip
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function AdminPayroll() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -597,7 +650,7 @@ function AdminPayroll() {
             </SelectContent>
           </Select>
         </div>
-        <div className="overflow-x-auto">
+        <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -639,60 +692,67 @@ function AdminPayroll() {
                     <StatusPill status={row.status} />
                   </TableCell>
                   <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label={`Actions for ${row.name}`}>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditing(row)}>
-                          <Pencil className="mr-2 h-4 w-4" /> Edit salary structure
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setSelected(row)}>
-                          <Eye className="mr-2 h-4 w-4" /> View payslip
-                        </DropdownMenuItem>
-                        {row.rawStatus === "CALCULATED" && (
-                          <DropdownMenuItem onClick={() => void payrollAction(row, "review")}>
-                            Mark reviewed
-                          </DropdownMenuItem>
-                        )}
-                        {user?.role === "SCHOOL_ADMIN" && row.rawStatus === "REVIEWED" && (
-                          <DropdownMenuItem onClick={() => void payrollAction(row, "approve")}>
-                            Approve salary
-                          </DropdownMenuItem>
-                        )}
-                        {user?.role === "SCHOOL_ADMIN" &&
-                          row.rawStatus &&
-                          row.rawStatus !== "PAID" &&
-                          row.rawStatus !== "ON_HOLD" && (
-                            <DropdownMenuItem onClick={() => void payrollAction(row, "hold")}>
-                              Place on hold
-                            </DropdownMenuItem>
-                          )}
-                        {user?.role === "SCHOOL_ADMIN" && row.rawStatus === "ON_HOLD" && (
-                          <DropdownMenuItem onClick={() => void payrollAction(row, "release")}>
-                            Release hold
-                          </DropdownMenuItem>
-                        )}
-                        {row.rawStatus === "APPROVED" && (
-                          <DropdownMenuItem onClick={() => void payrollAction(row, "pay")}>
-                            Record bank payment
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          onClick={() => toast.success(`Payslip sent to ${row.name}`)}
-                        >
-                          <Send className="mr-2 h-4 w-4" /> Send payslip
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <PayrollActionsMenu
+                      row={row}
+                      role={user?.role}
+                      onEdit={() => setEditing(row)}
+                      onView={() => setSelected(row)}
+                      onAction={(action) => void payrollAction(row, action)}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
+
+        <div className="grid gap-2.5 p-4 md:hidden">
+          {rows.map((row) => (
+            <div key={row.id} className="panel min-w-0 overflow-hidden p-3.5">
+              <div className="flex min-w-0 items-start justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <Initials name={row.name} tone={row.department === "Teaching" ? "navy" : "gold"} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{row.name}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {row.id} · {row.role}
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0">
+                  <PayrollActionsMenu
+                    row={row}
+                    role={user?.role}
+                    onEdit={() => setEditing(row)}
+                    onView={() => setSelected(row)}
+                    onAction={(action) => void payrollAction(row, action)}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex min-w-0 items-center justify-between gap-2">
+                <Badge variant="secondary" className="truncate">{row.department}</Badge>
+                <StatusPill status={row.status} className="shrink-0" />
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-1.5 rounded-xl bg-muted/40 p-2.5 text-center text-xs">
+                <div>
+                  <p className="text-muted-foreground">Gross</p>
+                  <p className="font-semibold">{money(row.gross)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Deductions</p>
+                  <p className="font-semibold text-destructive">{money(row.deductions)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Net</p>
+                  <p className="font-bold text-primary">{money(row.net)}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
         <div className="flex items-center justify-between border-t px-4 py-3 text-xs text-muted-foreground">
           <span>
             Showing {rows.length} of {payrollRows.length} employees

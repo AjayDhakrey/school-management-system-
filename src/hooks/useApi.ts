@@ -328,6 +328,34 @@ export interface ApiExam {
   passing_marks?: number | null;
   room_id?: string | null;
   instructions?: string | null;
+  examination_id?: string | null;
+  invigilator_id?: string | null;
+  review_note?: string | null;
+  submitted_at?: string | null;
+  published_at?: string | null;
+  class_name?: string | null;
+  section?: string | null;
+  room_name?: string | null;
+  invigilator_name?: string | null;
+}
+
+/** An examination (e.g. "Mid-Term Examination 2026") groups the subject papers in `exams`. */
+export interface ApiExamination {
+  id: string;
+  school_id: string;
+  academic_year_id: string;
+  academic_year_name: string | null;
+  term: string | null;
+  exam_type: string;
+  name: string;
+  description: string | null;
+  start_date: string;
+  end_date: string;
+  passing_percentage: number;
+  class_ids: string[];
+  based_on_examination_id: string | null;
+  schedule_published_at: string | null;
+  created_at: string;
 }
 
 /** Exam lifecycle is DRAFT → MARKS_ENTRY → REVIEW → PUBLISHED (or CANCELLED). */
@@ -414,16 +442,86 @@ export interface ApiLibraryBook {
   school_id: string;
   title: string;
   author: string | null;
+  /** Derived from the copies: Available / Issued / Unavailable. */
   status: string;
+  isbn?: string | null;
+  category?: string | null;
+  publisher?: string | null;
+  edition?: string | null;
+  shelf_location?: string | null;
+}
+
+export type LibraryCopyStatus = "AVAILABLE" | "ISSUED" | "LOST" | "DAMAGED" | "WITHDRAWN";
+export type LibraryBorrowerType = "STUDENT" | "TEACHER" | "STAFF";
+
+export interface ApiLibraryCopy {
+  id: string;
+  school_id: string;
+  book_id: string;
+  accession_no: string;
+  barcode: string | null;
+  status: LibraryCopyStatus;
+  note: string | null;
 }
 
 export interface ApiLibraryRecord {
   id: string;
   school_id: string;
   book_id: string;
-  student_id: string;
+  student_id: string | null;
   issued_on: string | null;
   returned_on: string | null;
+  copy_id?: string | null;
+  borrower_type?: LibraryBorrowerType;
+  teacher_id?: string | null;
+  staff_id?: string | null;
+  due_date?: string | null;
+  renew_count?: number;
+  return_condition?: "GOOD" | "DAMAGED" | "LOST" | null;
+}
+
+/** A loan as the librarian sees it (library_circulation RPC). */
+export interface ApiLibraryLoan {
+  id: string;
+  book_id: string;
+  copy_id: string | null;
+  title: string;
+  author: string | null;
+  isbn: string | null;
+  category: string | null;
+  accession_no: string | null;
+  barcode: string | null;
+  borrower_type: LibraryBorrowerType;
+  borrower_id: string;
+  borrower_name: string | null;
+  borrower_number: string | null;
+  borrower_detail: string | null;
+  issued_on: string;
+  due_date: string | null;
+  returned_on: string | null;
+  renew_count: number;
+  return_condition: "GOOD" | "DAMAGED" | "LOST" | null;
+  remarks: string | null;
+  overdue_days: number;
+}
+
+export interface ApiLibrarySettings {
+  student_loan_days: number;
+  teacher_loan_days: number;
+  staff_loan_days: number;
+  student_max_books: number;
+  teacher_max_books: number;
+  staff_max_books: number;
+  max_renewals: number;
+  block_when_overdue: boolean;
+}
+
+export interface ApiLibraryBorrower {
+  borrower_type: LibraryBorrowerType;
+  id: string;
+  name: string;
+  number: string | null;
+  detail: string | null;
 }
 
 export interface ApiVehicle {
@@ -896,6 +994,8 @@ export const useStaffAttendanceRoster = (date: string, department?: string, enab
   );
 export const useFees = (enabled = true) => useApiQuery<ApiFee[]>("fees", "/fees", enabled);
 export const useExams = (enabled = true) => useApiQuery<ApiExam[]>("exams", "/exams", enabled);
+export const useExaminations = (enabled = true) =>
+  useApiQuery<ApiExamination[]>("examinations", "/examinations", enabled);
 export const useResults = (enabled = true) =>
   useApiQuery<ApiResult[]>("results", "/results", enabled);
 export const useHomework = (enabled = true) =>
@@ -906,6 +1006,18 @@ export const useLibraryBooks = (enabled = true) =>
   useApiQuery<ApiLibraryBook[]>("library-books", "/library/books", enabled);
 export const useLibraryRecords = (enabled = true) =>
   useApiQuery<ApiLibraryRecord[]>("library-records", "/library/records", enabled);
+export const useLibraryCopies = (enabled = true) =>
+  useApiQuery<ApiLibraryCopy[]>("library-copies", "/library/copies", enabled);
+export const useLibraryCirculation = (enabled = true) =>
+  useApiQuery<ApiLibraryLoan[]>("library-circulation", "/library/circulation", enabled);
+export const useLibrarySettings = (enabled = true) =>
+  useApiQuery<ApiLibrarySettings>("library-settings", "/library/settings", enabled);
+export const useLibraryBorrowers = (query: string, type: string, enabled = true) =>
+  useApiQuery<ApiLibraryBorrower[]>(
+    "library-borrowers",
+    `/library/borrowers?q=${encodeURIComponent(query)}${type ? `&type=${type}` : ""}`,
+    enabled,
+  );
 export const useTransport = (enabled = true) =>
   useApiQuery<ApiVehicle[]>("transport", "/transport", enabled);
 export const useAdmissions = (enabled = true) =>

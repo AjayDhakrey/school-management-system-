@@ -38,6 +38,7 @@ const TABLES: Record<string, string> = {
   certificates: "certificates",
   classes: "classes",
   events: "events",
+  examinations: "examinations",
   exams: "exams",
   "fee-structures": "fee_structures",
   fees: "fees",
@@ -136,6 +137,9 @@ const UNIQUE_MESSAGES: Record<string, string> = {
   uq_timetable_teacher_slot: "This teacher is already scheduled at that day and time",
   uq_timetable_room_slot: "This room is already booked at that day and time",
   uq_exam_schedule: "A conflicting exam schedule already exists",
+  uq_exam_paper: "This subject is already scheduled for the class in this examination",
+  uq_examinations_school_year_name:
+    "An examination with this name already exists for the academic year",
   uq_teachers_employee_id: "Employee ID already exists",
   uq_staff_employee_id: "Employee ID already exists",
   uq_academic_years_school_name: "Academic year already exists",
@@ -149,6 +153,9 @@ const UNIQUE_MESSAGES: Record<string, string> = {
   uq_fee_structures_equivalent: "An equivalent active fee structure already exists",
   user_profiles_email_key: "A login with this email already exists",
   ux_library_one_active_issue_per_book: "Book is already issued",
+  ux_library_one_active_loan_per_copy: "This copy is already issued",
+  uq_library_copies_accession: "This accession number is already used",
+  uq_library_copies_barcode: "This barcode is already used by another copy",
 };
 
 const toSnake = (key: string) => key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
@@ -976,12 +983,28 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
       return byKeys(shaped, "-date", "person_name");
     }
 
+    case "examinations": {
+      const columns = "*,academic_years(name)";
+      const shape = (row: Row) => flatten(row, "academic_years", { name: "academic_year_name" });
+      if (second) return shape(await selectOne("examinations", second, columns));
+      const rows = await selectAll(() =>
+        supabase
+          .from("examinations")
+          .select(columns)
+          .order("start_date", { ascending: false })
+          .order("id"),
+      );
+      return rows.map(shape);
+    }
+
     case "exams": {
-      const columns = "*,subjects(name),classes(name,section),academic_years(name),rooms(name)";
+      const columns =
+        "*,subjects(name),classes(name,section),academic_years(name),rooms(name),teachers(name)";
       const shape = (row: Row) => {
         flatten(row, "subjects", { name: "subject_name" });
         flatten(row, "classes", { name: "class_name", section: "section" });
         flatten(row, "academic_years", { name: "academic_year_name" });
+        flatten(row, "teachers", { name: "invigilator_name" });
         return flatten(row, "rooms", { name: "room_name" });
       };
       if (second) return shape(await selectOne("exams", second, columns));
@@ -1244,6 +1267,20 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
             .order("issued_on", { ascending: false })
             .order("id"),
         );
+      }
+      if (second === "copies") {
+        return selectAll(() =>
+          supabase.from("library_copies").select("*").order("accession_no").order("id"),
+        );
+      }
+      // Librarian views: every loan with book, copy and borrower details.
+      if (second === "circulation") return rpc("library_circulation");
+      if (second === "settings") return rpc("library_get_settings");
+      if (second === "borrowers") {
+        return rpc("library_find_borrowers", {
+          p_query: param("q") ?? "",
+          p_type: param("type"),
+        });
       }
       break;
     }
@@ -1687,6 +1724,12 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
       if (method === "POST" && second === "exams" && third && fourth === "publish") {
         return rpc("publish_exam_results", { p_exam_id: third });
       }
+      if (method === "POST" && second === "exams" && third && fourth === "submit") {
+        return rpc("submit_exam_marks", { p_exam_id: third });
+      }
+      if (method === "POST" && second === "exams" && third && fourth === "return") {
+        return rpc("return_exam_marks", { p_exam_id: third, p_note: body["note"] ?? null });
+      }
       break;
 
     case "fees":
@@ -1842,23 +1885,57 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
       break;
 
     case "library":
-      if (method === "POST" && second === "records") {
+      if (method === "POST" && second === "records" && !third) {
+        // Issue a specific copy to a student / teacher / staff member; the older
+        // { bookId, studentId } form issues the first available copy.
+        if (body["copyId"]) {
+          return rpc("library_issue", {
+            p_copy_id: body["copyId"],
+            p_borrower_type: body["borrowerType"],
+            p_borrower_id: body["borrowerId"],
+            p_due_date: body["dueDate"] || null,
+          });
+        }
         return rpc("library_issue_book", {
           p_book_id: body["bookId"],
           p_student_id: body["studentId"],
         });
       }
       if (method === "PATCH" && second === "records" && third && fourth === "return") {
-        return rpc("library_return_book", { p_record_id: third });
+        return rpc("library_return_book", {
+          p_record_id: third,
+          p_condition: body["condition"] ?? "GOOD",
+          p_remarks: body["remarks"] ?? null,
+        });
       }
-      if (method === "POST" && second === "books") {
+      if (method === "POST" && second === "records" && third && fourth === "renew") {
+        return rpc("library_renew", { p_record_id: third });
+      }
+      if (method === "POST" && second === "books" && third && fourth === "copies") {
+        return rpc("library_add_copies", { p_book_id: third, p_count: body["count"] ?? 1 });
+      }
+      if (method === "POST" && second === "books" && !third) {
         const title = str(body["title"]).trim();
         const author = str(body["author"]).trim();
         if (!title) throw new ApiError(400, "title is required");
         if (title.length > 200 || author.length > 200) {
           throw new ApiError(400, "title and author must be at most 200 characters");
         }
-        return insertRow("library_books", { title, author: author || null });
+        return rpc("library_create_book", {
+          p_book: {
+            title,
+            author: author || null,
+            isbn: str(body["isbn"]).trim() || null,
+            category: str(body["category"]).trim() || null,
+            publisher: str(body["publisher"]).trim() || null,
+            edition: str(body["edition"]).trim() || null,
+            shelfLocation: str(body["shelfLocation"]).trim() || null,
+          },
+          p_copies: body["copies"] ?? 1,
+        });
+      }
+      if (method === "PUT" && second === "settings") {
+        return rpc("library_save_settings", { p_settings: body });
       }
       break;
 
@@ -2072,7 +2149,12 @@ async function genericWrite(method: Method, parts: string[], values: Row) {
     id = third;
   }
   if (resource === "library") {
-    table = second === "books" ? "library_books" : "library_records";
+    table =
+      second === "books"
+        ? "library_books"
+        : second === "copies"
+          ? "library_copies"
+          : "library_records";
     id = third;
   }
   if (!table) throw new ApiError(404, `Unsupported backend route: ${method} /${parts.join("/")}`);

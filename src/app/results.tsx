@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useResults, useStudents, useExams, useMyStudentProfile, useMyTeacherProfile, useClasses } from "@/hooks/useApi";
 import { useAuth } from "@/lib/auth-context";
 import { canView } from "@/lib/permissions";
-import { SCHOOL } from "@/lib/siteData";
+import { useSchoolBranding } from "@/hooks/use-school-branding";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,7 @@ function overallGrade(percentage: number): string {
 
 function StudentResultsView() {
   const { user } = useAuth();
+  const school = useSchoolBranding();
   const { data: profile } = useMyStudentProfile();
   const { data: results, isLoading: resultsLoading } = useResults();
   const { data: exams, isLoading: examsLoading } = useExams();
@@ -56,7 +57,7 @@ function StudentResultsView() {
   const rowsByTerm = useMemo(() => {
     const grouped = new Map<
       string,
-      { subject: string; marks: number | null; maxMarks: number; grade: string }[]
+      { subject: string; marks: number | null; maxMarks: number; passMarks: number; attendance: string; grade: string }[]
     >();
     for (const r of results ?? []) {
       const exam = r.exam_id ? examsById.get(r.exam_id) : undefined;
@@ -66,6 +67,9 @@ function StudentResultsView() {
         subject: exam.subject ?? "—",
         marks: r.marks,
         maxMarks: r.max_marks || 100,
+        // Each paper's own passing marks; 40% only for old rows that have none.
+        passMarks: r.passing_marks ?? (r.max_marks || 100) * 0.4,
+        attendance: r.attendance_status ?? "PRESENT",
         grade: r.grade ?? "—",
       });
       grouped.set(exam.term, list);
@@ -94,12 +98,17 @@ function StudentResultsView() {
   }, [availableTerms, term]);
 
   const activeRows = rowsByTerm.get(term) ?? [];
-  const scored = activeRows.filter((r) => r.marks !== null);
+  // Absent papers count as 0 of their maximum; Not Applicable papers are left out.
+  const scored = activeRows.filter((r) => r.marks !== null || r.attendance === "ABSENT");
   const totalObtained = scored.reduce((a, r) => a + (r.marks ?? 0), 0);
   const totalMax = scored.reduce((a, r) => a + r.maxMarks, 0);
   const percentage = totalMax ? Math.round((totalObtained / totalMax) * 1000) / 10 : 0;
   const finalGrade = scored.length ? overallGrade(percentage) : "—";
-  const passStatus = scored.length ? (activeRows.every((r) => r.marks === null || r.marks >= r.maxMarks * 0.4) ? "Pass" : "Fail") : "—";
+  const passStatus = scored.length
+    ? scored.every((r) => r.attendance !== "ABSENT" && (r.marks ?? 0) >= r.passMarks)
+      ? "Pass"
+      : "Fail"
+    : "—";
 
   const isLoading = resultsLoading || examsLoading;
 
@@ -142,10 +151,10 @@ function StudentResultsView() {
           <div className="grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary">
             <GraduationCap className="h-6 w-6" />
           </div>
-          <h2 className="text-lg font-semibold text-foreground">{SCHOOL.name}</h2>
-          <p className="text-xs text-muted-foreground">{SCHOOL.address}</p>
+          <h2 className="text-lg font-semibold text-foreground">{school.name}</h2>
+          <p className="text-xs text-muted-foreground">{school.address}</p>
           <p className="mt-1 text-sm font-medium text-foreground">
-            Report Card — {term === "Final" ? "Final Result" : term} · Session {SCHOOL.session}
+            Report Card — {term === "Final" ? "Final Result" : term} · Session {school.session}
           </p>
         </div>
 
@@ -193,11 +202,12 @@ function StudentResultsView() {
               <TableBody>
                 {activeRows.map((r, i) => {
                   const subjectPct = r.marks !== null ? Math.round((r.marks / r.maxMarks) * 1000) / 10 : null;
-                  const subjectPass = r.marks !== null ? r.marks >= r.maxMarks * 0.4 : null;
+                  const absent = r.attendance === "ABSENT";
+                  const subjectPass = absent ? false : r.marks !== null ? r.marks >= r.passMarks : null;
                   return (
                     <TableRow key={`${r.subject}-${i}`}>
                       <TableCell className="font-medium">{r.subject}</TableCell>
-                      <TableCell className="text-right">{r.marks ?? "—"}</TableCell>
+                      <TableCell className="text-right">{absent ? "AB" : (r.marks ?? "—")}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{r.maxMarks}</TableCell>
                       <TableCell className="text-right">{subjectPct !== null ? `${subjectPct}%` : "—"}</TableCell>
                       <TableCell className="text-right">
@@ -208,7 +218,7 @@ function StudentResultsView() {
                           "—"
                         ) : (
                           <span className={subjectPass ? "font-medium text-success" : "font-medium text-destructive"}>
-                            {subjectPass ? "Pass" : "Fail"}
+                            {absent ? "Absent" : subjectPass ? "Pass" : "Fail"}
                           </span>
                         )}
                       </TableCell>

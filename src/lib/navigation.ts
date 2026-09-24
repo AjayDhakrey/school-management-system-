@@ -241,7 +241,9 @@ export const NAV: NavGroup[] = [
         label: "Examinations",
         to: "/examinations",
         icon: FileSpreadsheet,
-        roles: [...admins, "Teacher", "Student"],
+        // Staff see the module; what they can do comes from the exams.* / results.*
+        // permissions the School Admin grants under Roles & Permissions.
+        roles: [...admins, "Teacher", "Student", "Staff"],
         hideFromSidebar: ["Student", "Teacher"],
       },
       {
@@ -329,7 +331,16 @@ export const NAV: NavGroup[] = [
         label: "Library",
         to: "/library",
         icon: Library,
-        roles: [...admins, "Librarian", "Student"],
+        // Teachers and staff borrow books too; they see their own loans and the catalogue.
+        roles: [
+          ...admins,
+          "Librarian",
+          "Student",
+          "Teacher",
+          "Staff",
+          "Accountant",
+          "Transport Manager",
+        ],
       },
       {
         label: "Transport",

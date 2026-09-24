@@ -4,7 +4,7 @@ import { ChevronDown, LogOut, MoreVertical, User } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { useAuth, toDisplayRole } from "@/lib/auth-context";
 import { navForRole, PROFILE_PATH_FOR_ROLE } from "@/lib/navigation";
-import { SCHOOL } from "@/lib/siteData";
+import { useSchoolBranding } from "@/hooks/use-school-branding";
 import { cn } from "@/lib/utils";
 import { Initials } from "@/components/shared/ui-kit";
 import {
@@ -130,6 +130,7 @@ export function SidebarBrand({
   mobile?: boolean;
 }) {
   const { collapsed } = useApp();
+  const school = useSchoolBranding();
   return (
     <div
       className={cn(
@@ -144,15 +145,15 @@ export function SidebarBrand({
           mobile && "h-14 w-14",
         )}
       >
-        <img src={edunexLogo} alt="Edunex" />
+        <img src={school.logoUrl ?? edunexLogo} alt={school.name} />
       </span>
       {!collapsed && (
         <span className="min-w-0">
           <span className="block truncate font-display text-sm font-bold leading-tight text-foreground">
-            {SCHOOL.name}
+            {school.name}
           </span>
           <span className="mt-1 block text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
-            {SCHOOL.session}
+            {school.session}
           </span>
         </span>
       )}

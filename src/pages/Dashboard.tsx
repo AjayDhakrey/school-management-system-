@@ -314,7 +314,7 @@ const TEACHER_SHORTCUTS: TeacherShortcut[] = [
   { label: "Attendance", image: attendanceIcon, to: "/attendance" },
   { label: "Homework", image: homeworkIcon, to: "/homework" },
   { label: "Exams", image: examIcon, to: "/examinations" },
-  { label: "Results", image: resultIcon, to: "/results" },
+  { label: "Marks & Results", image: resultIcon, to: "/results" },
   { label: "Leave", image: leaveIcon, to: "/leave/teachers" },
 ];
 

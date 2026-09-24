@@ -3,6 +3,7 @@
 import { Cake, Droplet, Home, Mail, Phone, School, User } from "lucide-react";
 import { PageHeader, EmptyState, CardSkeleton } from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
+import { AppearanceSettings } from "@/components/shared/AppearanceSettings";
 import { SignOutCard } from "@/components/shared/SignOutCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
@@ -34,6 +35,8 @@ export default function ChildProfilePage() {
         description="View your child's school profile."
         breadcrumb={["Dashboard", "My Children", "Profile"]}
       />
+
+      <AppearanceSettings />
 
       <ChildSwitcher />
 

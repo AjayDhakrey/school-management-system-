@@ -1,6 +1,6 @@
 import { type ComponentType } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AiFillHome, AiOutlineHome, AiOutlineSchedule } from "react-icons/ai";
+import { AiFillHome, AiOutlineHome } from "react-icons/ai";
 import {
   HiNewspaper,
   HiOutlineNewspaper,
@@ -8,7 +8,6 @@ import {
   HiUserCircle,
 } from "react-icons/hi2";
 import { PiCalendarDotsDuotone, PiCalendarDotsFill } from "react-icons/pi";
-import { FaChalkboardUser } from "react-icons/fa6";
 import {
   IoBook,
   IoBookOutline,
@@ -51,6 +50,16 @@ type DockItem = {
 
 const EXAM_PATHS = ["/examinations", "/results"];
 
+const ACADEMIC_PATHS = [
+  "/classes",
+  "/subjects",
+  "/timetable",
+  "/attendance",
+  "/homework",
+  "/examinations",
+  "/results",
+];
+
 /** Second slot: the role's academics hub, or its main workspace for roles without one. */
 const WORKSPACE: Record<Role, DockItem> = {
   "Super Admin": {
@@ -65,14 +74,14 @@ const WORKSPACE: Record<Role, DockItem> = {
     to: "/classes",
     icon: IoBookOutline,
     activeIcon: IoBook,
-    match: ["/classes"],
+    match: ACADEMIC_PATHS,
   },
   Teacher: {
-    label: "Subjects",
-    to: "/teacher/subjects",
+    label: "Academics",
+    to: "/teacher/classes",
     icon: IoBookOutline,
     activeIcon: IoBook,
-    match: ["/teacher/subjects"],
+    match: ["/teacher/classes", "/teacher/students", "/teacher/subjects", ...ACADEMIC_PATHS],
   },
   // Students land on their timetable rather than the subjects list.
   Student: {
@@ -80,14 +89,20 @@ const WORKSPACE: Record<Role, DockItem> = {
     to: "/timetable",
     icon: PiCalendarDotsDuotone,
     activeIcon: PiCalendarDotsFill,
-    match: ["/timetable"],
+    match: ["/my-subjects", ...ACADEMIC_PATHS.filter((p) => !EXAM_PATHS.includes(p))],
   },
   Parent: {
     label: "Academics",
     to: "/parent/children/timetable",
     icon: IoBookOutline,
     activeIcon: IoBook,
-    match: ["/parent/children/timetable"],
+    match: [
+      "/parent/children/attendance",
+      "/parent/children/timetable",
+      "/parent/children/homework",
+      "/parent/children/exams",
+      "/parent/children/results",
+    ],
   },
   Staff: {
     label: "Students",
@@ -190,30 +205,22 @@ export function MobileBottomNav() {
             activeIcon: IoMegaphone,
             match: ["/super-admin/announcements"],
           }
-        : role === "Teacher"
+        : (ROUTE_ROLES["/notifications"] ?? []).includes(role)
           ? {
-              label: "Attendance",
-              to: "/attendance",
-              icon: AiOutlineSchedule,
-              activeIcon: AiOutlineSchedule,
-              match: ["/attendance"],
+              label: "Alerts",
+              to: "/notifications",
+              icon: IoNotificationsOutline,
+              activeIcon: IoNotifications,
+              match: ["/notifications"],
+              badge: unread,
             }
-          : (ROUTE_ROLES["/notifications"] ?? []).includes(role)
-            ? {
-                label: "Alerts",
-                to: "/notifications",
-                icon: IoNotificationsOutline,
-                activeIcon: IoNotifications,
-                match: ["/notifications"],
-                badge: unread,
-              }
-            : {
-                label: "Notices",
-                to: "/notices",
-                icon: IoMegaphoneOutline,
-                activeIcon: IoMegaphone,
-                match: ["/notices"],
-              };
+          : {
+              label: "Notices",
+              to: "/notices",
+              icon: IoMegaphoneOutline,
+              activeIcon: IoMegaphone,
+              match: ["/notices"],
+            };
 
   const home: DockItem = {
     label: "Home",
@@ -230,9 +237,8 @@ export function MobileBottomNav() {
     match: [profilePath],
   };
 
-  // Students get their fees in the centre slot, Teachers get their classes; every other
-  // role keeps the menu button there. The sidebar stays reachable for them from the
-  // header's hamburger.
+  // Students get their fees in the centre slot; every other role keeps the menu button
+  // there. The sidebar stays reachable for them from the header's hamburger.
   const centre: DockItem | null =
     role === "Student"
       ? {
@@ -242,15 +248,7 @@ export function MobileBottomNav() {
           activeIcon: IoWallet,
           match: ["/my-fees"],
         }
-      : role === "Teacher"
-        ? {
-            label: "Classes",
-            to: "/teacher/classes",
-            icon: FaChalkboardUser,
-            activeIcon: FaChalkboardUser,
-            match: ["/teacher/classes"],
-          }
-        : null;
+      : null;
 
   const left = [home, WORKSPACE[role]];
   const right = [alerts, profile];

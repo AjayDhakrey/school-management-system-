@@ -3,11 +3,9 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Phone } from "lucide-react";
-import { PageHeader, EmptyState } from "@/components/shared/ui-kit";
+import { Phone, Image as ImageIcon } from "lucide-react";
+import { PageHeader, Initials, EmptyState } from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
-import { ProfileHero } from "@/components/shared/ProfileHero";
-import { PhotoField } from "@/components/shared/PhotoField";
 import { SignOutCard } from "@/components/shared/SignOutCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -69,21 +67,22 @@ export default function TeacherProfilePage() {
         breadcrumb={["Dashboard", "My Profile"]}
       />
 
-      <ProfileHero
-        name={teacher.name}
-        photoUrl={photoUrl}
-        onPhotoChange={setPhotoUrl}
-        lines={
-          <>
-            <p className="mt-0.5 text-xs text-white/80">
+      <div className="panel mb-4 p-4 sm:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <Initials name={teacher.name} className="h-16 w-16 text-lg" />
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-lg font-bold">{teacher.name}</h2>
+            <p className="text-xs text-muted-foreground">
               Employee ID: {teacher.id.slice(0, 8).toUpperCase()} ·{" "}
               {teacher.designation ?? "Teacher"}
             </p>
-            <p className="mt-1 text-xs text-white/80">{teacher.department ?? "—"}</p>
-          </>
-        }
-        badges={<StatusBadge status={teacher.employment_status} />}
-      />
+            <p className="mt-1 text-xs text-muted-foreground">{teacher.department ?? "—"}</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <StatusBadge status={teacher.employment_status} />
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard title="Academic Info" subtitle="Read-only — set by your school administrator">
@@ -131,12 +130,18 @@ export default function TeacherProfilePage() {
               </Label>
               <Input id="t-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
-            <PhotoField
-              id="t-photo"
-              name={teacher.name}
-              photoUrl={photoUrl}
-              onPhotoChange={setPhotoUrl}
-            />
+            <div className="grid gap-1.5">
+              <Label htmlFor="t-photo">
+                <ImageIcon className="mr-1 inline h-3.5 w-3.5" />
+                Photo URL
+              </Label>
+              <Input
+                id="t-photo"
+                value={photoUrl}
+                onChange={(e) => setPhotoUrl(e.target.value)}
+                placeholder="https://…"
+              />
+            </div>
             <Button type="submit" disabled={submitting} className="mt-1">
               Save Changes
             </Button>

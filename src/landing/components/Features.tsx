@@ -8,18 +8,18 @@ export function RoleStrip() {
   const rows = [ROLES, [...ROLES.slice(half), ...ROLES.slice(0, half)]];
 
   return (
-    <section aria-label="Who uses EduNex" className="relative overflow-hidden bg-white py-16 lg:py-20">
+    <section aria-label="Who uses EduNex" className="relative overflow-hidden bg-white py-12 sm:py-16 lg:py-20">
       <div className="pointer-events-none absolute inset-x-0 top-1/2 h-64 -translate-y-1/2 bg-gradient-to-r from-[#EAF2FF] via-[#F4F8FF] to-[#EAF2FF]" />
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-56 w-[60%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#5F9AF8]/15 blur-3xl" />
 
-      <div className="relative mx-auto max-w-3xl px-4 text-center">
+      <div className="relative mx-auto max-w-3xl px-6 text-center">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#5F9AF8]">One platform</p>
-        <h2 className="font-display mt-3 text-2xl font-extrabold text-[#141C3A] sm:text-3xl">
+        <h2 className="font-display mt-3 text-[1.35rem] font-extrabold leading-snug text-[#141C3A] [text-wrap:balance] sm:text-3xl">
           A dedicated portal for <span className="text-gradient">every role</span> in your school
         </h2>
       </div>
 
-      <div className="group relative mt-10 grid gap-4 [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)]">
+      <div className="group relative mt-8 grid gap-3 [mask-image:linear-gradient(90deg,transparent,#000_4%,#000_96%,transparent)] sm:mt-10 sm:gap-4 sm:[mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)]">
         {rows.map((row, r) => (
           <ul
             key={r}
@@ -35,19 +35,19 @@ export function RoleStrip() {
                 <li
                   key={`${role}-${i}`}
                   aria-hidden={i >= row.length || r > 0}
-                  className="mr-4 flex items-center gap-3 whitespace-nowrap rounded-2xl border border-white bg-white/80 py-2.5 pl-2.5 pr-5 shadow-[0_10px_30px_-18px_rgba(20,28,58,0.35)] ring-1 ring-[#5F9AF8]/10 backdrop-blur transition-transform duration-300 hover:-translate-y-0.5"
+                  className="mr-3 flex items-center gap-2.5 whitespace-nowrap rounded-xl border border-white bg-white/80 py-2 pl-2 pr-4 sm:mr-4 sm:gap-3 sm:rounded-2xl sm:py-2.5 sm:pl-2.5 sm:pr-5 shadow-[0_10px_30px_-18px_rgba(20,28,58,0.35)] ring-1 ring-[#5F9AF8]/10 backdrop-blur transition-transform duration-300 hover:-translate-y-0.5"
                 >
                   <span
                     className={cn(
-                      "grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br text-white shadow-md",
+                      "grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl bg-gradient-to-br text-white shadow-md",
                       meta?.tone ?? "from-[#5F9AF8] to-[#2F5FC4]",
                     )}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                   </span>
                   <span className="leading-tight">
-                    <span className="block text-sm font-bold text-[#141C3A]">{role}</span>
-                    {meta && <span className="block text-xs text-[#5b6685]">{meta.text}</span>}
+                    <span className="block text-[13px] font-bold text-[#141C3A] sm:text-sm">{role}</span>
+                    {meta && <span className="block text-[11px] text-[#5b6685] sm:text-xs">{meta.text}</span>}
                   </span>
                 </li>
               );

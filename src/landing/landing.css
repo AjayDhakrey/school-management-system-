@@ -1,0 +1,91 @@
+/* Landing-page-only styles: motion + a few effects Tailwind utilities can't express cleanly. */
+
+html:has(.landing-root) {
+  scroll-behavior: smooth;
+}
+
+.landing-root section[id] {
+  scroll-margin-top: 84px;
+}
+
+.landing-root .font-display {
+  font-family: "Sora", ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.landing-root .text-gradient {
+  background: linear-gradient(100deg, #2f5fc4 0%, #5f9af8 55%, #7cc4ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Reveal-on-scroll */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.7s ease,
+    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes ss-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+.animate-float {
+  animation: ss-float 6s ease-in-out infinite;
+}
+.animate-float-slow {
+  animation: ss-float 8s ease-in-out infinite;
+  animation-delay: -3s;
+}
+
+@keyframes ss-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: ss-marquee 40s linear infinite;
+}
+.animate-marquee-reverse {
+  animation: ss-marquee 40s linear infinite reverse;
+}
+
+@keyframes ss-fade-swap {
+  from { opacity: 0; transform: translateY(18px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.animate-swap {
+  animation: ss-fade-swap 0.55s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.fade-bottom {
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(95, 154, 248, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(95, 154, 248, 0.08) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+.landing-root details > summary::-webkit-details-marker {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.landing-root) { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .animate-float,
+  .animate-float-slow,
+  .animate-marquee,
+  .animate-marquee-reverse,
+  .animate-swap { animation: none; }
+}

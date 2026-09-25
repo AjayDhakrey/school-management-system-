@@ -13,6 +13,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ErrorBoundary } from "@/pages/ErrorFallback";
 
 const Login = lazy(() => import("@/pages/Login"));
+const LandingPage = lazy(() => import("@/landing/LandingPage"));
 const Dashboard = lazy(() => import("@/pages/Dashboard"));
 const StudentsPage = lazy(() => import("@/pages/StudentsPage"));
 const StudentProfile = lazy(() => import("@/pages/StudentProfile"));
@@ -102,7 +103,7 @@ function guarded(path: string, element: ReactElement) {
 function RootRedirect() {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <LandingPage />;
   return <Navigate to={DASHBOARD_PATH_FOR_ROLE[user.role]} replace />;
 }
 

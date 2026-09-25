@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, GraduationCap, Loader2 } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ArrowLeft, Eye, EyeOff, GraduationCap, Loader2 } from "lucide-react";
 import { useAuth, DASHBOARD_PATH_FOR_ROLE } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
 
@@ -47,6 +47,13 @@ export default function Login() {
       <div className="pointer-events-none absolute -bottom-28 -right-16 h-80 w-80 rounded-full bg-[#5F9AF8]/25 blur-3xl" />
       <div className="pointer-events-none absolute bottom-10 left-10 h-40 w-40 rounded-full bg-white/60 blur-2xl" />
 
+      <Link
+        to="/"
+        className="absolute left-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-full bg-white/80 px-4 py-2 text-sm font-semibold text-[#2F5FC4] shadow-sm backdrop-blur transition hover:bg-white"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to home
+      </Link>
+
       <div
         className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-[32px] bg-white [transform:rotateX(2deg)_rotateY(-3deg)] transition-transform duration-500 hover:[transform:rotateX(0deg)_rotateY(0deg)] md:h-[520px] md:flex-row"
         style={{
@@ -72,7 +79,7 @@ export default function Login() {
               </span>
               <span className="text-center md:text-left">
                 <span className="block text-[15px] font-bold leading-tight tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.25)] md:text-[17px]">
-                  SchoolSphere
+                  EduNex
                 </span>
                 <span className="block text-[10px] font-medium tracking-wide text-white/75 md:text-[11px]">
                   Smart School Management

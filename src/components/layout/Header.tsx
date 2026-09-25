@@ -304,7 +304,7 @@ export function Header() {
         <div className="flex items-center gap-2">
           <div className="min-w-0">
             <p className="truncate font-display text-sm font-bold">
-              {school?.name ?? "SchoolSphere"}
+              {school?.name ?? "EduNex"}
             </p>
             {school?.session && (
               <p className="truncate text-[11px] text-muted-foreground">Session {school.session}</p>

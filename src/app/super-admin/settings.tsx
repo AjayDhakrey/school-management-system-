@@ -12,7 +12,7 @@ import { SITE_METADATA } from "@/lib/siteData";
 import { api } from "@/lib/api";
 
 export default function PlatformSettingsPage() {
-  const [platformName, setPlatformName] = useState(SITE_METADATA.titleDefault ?? "SchoolSphere");
+  const [platformName, setPlatformName] = useState(SITE_METADATA.titleDefault ?? "EduNex");
   const [supportEmail, setSupportEmail] = useState("support@schoolsphere.app");
   const [saving, setSaving] = useState(false);
   useEffect(() => {

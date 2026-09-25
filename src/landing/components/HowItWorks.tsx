@@ -1,4 +1,14 @@
-import { ArrowRight, KeyRound, LogIn, ShieldCheck, Sun, Users } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarCheck2,
+  DatabaseZap,
+  KeyRound,
+  LogIn,
+  Rocket,
+  ShieldCheck,
+  Sun,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DAY_FLOW, ONBOARDING_STEPS, ROLE_META, SHOTS } from "../landing-data";
 import { LoginLink, Reveal, SectionHeading, buttonStyles } from "./primitives";
@@ -7,6 +17,14 @@ const LOGIN_STEPS = [
   { title: "Open EduNex", text: "On your phone or computer — no app store download needed." },
   { title: "Enter your User ID & password", text: "Your school admin creates the login for each person." },
   { title: "Land on your own dashboard", text: "Admin, teacher, parent or student — you only see what's yours." },
+];
+
+// Icon + accent colour for each onboarding step, in order.
+const STEP_STYLES = [
+  { icon: CalendarCheck2, tone: "from-[#8FB8FB] to-[#2F5FC4]", text: "text-[#2F5FC4]" },
+  { icon: DatabaseZap, tone: "from-[#C084FC] to-[#7E22CE]", text: "text-[#7E22CE]" },
+  { icon: KeyRound, tone: "from-[#FDBA74] to-[#EA580C]", text: "text-[#EA580C]" },
+  { icon: Rocket, tone: "from-[#5EEAD4] to-[#0F766E]", text: "text-[#0F766E]" },
 ];
 
 export function HowItWorks() {
@@ -23,24 +41,60 @@ export function HowItWorks() {
           text="We handle the setup so your team can start using EduNex right away."
         />
 
-        {/* onboarding steps */}
-        <div className="relative mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <div
-            aria-hidden
-            className="absolute left-[12%] right-[12%] top-8 hidden h-0.5 bg-gradient-to-r from-[#5F9AF8]/0 via-[#5F9AF8]/40 to-[#5F9AF8]/0 lg:block"
-          />
-          {ONBOARDING_STEPS.map((s, i) => (
-            <Reveal key={s.title} delay={i * 100}>
-              <article className="relative h-full rounded-3xl bg-white p-6 text-center shadow-[0_20px_40px_-28px_rgba(20,28,58,0.35)] ring-1 ring-[#5F9AF8]/10">
-                <span className="font-display mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-gradient-to-br from-[#8FB8FB] via-[#5F9AF8] to-[#2F5FC4] text-2xl font-bold text-white shadow-[0_14px_28px_-10px_rgba(47,95,196,0.7)]">
-                  {i + 1}
-                </span>
-                <h3 className="font-display mt-5 text-lg font-bold text-[#141C3A]">{s.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-[#5b6685]">{s.text}</p>
-              </article>
-            </Reveal>
-          ))}
-        </div>
+        {/* onboarding journey */}
+        <Reveal className="relative mt-14 overflow-hidden rounded-[32px] bg-gradient-to-br from-white via-[#F7FAFF] to-[#EEF4FF] px-6 py-12 shadow-[0_40px_80px_-50px_rgba(20,28,58,0.4)] ring-1 ring-[#5F9AF8]/15 sm:px-10 lg:px-12 lg:py-16">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(95,154,248,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(95,154,248,0.08)_1px,transparent_1px)] [background-size:40px_40px] [mask-image:radial-gradient(ellipse_at_center,#000_20%,transparent_75%)]" />
+          <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-[#8FB8FB]/30 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-28 -right-20 h-80 w-80 rounded-full bg-[#5EEAD4]/20 blur-3xl" />
+
+          <ol className="relative grid gap-8 lg:grid-cols-4 lg:gap-6">
+            {/* track: horizontal on desktop, vertical on mobile */}
+            <span
+              aria-hidden
+              className="absolute left-[12.5%] right-[12.5%] top-10 hidden h-1 -translate-y-1/2 rounded-full bg-gradient-to-r from-[#5F9AF8] via-[#A855F7] via-60% to-[#14B8A6] opacity-50 lg:block"
+            >
+              <span className="animate-travel absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#5F9AF8] shadow-[0_0_16px_5px_rgba(95,154,248,0.55)]" />
+            </span>
+            <span
+              aria-hidden
+              className="absolute bottom-10 left-10 top-10 w-1 -translate-x-1/2 rounded-full bg-gradient-to-b from-[#5F9AF8] via-[#A855F7] to-[#14B8A6] opacity-40 lg:hidden"
+            />
+            <span aria-hidden className="absolute bottom-10 left-10 top-10 w-1 -translate-x-1/2 lg:hidden">
+              <span className="animate-travel-y absolute left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#5F9AF8] shadow-[0_0_16px_5px_rgba(95,154,248,0.55)]" />
+            </span>
+
+            {ONBOARDING_STEPS.map((s, i) => {
+              const style = STEP_STYLES[i % STEP_STYLES.length]!;
+              const Icon = style.icon;
+              return (
+                <li key={s.title} className="group relative flex gap-5 lg:flex-col lg:items-center lg:gap-0 lg:text-center">
+                  <span className="relative z-10 grid h-20 w-20 shrink-0 place-items-center rounded-full bg-white shadow-[0_14px_30px_-14px_rgba(20,28,58,0.45)] ring-1 ring-[#5F9AF8]/15">
+                    <span aria-hidden className={cn("absolute inset-2 rounded-full bg-gradient-to-br opacity-35 blur-lg transition-opacity duration-300 group-hover:opacity-70", style.tone)} />
+                    <span
+                      className={cn(
+                        "relative grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br text-white ring-4 ring-white transition-transform duration-300 group-hover:scale-110",
+                        style.tone,
+                      )}
+                    >
+                      <Icon className="h-6 w-6" />
+                    </span>
+                    <span className="font-display absolute -right-1 -top-1 grid h-7 w-7 place-items-center rounded-full bg-[#141C3A] text-xs font-extrabold text-white shadow-lg ring-2 ring-white">
+                      {i + 1}
+                    </span>
+                  </span>
+
+                  <div className="flex-1 rounded-2xl bg-white/90 p-5 shadow-[0_18px_40px_-30px_rgba(20,28,58,0.45)] ring-1 ring-[#141C3A]/[0.06] backdrop-blur-sm transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_28px_50px_-28px_rgba(20,28,58,0.45)] lg:mt-7 lg:w-full">
+                    <p className={cn("text-xs font-bold uppercase tracking-[0.16em]", style.text)}>
+                      Step {String(i + 1).padStart(2, "0")}
+                    </p>
+                    <h3 className="font-display mt-1.5 text-lg font-bold text-[#141C3A]">{s.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-[#5b6685]">{s.text}</p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </Reveal>
 
         <div className="mt-20 grid gap-8 lg:grid-cols-2">
           {/* day timeline */}

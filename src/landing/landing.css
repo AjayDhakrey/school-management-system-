@@ -52,6 +52,22 @@ html:has(.landing-root) {
 .animate-marquee {
   animation: ss-marquee 40s linear infinite;
 }
+@keyframes ss-travel {
+  0% { left: 0; opacity: 0; }
+  10%, 90% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+.animate-travel {
+  animation: ss-travel 5s ease-in-out infinite;
+}
+@keyframes ss-travel-y {
+  0% { top: 0; opacity: 0; }
+  10%, 90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+.animate-travel-y {
+  animation: ss-travel-y 5s ease-in-out infinite;
+}
 .animate-marquee-reverse {
   animation: ss-marquee 40s linear infinite reverse;
 }
@@ -87,5 +103,7 @@ html:has(.landing-root) {
   .animate-float-slow,
   .animate-marquee,
   .animate-marquee-reverse,
+  .animate-travel,
+  .animate-travel-y,
   .animate-swap { animation: none; }
 }

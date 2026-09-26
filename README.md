@@ -1,13 +1,29 @@
-# SchoolSphere Hub
+# EduNex
 
 ## Repository layout
 
-The active React application lives in `src/`, with static assets in `public/`.
-The root `supabase/` folder contains the current database files, while
-`deploy/` and `ecosystem.config.cjs` serve the built frontend. An older API and
-its deployment files are preserved under `legacy/postgres-backend/` and are not
-part of the current build. Generated folders such as `dist/` and
-`supabase/.temp/` are ignored by Git.
+```
+frontend/   React + Vite app (src/, public/, configs), nginx + PM2 deploy files
+backend/    Supabase: migrations, edge functions, config.toml, rollback SQL
+            legacy/postgres-backend/ — older API, not part of the current build
+docs/       User guide PDF
+```
+
+The frontend and backend each have their own `package.json`, `node_modules`
+and `.env` (copy the matching `.env.example`). Browser-safe `VITE_*` keys go in
+`frontend/.env`; the Supabase CLI access token goes in `backend/.env`.
+
+Run everything from the repo root:
+
+| Command | What it does |
+| --- | --- |
+| `npm run install:all` | Install frontend and backend dependencies |
+| `npm run dev` | Start the Vite dev server |
+| `npm run build` | Type-check and build to `frontend/dist/` |
+| `npm run db:status` / `npm run db:push` | List / apply Supabase migrations |
+| `npm run functions:deploy` | Deploy the `manage-user-login` edge function |
+
+Generated folders such as `dist/` and `supabase/.temp/` are ignored by Git.
 
 The original UI-only project brief follows below. The current implementation
 has since added Supabase authentication and data access, so the brief does not

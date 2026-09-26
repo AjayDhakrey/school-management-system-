@@ -1,0 +1,13 @@
+{
+  "name": "edunex-backend",
+  "private": true,
+  "description": "Supabase database migrations, edge functions and config for EduNex.",
+  "scripts": {
+    "status": "supabase migration list --linked",
+    "push": "supabase db push --linked",
+    "functions:deploy": "supabase functions deploy manage-user-login --project-ref fppwmrfomuyrewngbuip"
+  },
+  "devDependencies": {
+    "supabase": "^2.117.0"
+  }
+}

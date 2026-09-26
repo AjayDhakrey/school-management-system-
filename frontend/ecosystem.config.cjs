@@ -1,8 +1,8 @@
-// Optional PM2 process file for the SchoolSphere VPS deployment.
+// Optional PM2 process file for the EduNex VPS deployment.
 // CommonJS (.cjs) is required because package.json sets "type": "module".
 //
-// Usage on the VPS (after `npm ci && npm run build` at the repo root):
-//   pm2 start ecosystem.config.cjs
+// Usage on the VPS (after `npm ci && npm run build` inside frontend/):
+//   pm2 start frontend/ecosystem.config.cjs
 //   pm2 save                  # persist across reboots (pm2-root.service is enabled)
 //
 // Supabase hosts the backend, so this process only serves the built frontend.

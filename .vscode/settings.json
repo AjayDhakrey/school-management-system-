@@ -1,14 +1,14 @@
 {
   "files.exclude": {
     "**/node_modules": true,
-    "dist": true,
-    "supabase/.temp": true,
+    "**/dist": true,
+    "**/supabase/.temp": true,
     "**/*.tsbuildinfo": true
   },
   "search.exclude": {
     "**/node_modules": true,
-    "dist": true,
-    "supabase/.temp": true,
-    "legacy": true
+    "**/dist": true,
+    "**/supabase/.temp": true,
+    "backend/legacy": true
   }
 }

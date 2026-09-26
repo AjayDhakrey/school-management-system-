@@ -52,5 +52,5 @@ next-env.d.ts
 .netlify
 
 # Generated local state
-supabase/.temp/
+**/supabase/.temp/
 *.tsbuildinfo

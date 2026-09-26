@@ -1,5 +1,5 @@
 {
-  "name": "school-app",
+  "name": "edunex-frontend",
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -10,9 +10,6 @@
     "typecheck": "tsc --noEmit",
     "format:check": "prettier --check .",
     "start": "vite preview --host 0.0.0.0 --port 4173",
-    "supabase:status": "supabase migration list --linked",
-    "supabase:push": "supabase db push --linked",
-    "supabase:functions": "supabase functions deploy manage-user-login --project-ref fppwmrfomuyrewngbuip",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write ."
@@ -63,7 +60,6 @@
     "react-router-dom": "^7.9.4",
     "recharts": "^2.15.4",
     "sonner": "^2.0.7",
-    "supabase": "^2.117.0",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",
     "tw-animate-css": "^1.3.4",

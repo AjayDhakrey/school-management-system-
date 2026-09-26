@@ -1,0 +1,17 @@
+{
+  "name": "edunex",
+  "private": true,
+  "description": "EduNex school management system. The app lives in frontend/, the Supabase backend in backend/.",
+  "scripts": {
+    "install:all": "npm --prefix frontend install && npm --prefix backend install",
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start",
+    "typecheck": "npm --prefix frontend run typecheck",
+    "lint": "npm --prefix frontend run lint",
+    "format": "npm --prefix frontend run format",
+    "db:status": "npm --prefix backend run status",
+    "db:push": "npm --prefix backend run push",
+    "functions:deploy": "npm --prefix backend run functions:deploy"
+  }
+}

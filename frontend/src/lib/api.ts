@@ -2749,6 +2749,34 @@ async function saveStudent(method: "POST" | "PATCH", id: string | undefined, inp
   }
   const parentId = "parent_id" in input ? str(input["parent_id"]) || null : undefined;
 
+  // A roll number identifies a student within their class, so it must not repeat there.
+  if ("roll" in row || "class_id" in row) {
+    const current =
+      method === "PATCH" && id && !("roll" in row && "class_id" in row)
+        ? await selectOne("students", id, "class_id,roll")
+        : {};
+    const classId = "class_id" in row ? row["class_id"] : current["class_id"];
+    const roll = "roll" in row ? row["roll"] : current["roll"];
+    if (typeof classId === "string" && typeof roll === "number") {
+      let query = supabase
+        .from("students")
+        .select("name")
+        .eq("class_id", classId)
+        .eq("roll", roll)
+        .limit(1);
+      if (id) query = query.neq("id", id);
+      const { data, error } = await query;
+      if (error) fail(error);
+      const clash = (data ?? [])[0] as Row | undefined;
+      if (clash) {
+        throw new ApiError(
+          409,
+          `Roll number ${roll} is already assigned to ${str(clash["name"]) || "another student"} in this class`,
+        );
+      }
+    }
+  }
+
   if (method === "POST") {
     if (!("name" in row)) throw new ApiError(400, "A valid name is required");
     const created = await insertRow("students", row);

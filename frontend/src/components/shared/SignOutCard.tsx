@@ -1,9 +1,8 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { ChevronRight, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { SectionCard } from "@/components/shared/SectionCard";
-import { Button } from "@/components/ui/button";
+import { IconTile } from "@/components/shared/ProfileTiles";
 import { useAuth } from "@/lib/auth-context";
 import { cn } from "@/lib/utils";
 
@@ -18,27 +17,21 @@ export function SignOutCard({ className }: { className?: string }) {
   }
 
   return (
-    <SectionCard
-      title="Account"
-      subtitle="Sign out of this device"
-      className={cn("mt-4", className)}
-    >
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-border p-3.5">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-destructive-soft text-destructive">
-            <LogOut className="h-5 w-5" />
+    <section className={cn("panel mt-4 overflow-hidden shadow-md shadow-gray-300", className)}>
+      <button
+        type="button"
+        onClick={handleSignOut}
+        className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-destructive/5 active:bg-destructive/10"
+      >
+        <IconTile icon={LogOut} tone="danger" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-destructive">Log Out</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            Signed in as {user?.name ?? "you"} · you'll need to sign in again
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{user?.name ?? "Signed in"}</p>
-            <p className="truncate text-xs text-muted-foreground">
-              You will need to sign in again to continue.
-            </p>
-          </div>
-        </div>
-        <Button type="button" variant="destructive" onClick={handleSignOut} className="shrink-0">
-          Log Out
-        </Button>
-      </div>
-    </SectionCard>
+        </span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </button>
+    </section>
   );
 }

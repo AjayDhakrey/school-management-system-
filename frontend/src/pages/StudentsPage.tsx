@@ -73,6 +73,22 @@ export function StudentFormDialog({
   const [status, setStatus] = useState(initial?.status ?? "Active");
   const [vehicleId, setVehicleId] = useState(initial?.vehicle_id ?? NONE);
   const [bloodGroup, setBloodGroup] = useState(initial?.blood_group ?? NONE);
+  const [roll, setRoll] = useState(initial?.roll != null ? String(initial.roll) : "");
+  const [rollTouched, setRollTouched] = useState(isEdit);
+
+  // Roll numbers are unique within a class — look at the chosen class to suggest the next
+  // free number and flag a clash before the form is submitted.
+  const { data: classmates } = useStudents(classId !== NONE, classId !== NONE ? { classId } : undefined);
+  const otherClassmates = useMemo(
+    () => (classId !== NONE ? (classmates ?? []) : []).filter((s) => s.id !== initial?.id),
+    [classmates, classId, initial?.id],
+  );
+  const nextRoll = otherClassmates.reduce((max, s) => Math.max(max, s.roll ?? 0), 0) + 1;
+  const rollClash = roll ? otherClassmates.find((s) => s.roll === Number(roll)) : undefined;
+
+  useEffect(() => {
+    if (!rollTouched && classId !== NONE && classmates) setRoll(String(nextRoll));
+  }, [rollTouched, classId, classmates, nextRoll]);
 
   // Most students get a brand-new parent record; only siblings of an already-enrolled
   // student need the "existing parent" list, so that's opt-in rather than the default.
@@ -94,7 +110,7 @@ export function StudentFormDialog({
     const form = new FormData(e.currentTarget);
     const name = String(form.get("name") ?? "").trim();
     const admissionNo = String(form.get("admissionNo") ?? "").trim();
-    const rollRaw = String(form.get("roll") ?? "").trim();
+    const rollRaw = roll.trim();
     const admittedOn = String(form.get("admittedOn") ?? "").trim();
     const dob = String(form.get("dob") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
@@ -105,6 +121,14 @@ export function StudentFormDialog({
 
     if (!name) {
       toast.error("Name is required");
+      return;
+    }
+    if (rollRaw && (!Number.isInteger(Number(rollRaw)) || Number(rollRaw) < 1)) {
+      toast.error("Roll number must be a positive whole number");
+      return;
+    }
+    if (rollClash) {
+      toast.error(`Roll number ${rollRaw} is already assigned to ${rollClash.name} in this class`);
       return;
     }
 
@@ -248,7 +272,30 @@ export function StudentFormDialog({
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="roll">Roll No.</Label>
-          <Input id="roll" name="roll" type="number" defaultValue={initial?.roll ?? ""} placeholder="12" />
+          <Input
+            id="roll"
+            name="roll"
+            type="number"
+            min={1}
+            step={1}
+            value={roll}
+            onChange={(e) => {
+              setRoll(e.target.value);
+              setRollTouched(true);
+            }}
+            placeholder={classId !== NONE ? String(nextRoll) : "Select a class first"}
+            aria-invalid={Boolean(rollClash)}
+          />
+          {rollClash ? (
+            <p className="text-xs text-destructive">
+              Already assigned to {rollClash.name}.{" "}
+              <button type="button" className="font-medium underline" onClick={() => setRoll(String(nextRoll))}>
+                Use {nextRoll}
+              </button>
+            </p>
+          ) : classId !== NONE && classmates && roll !== String(nextRoll) ? (
+            <p className="text-xs text-muted-foreground">Next free roll no.: {nextRoll}</p>
+          ) : null}
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="admittedOn">Admission Date</Label>
@@ -635,6 +682,7 @@ export default function StudentsPage() {
                   <TableRow>
                     <TableHead>Student</TableHead>
                     <TableHead>Admission No.</TableHead>
+                    <TableHead>Roll No.</TableHead>
                     <TableHead>Class</TableHead>
                     <TableHead>Section</TableHead>
                     <TableHead>Parent</TableHead>
@@ -658,6 +706,7 @@ export default function StudentsPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{s.admission_no}</TableCell>
+                      <TableCell>{s.roll ?? "—"}</TableCell>
                       <TableCell>{s.class_name}</TableCell>
                       <TableCell>{s.section}</TableCell>
                       <TableCell className="truncate">{s.parent_id ? parentsById.get(s.parent_id) : "—"}</TableCell>
@@ -689,7 +738,10 @@ export default function StudentsPage() {
                         >
                           {s.name}
                         </Link>
-                        <p className="text-xs text-muted-foreground">{s.admission_no}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {s.admission_no}
+                          {s.roll ? ` · Roll ${s.roll}` : ""}
+                        </p>
                       </div>
                     </div>
                     <RowActions student={s} onEdit={() => setEditing(s)} onDelete={() => handleDelete(s)} />

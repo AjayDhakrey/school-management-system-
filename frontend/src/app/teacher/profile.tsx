@@ -83,6 +83,11 @@ export default function TeacherProfilePage() {
           </>
         }
         badges={<StatusBadge status={teacher.employment_status} />}
+        stats={[
+          { label: "Classes", value: classNames.length },
+          { label: "Subjects", value: subjectNames.length },
+          { label: "Joined", value: teacher.joining_date?.slice(0, 4) ?? "—" },
+        ]}
       />
 
       <div className="grid gap-4 lg:grid-cols-2">

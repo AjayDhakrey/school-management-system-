@@ -39,6 +39,7 @@ import { useFees, useMyStudentProfile, useSchoolProfile, type ApiFee } from "@/h
 import { api, ApiError } from "@/lib/api";
 import { feeTitle } from "@/lib/fees";
 import { FeeReceipt } from "@/components/shared/FeeReceipt";
+import { FeeCard } from "@/components/shared/FeeCard";
 
 function payable(f: ApiFee) {
   return Math.max(0, f.amount - f.discount + f.fine);
@@ -302,66 +303,98 @@ export default function MyFeesPage() {
             icon={Wallet}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fee Type</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Paid</TableHead>
-                  <TableHead>Remaining</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((f) => {
-                  const fPayable = payable(f);
-                  const fPaid = f.paid_amount ?? 0;
-                  const fRemaining = Math.max(0, fPayable - fPaid);
-                  return (
-                    <TableRow key={f.id}>
-                      <TableCell className="font-medium">{feeTitle(f)}</TableCell>
-                      <TableCell className="font-mono">₹{fPayable.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-success">
-                        ₹{fPaid.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="font-mono">
-                        {fRemaining > 0 ? (
-                          <span className="text-destructive">₹{fRemaining.toLocaleString()}</span>
-                        ) : (
-                          <span className="text-success">₹0</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{f.due_date ?? "—"}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={f.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {f.status === "Paid" ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setReceipt({ fee: f, receiptNo: f.receipt_no ?? "—" })}
-                            >
-                              <Printer className="h-3.5 w-3.5" /> Receipt
-                            </Button>
+          <>
+            <div className="space-y-3 p-3 md:hidden">
+              {rows.map((f) => (
+                <FeeCard
+                  key={f.id}
+                  title={feeTitle(f)}
+                  status={f.status}
+                  dueDate={f.due_date}
+                  total={payable(f)}
+                  paid={f.paid_amount ?? 0}
+                  action={
+                    f.status === "Paid" ? (
+                      <Button
+                        variant="outline"
+                        className="gap-1.5"
+                        onClick={() => setReceipt({ fee: f, receiptNo: f.receipt_no ?? "—" })}
+                      >
+                        <Printer className="h-4 w-4" /> View Receipt
+                      </Button>
+                    ) : (
+                      <Button className="gap-1.5" onClick={() => setPayingFor(f)}>
+                        <CreditCard className="h-4 w-4" />
+                        {f.status === "Partial" ? "Pay Remaining" : "Pay Now"}
+                      </Button>
+                    )
+                  }
+                />
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fee Type</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Paid</TableHead>
+                    <TableHead>Remaining</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((f) => {
+                    const fPayable = payable(f);
+                    const fPaid = f.paid_amount ?? 0;
+                    const fRemaining = Math.max(0, fPayable - fPaid);
+                    return (
+                      <TableRow key={f.id}>
+                        <TableCell className="font-medium">{feeTitle(f)}</TableCell>
+                        <TableCell className="font-mono">₹{fPayable.toLocaleString()}</TableCell>
+                        <TableCell className="font-mono text-success">
+                          ₹{fPaid.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-mono">
+                          {fRemaining > 0 ? (
+                            <span className="text-destructive">₹{fRemaining.toLocaleString()}</span>
                           ) : (
-                            <Button size="sm" className="gap-1" onClick={() => setPayingFor(f)}>
-                              <CreditCard className="h-3.5 w-3.5" />
-                              {f.status === "Partial" ? "Pay Remaining" : "Pay Now"}
-                            </Button>
+                            <span className="text-success">₹0</span>
                           )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{f.due_date ?? "—"}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={f.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {f.status === "Paid" ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setReceipt({ fee: f, receiptNo: f.receipt_no ?? "—" })
+                                }
+                              >
+                                <Printer className="h-3.5 w-3.5" /> Receipt
+                              </Button>
+                            ) : (
+                              <Button size="sm" className="gap-1" onClick={() => setPayingFor(f)}>
+                                <CreditCard className="h-3.5 w-3.5" />
+                                {f.status === "Partial" ? "Pay Remaining" : "Pay Now"}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </div>
 

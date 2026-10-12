@@ -11,7 +11,10 @@ import {
   School,
   MapPin,
   UserRound,
+  Clock,
+  Coffee,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { PageHeader } from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { Button } from "@/components/ui/button";
@@ -75,6 +78,106 @@ function weekLabel(offset: number) {
   return `${fmt(base)} – ${fmt(end)}, ${base.getFullYear()}`;
 }
 
+function todayName() {
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  return DAYS.includes(today) ? today : DAYS[0]!;
+}
+
+/** PERIODS times are 12-hour without am/pm ("01:15" is after lunch), so hours before 8 are PM. */
+function toMinutes(hhmm: string) {
+  const [h = 0, m = 0] = hhmm.split(":").map(Number);
+  return (h < 8 ? h + 12 : h) * 60 + m;
+}
+
+function isCurrentPeriod(day: string, period: number) {
+  const time = PERIODS[period - 1]?.time;
+  if (!time || day !== new Date().toLocaleDateString("en-US", { weekday: "long" })) return false;
+  const [start, end] = time.split("–").map((t) => toMinutes(t.trim()));
+  const now = new Date().getHours() * 60 + new Date().getMinutes();
+  return start !== undefined && end !== undefined && now >= start && now < end;
+}
+
+/** One period in the mobile schedule — a badge with the period number, subject and details. */
+function PeriodCard({
+  period,
+  subject,
+  live,
+  children,
+}: {
+  period: number;
+  subject: string | null;
+  live?: boolean;
+  children?: ReactNode;
+}) {
+  const time = PERIODS[period - 1]?.time ?? `Period ${period}`;
+
+  if (subject === "Break") {
+    return (
+      <div className="col-span-full flex items-center gap-3 px-1 py-0.5 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        <span className="flex items-center gap-1.5 font-medium">
+          <Coffee className="h-3.5 w-3.5" /> Break · {time}
+        </span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex items-stretch gap-3 rounded-2xl border bg-card p-2.5 shadow-sm transition-colors",
+        live ? "border-primary/60 ring-2 ring-primary/15" : "border-border",
+        !subject && "border-dashed bg-transparent shadow-none",
+      )}
+    >
+      <div
+        className={cn(
+          "flex w-12 shrink-0 flex-col items-center justify-center rounded-xl py-2",
+          subject ? toneFor(subject) : "bg-muted text-muted-foreground",
+        )}
+      >
+        <span className="text-[9px] font-semibold uppercase tracking-wider opacity-75">Per</span>
+        <span className="font-display text-lg font-bold leading-tight">{period}</span>
+      </div>
+      <div className="min-w-0 flex-1 py-0.5">
+        <div className="flex items-start justify-between gap-2">
+          <p
+            className={cn(
+              "truncate text-sm font-semibold",
+              !subject && "font-medium text-muted-foreground",
+            )}
+          >
+            {subject ?? "Free period"}
+          </p>
+          {live && (
+            <span className="flex shrink-0 items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" /> Now
+            </span>
+          )}
+        </div>
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock className="h-3 w-3 shrink-0" /> {time}
+        </p>
+        {subject && children && (
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-foreground/80">
+            {children}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MetaItem({ icon: Icon, children }: { icon: typeof MapPin; children: ReactNode }) {
+  return (
+    <span className="flex min-w-0 items-center gap-1">
+      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
 /** Shared read-only weekly list — a teacher's own schedule, or (for admins) any teacher's. */
 function TeacherScheduleList({
   slots,
@@ -83,7 +186,7 @@ function TeacherScheduleList({
   slots: ApiTimetableSlot[];
   classNameById: Map<string, string>;
 }) {
-  const [activeDay, setActiveDay] = useState(DAYS[0]!);
+  const [activeDay, setActiveDay] = useState(todayName);
   const grid: Record<string, ApiTimetableSlot[]> = {};
   for (const day of DAYS)
     grid[day] = slots.filter((s) => s.day === day).sort((a, b) => a.period - b.period);
@@ -96,105 +199,47 @@ function TeacherScheduleList({
 
   return (
     <SectionCard bodyClassName="p-0">
-      <div className="flex gap-2 overflow-x-auto border-b border-border p-3 md:hidden">
-        {DAYS.map((d) => (
-          <button
-            key={d}
-            onClick={() => setActiveDay(d)}
-            className={cn(
-              "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
-              activeDay === d
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border text-muted-foreground",
-            )}
-          >
-            {d.slice(0, 3)}
-          </button>
-        ))}
+      <div className="border-b border-border p-3">
+        <div className="grid grid-cols-6 gap-1.5 md:max-w-2xl">
+          {DAYS.map((d) => (
+            <button
+              key={d}
+              onClick={() => setActiveDay(d)}
+              className={cn(
+                "min-w-0 rounded-full border py-2 text-center text-xs font-medium transition-colors active:scale-95",
+                activeDay === d
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:bg-muted/50",
+              )}
+            >
+              <span className="md:hidden">{d.slice(0, 3)}</span>
+              <span className="hidden md:inline">{d}</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="space-y-2.5 p-3 md:hidden">
+      <div className="grid gap-2.5 p-3 md:grid-cols-2 xl:grid-cols-3">
         {(grid[activeDay] ?? []).length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">
+          <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
             No classes on {activeDay}.
           </p>
         ) : (
-          (grid[activeDay] ?? []).map((slot) => {
-            const isBreak = slot.subject === "Break";
-            return (
-              <div key={slot.id} className="rounded-xl border border-border bg-card p-3 shadow-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <span
-                    className={cn(
-                      "rounded-lg px-2 py-1 text-xs font-semibold",
-                      toneFor(slot.subject ?? ""),
-                    )}
-                  >
-                    {slot.subject}
-                  </span>
-                  <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                    {PERIODS[slot.period - 1]?.time ?? `Period ${slot.period}`}
-                  </span>
-                </div>
-                {!isBreak && (
-                  <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-foreground/80">
-                    <span className="flex items-center gap-1.5">
-                      <School className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      Class {classNameById.get(slot.class_id ?? "") ?? "—"}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      {slot.room ?? "No room set"}
-                    </span>
-                  </div>
-                )}
-              </div>
-            );
-          })
+          (grid[activeDay] ?? []).map((slot) => (
+            <PeriodCard
+              key={slot.id}
+              period={slot.period}
+              subject={slot.subject}
+              live={isCurrentPeriod(activeDay, slot.period)}
+            >
+              {classNameById.size > 0 && (
+                <MetaItem icon={School}>
+                  Class {classNameById.get(slot.class_id ?? "") ?? "—"}
+                </MetaItem>
+              )}
+              <MetaItem icon={MapPin}>{slot.room ?? "No room set"}</MetaItem>
+            </PeriodCard>
+          ))
         )}
-      </div>
-
-      <div className="hidden overflow-x-auto md:block">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/40 text-left text-xs text-muted-foreground">
-              <th className="p-2.5 font-medium">Day</th>
-              <th className="p-2.5 font-medium">Period</th>
-              <th className="p-2.5 font-medium">Subject</th>
-              <th className="p-2.5 font-medium">Class</th>
-              <th className="p-2.5 font-medium">Room</th>
-            </tr>
-          </thead>
-          <tbody>
-            {DAYS.flatMap((day) =>
-              (grid[day] ?? []).map((slot, i) => (
-                <tr key={slot.id} className="border-b border-border last:border-0">
-                  {i === 0 && (
-                    <td className="p-2.5 align-top font-semibold" rowSpan={grid[day]?.length ?? 1}>
-                      {day}
-                    </td>
-                  )}
-                  <td className="p-2.5 text-muted-foreground">
-                    {PERIODS[slot.period - 1]?.time ?? `Period ${slot.period}`}
-                  </td>
-                  <td className="p-2.5">
-                    <span
-                      className={cn(
-                        "rounded-lg px-2 py-1 text-xs font-medium",
-                        toneFor(slot.subject ?? ""),
-                      )}
-                    >
-                      {slot.subject}
-                    </span>
-                  </td>
-                  <td className="p-2.5 text-muted-foreground">
-                    {classNameById.get(slot.class_id ?? "") ?? "—"}
-                  </td>
-                  <td className="p-2.5 text-muted-foreground">{slot.room ?? "—"}</td>
-                </tr>
-              )),
-            )}
-          </tbody>
-        </table>
       </div>
     </SectionCard>
   );
@@ -217,10 +262,7 @@ function TeacherClassTimetable() {
 
   const [classId, setClassId] = useState("");
   const activeClassId = classId || myClasses[0]?.id || "";
-  const [day, setDay] = useState(() => {
-    const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
-    return DAYS.includes(today) ? today : DAYS[0]!;
-  });
+  const [day, setDay] = useState(todayName);
   const { data: slots, isLoading } = useClassTimetable(activeClassId || undefined);
   const byPeriod = new Map((slots ?? []).filter((s) => s.day === day).map((s) => [s.period, s]));
   const classLabel = (c: { name: string; section: string; class_teacher_id: string | null }) =>
@@ -255,14 +297,14 @@ function TeacherClassTimetable() {
             ))}
           </SelectContent>
         </Select>
-        <div className="flex gap-2 overflow-x-auto">
+        <div className="grid grid-cols-6 gap-1.5 sm:max-w-md">
           {DAYS.map((d) => (
             <button
               key={d}
               type="button"
               onClick={() => setDay(d)}
               className={cn(
-                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium",
+                "min-w-0 rounded-full border py-2 text-center text-xs font-medium transition-colors active:scale-95",
                 day === d
                   ? "border-primary bg-primary/10 text-primary"
                   : "border-border text-muted-foreground",
@@ -276,45 +318,24 @@ function TeacherClassTimetable() {
       {isLoading ? (
         <p className="p-4 text-sm text-muted-foreground">Loading…</p>
       ) : (
-        <div className="divide-y divide-border">
+        <div className="grid gap-2.5 p-3 md:grid-cols-2 xl:grid-cols-3">
           {PERIODS.map((p) => {
             const slot = byPeriod.get(p.period);
             return (
-              <div key={p.period} className="flex items-start gap-3 px-4 py-3">
-                <div className="w-24 shrink-0">
-                  <p className="text-sm font-semibold">Period {p.period}</p>
-                  <p className="text-[11px] text-muted-foreground">{p.time}</p>
-                </div>
-                {slot?.subject ? (
-                  <div className="min-w-0 flex-1">
-                    <span
-                      className={cn(
-                        "rounded-lg px-2 py-1 text-xs font-semibold",
-                        toneFor(slot.subject),
-                      )}
-                    >
-                      {slot.subject}
-                    </span>
-                    {slot.subject !== "Break" && (
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-foreground/80">
-                        <span className="flex items-center gap-1.5">
-                          <UserRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          {slot.teacher_name ?? "No teacher set"}
-                          {slot.teacher_id && slot.teacher_id === teacher?.id && (
-                            <span className="font-semibold text-primary">(You)</span>
-                          )}
-                        </span>
-                        <span className="flex items-center gap-1.5">
-                          <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                          {slot.room ?? "No room set"}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="flex-1 pt-0.5 text-sm text-muted-foreground">Free period</p>
-                )}
-              </div>
+              <PeriodCard
+                key={p.period}
+                period={p.period}
+                subject={slot?.subject ?? null}
+                live={isCurrentPeriod(day, p.period)}
+              >
+                <MetaItem icon={UserRound}>
+                  {slot?.teacher_name ?? "No teacher set"}
+                  {slot?.teacher_id && slot.teacher_id === teacher?.id && (
+                    <span className="ml-1 font-semibold text-primary">(You)</span>
+                  )}
+                </MetaItem>
+                <MetaItem icon={MapPin}>{slot?.room ?? "No room set"}</MetaItem>
+              </PeriodCard>
             );
           })}
         </div>

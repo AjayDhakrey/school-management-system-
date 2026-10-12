@@ -6,14 +6,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ClipboardList, Clock3, CheckCircle2, XCircle, Plus } from "lucide-react";
 import { PageHeader, EmptyState, TableSkeleton } from "@/components/shared/ui-kit";
 import { InfoCard } from "@/components/shared/InfoCard";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { LeaveRequestList } from "@/components/shared/LeaveRequestList";
 import { useLeaveRequests } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 
@@ -131,30 +130,7 @@ export default function MyLeavePage() {
         ) : rows.length === 0 ? (
           <EmptyState title="No leave requests yet" description="Apply for leave to see it here." icon={ClipboardList} />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((l) => (
-                  <TableRow key={l.id}>
-                    <TableCell className="max-w-[240px] truncate font-medium">{l.reason ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{l.from_date}</TableCell>
-                    <TableCell className="text-muted-foreground">{l.to_date}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={l.status} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <LeaveRequestList rows={rows} />
         )}
       </div>
     </div>

@@ -22,7 +22,7 @@ export function PageHeader({
     <div className="mb-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
       <div className="min-w-0">
         {breadcrumb && breadcrumb.length > 0 && (
-          <nav className="mb-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+          <nav className="mb-1 hidden flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground sm:flex">
             {breadcrumb.map((b, i) => (
               <span key={b} className="flex items-center gap-1.5">
                 {i > 0 && <span className="opacity-50">/</span>}

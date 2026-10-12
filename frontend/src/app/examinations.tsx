@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { PageHeader, EmptyState, FilterSelect, TableSkeleton } from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { StatusBadge, GradeBadge } from "@/components/shared/StatusBadge";
@@ -71,6 +71,8 @@ import {
   Ban,
   Lock,
   ShieldAlert,
+  MapPin,
+  School,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -204,6 +206,93 @@ function paperStatus(exam: ApiExam): {
 function PaperStatusBadge({ exam }: { exam: ApiExam }) {
   const s = paperStatus(exam);
   return <StatusBadge status={s.label} tone={s.tone} />;
+}
+
+/** "Today", "Tomorrow" or "In 5 days" for a paper that hasn't happened yet. */
+function countdown(date: string | null | undefined) {
+  if (!date) return null;
+  try {
+    const days = differenceInCalendarDays(parseISO(date), new Date());
+    if (days < 0) return null;
+    return days === 0 ? "Today" : days === 1 ? "Tomorrow" : `In ${days} days`;
+  } catch {
+    return null;
+  }
+}
+
+/** Mobile replacement for an exam schedule row — date tile, subject, timing and status. */
+function ExamCard({
+  exam,
+  examName,
+  classText,
+  status,
+}: {
+  exam: ApiExam;
+  examName: string;
+  classText?: string;
+  status: ReactNode;
+}) {
+  let day = "—";
+  let month = "";
+  let weekday = "";
+  try {
+    if (exam.date) {
+      const d = parseISO(exam.date);
+      day = format(d, "d");
+      month = format(d, "MMM");
+      weekday = format(d, "EEE");
+    }
+  } catch {
+    /* keep placeholders */
+  }
+  const soon = exam.status !== "PUBLISHED" ? countdown(exam.date) : null;
+
+  return (
+    <div className="flex gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
+      <div
+        className={cn(
+          "flex w-14 shrink-0 flex-col items-center justify-center rounded-xl py-2",
+          soon ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+        )}
+      >
+        <span className="text-[10px] font-semibold uppercase tracking-wider">{month}</span>
+        <span className="font-display text-xl font-bold leading-tight">{day}</span>
+        <span className="text-[10px] font-medium opacity-80">{weekday}</span>
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">
+              {exam.subject_name ?? exam.subject ?? "—"}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">{examName}</p>
+          </div>
+          <div className="shrink-0">{status}</div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-foreground/80">
+          <span className="flex items-center gap-1">
+            <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            {timeRange(exam)}
+          </span>
+          {classText && (
+            <span className="flex items-center gap-1">
+              <School className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              {classText}
+            </span>
+          )}
+          <span className="flex items-center gap-1">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            {exam.room_name ?? "Room not set"}
+          </span>
+        </div>
+        {soon && (
+          <p className="mt-2 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+            {soon}
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function suggestedName(type: string, year: ApiAcademicYear | undefined) {
@@ -2558,50 +2647,67 @@ function TeacherExamsView() {
                 icon={CalendarDays}
               />
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Examination</TableHead>
-                      <TableHead>Class</TableHead>
-                      <TableHead>Subject</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Room</TableHead>
-                      <TableHead className="text-right">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((e) => (
-                      <TableRow key={e.id}>
-                        <TableCell className="whitespace-nowrap">
-                          {(e.examination_id && examinationName.get(e.examination_id)) ||
-                            e.name ||
-                            e.term}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {paperClassLabel(e, classesById)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap font-medium">
-                          {e.subject_name ?? e.subject ?? "—"}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {fmtDate(e.date)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {timeRange(e)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {e.room_name ?? "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <PaperStatusBadge exam={e} />
-                        </TableCell>
+              <>
+                <div className="space-y-2.5 p-3 md:hidden">
+                  {rows.map((e) => (
+                    <ExamCard
+                      key={e.id}
+                      exam={e}
+                      examName={
+                        (e.examination_id && examinationName.get(e.examination_id)) ||
+                        e.name ||
+                        e.term
+                      }
+                      classText={paperClassLabel(e, classesById)}
+                      status={<PaperStatusBadge exam={e} />}
+                    />
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Examination</TableHead>
+                        <TableHead>Class</TableHead>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Room</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((e) => (
+                        <TableRow key={e.id}>
+                          <TableCell className="whitespace-nowrap">
+                            {(e.examination_id && examinationName.get(e.examination_id)) ||
+                              e.name ||
+                              e.term}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {paperClassLabel(e, classesById)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap font-medium">
+                            {e.subject_name ?? e.subject ?? "—"}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {fmtDate(e.date)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {timeRange(e)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {e.room_name ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <PaperStatusBadge exam={e} />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
           </div>
         </TabsContent>
@@ -2659,52 +2765,74 @@ function StudentExamsView() {
             icon={CalendarDays}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Examination</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Room</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {(e.examination_id && examinationName.get(e.examination_id)) ||
-                        e.name ||
-                        e.term}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap font-medium">
-                      {e.subject_name ?? e.subject ?? "—"}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {fmtDate(e.date)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {timeRange(e)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {e.room_name ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      {e.status === "PUBLISHED" ? (
-                        <StatusBadge status="Result Published" tone="success" />
-                      ) : (e.date ?? "") >= today ? (
-                        <StatusBadge status="Upcoming" tone="info" />
-                      ) : (
-                        <StatusBadge status="Completed" tone="neutral" />
-                      )}
-                    </TableCell>
+          <>
+            <div className="space-y-2.5 p-3 md:hidden">
+              {rows.map((e) => (
+                <ExamCard
+                  key={e.id}
+                  exam={e}
+                  examName={
+                    (e.examination_id && examinationName.get(e.examination_id)) || e.name || e.term
+                  }
+                  status={
+                    e.status === "PUBLISHED" ? (
+                      <StatusBadge status="Result Published" tone="success" />
+                    ) : (e.date ?? "") >= today ? (
+                      <StatusBadge status="Upcoming" tone="info" />
+                    ) : (
+                      <StatusBadge status="Completed" tone="neutral" />
+                    )
+                  }
+                />
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Examination</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Room</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((e) => (
+                    <TableRow key={e.id}>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {(e.examination_id && examinationName.get(e.examination_id)) ||
+                          e.name ||
+                          e.term}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap font-medium">
+                        {e.subject_name ?? e.subject ?? "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {fmtDate(e.date)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {timeRange(e)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {e.room_name ?? "—"}
+                      </TableCell>
+                      <TableCell>
+                        {e.status === "PUBLISHED" ? (
+                          <StatusBadge status="Result Published" tone="success" />
+                        ) : (e.date ?? "") >= today ? (
+                          <StatusBadge status="Upcoming" tone="info" />
+                        ) : (
+                          <StatusBadge status="Completed" tone="neutral" />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </div>
     </div>

@@ -12,12 +12,15 @@ export function ProfileHero({
   onPhotoChange,
   lines,
   badges,
+  stats,
 }: {
   name: string;
   photoUrl: string;
   onPhotoChange: (url: string) => void;
   lines: ReactNode;
   badges?: ReactNode;
+  /** Up to three quick facts shown in a frosted strip along the bottom of the banner. */
+  stats?: { label: string; value: ReactNode }[];
 }) {
   const [photoError, setPhotoError] = useState(false);
   useEffect(() => setPhotoError(false), [photoUrl]);
@@ -28,27 +31,30 @@ export function ProfileHero({
   });
 
   return (
-    <div className="relative mb-4 overflow-hidden rounded-2xl border border-border shadow-[var(--shadow-soft)]">
+    <div className="relative mb-4 overflow-hidden rounded-3xl border border-border shadow-[var(--shadow-soft)]">
       <div
         aria-hidden
         className="absolute inset-0 bg-[linear-gradient(135deg,var(--hero-sky)_0%,var(--hero)_100%)]"
       />
       <div aria-hidden className="absolute -top-16 -right-10 h-48 w-48 rounded-full bg-white/10" />
-      <div aria-hidden className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-white/10" />
+      <div
+        aria-hidden
+        className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-white/10"
+      />
 
-      <div className="relative flex flex-col gap-4 p-4 text-white sm:flex-row sm:items-center sm:p-6">
+      <div className="relative flex flex-col gap-3 px-4 pt-6 pb-4 text-white sm:flex-row sm:items-center sm:gap-4 sm:p-6">
         <div className="relative shrink-0 self-center sm:self-auto">
           {photoUrl && !photoError ? (
             <img
               src={photoUrl}
               alt={name}
               onError={() => setPhotoError(true)}
-              className="h-24 w-24 rounded-full border-4 border-white/80 object-cover shadow-lg"
+              className="h-24 w-24 rounded-full object-cover shadow-lg ring-4 ring-white/70 ring-offset-2 ring-offset-transparent"
             />
           ) : (
             <Initials
               name={name}
-              className="h-24 w-24 border-4 border-white/80 bg-white/20 text-2xl text-white shadow-lg"
+              className="h-24 w-24 bg-white/20 text-2xl text-white shadow-lg ring-4 ring-white/70"
             />
           )}
           <button
@@ -78,6 +84,22 @@ export function ProfileHero({
           )}
         </div>
       </div>
+
+      {stats && stats.length > 0 && (
+        <div
+          className="relative mx-3 mb-3 grid divide-x divide-white/20 rounded-2xl bg-white/15 py-2.5 text-center text-white backdrop-blur-sm sm:mx-6 sm:mb-6 sm:max-w-md"
+          style={{ gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))` }}
+        >
+          {stats.map((s) => (
+            <div key={s.label} className="min-w-0 px-2">
+              <p className="truncate font-display text-base font-bold leading-tight">{s.value}</p>
+              <p className="truncate text-[10px] font-medium uppercase tracking-wider text-white/75">
+                {s.label}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

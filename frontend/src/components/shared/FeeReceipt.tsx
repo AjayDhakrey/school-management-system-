@@ -1,8 +1,11 @@
-import { Printer, ShieldCheck } from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
+import { Download, Loader2, Printer, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { ApiFee, ApiSchool, ApiStudent } from "@/hooks/useApi";
 import { feeTitle } from "@/lib/fees";
+import { downloadElementAsPdf } from "@/lib/pdf";
 
 function currency(value: number) {
   return `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -106,10 +109,25 @@ export function FeeReceipt({
   const balance = Math.max(0, netPayable - totalPaid);
   const finalReceiptNo = receiptNo || fee.receipt_no || `RCPT-${fee.id.slice(0, 8).toUpperCase()}`;
   const classLabel = [student?.class_name, student?.section].filter(Boolean).join(" – ") || "—";
+  const receiptRef = useRef<HTMLElement>(null);
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownload() {
+    if (!receiptRef.current) return;
+    setDownloading(true);
+    try {
+      await downloadElementAsPdf(receiptRef.current, `Fee-Receipt-${finalReceiptNo}`);
+    } catch {
+      toast.error("Couldn't create the PDF. Try Print instead.");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div>
       <article
+        ref={receiptRef}
         id="report-card"
         className="mx-auto max-w-3xl overflow-hidden rounded-xl border border-slate-300 bg-white text-slate-900 shadow-sm print:rounded-none print:border-0 print:shadow-none"
       >
@@ -293,9 +311,19 @@ export function FeeReceipt({
           </footer>
         </div>
       </article>
-      <Button className="mt-4 w-full gap-2 print:hidden" onClick={() => window.print()}>
-        <Printer className="h-4 w-4" /> Print / Save as PDF
-      </Button>
+      <div className="mt-4 grid grid-cols-2 gap-2 print:hidden">
+        <Button variant="outline" className="gap-2" onClick={() => window.print()}>
+          <Printer className="h-4 w-4" /> Print
+        </Button>
+        <Button className="gap-2" onClick={handleDownload} disabled={downloading}>
+          {downloading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {downloading ? "Preparing…" : "Download PDF"}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -41,6 +41,7 @@ import { useParentChild } from "@/lib/parent-child-context";
 import { api, ApiError } from "@/lib/api";
 import { feeTitle } from "@/lib/fees";
 import { FeeReceipt } from "@/components/shared/FeeReceipt";
+import { FeeCard } from "@/components/shared/FeeCard";
 
 function payable(f: ApiFee) {
   return Math.max(0, f.amount - f.discount + f.fine);
@@ -269,54 +270,74 @@ export default function ParentPayFeesPage() {
             icon={Wallet}
           />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fee Type</TableHead>
-                  <TableHead>Total</TableHead>
-                  <TableHead>Paid</TableHead>
-                  <TableHead>Remaining</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((f) => {
-                  const fPayable = payable(f);
-                  const fPaid = f.paid_amount ?? 0;
-                  const fRemaining = Math.max(0, fPayable - fPaid);
-                  return (
-                    <TableRow key={f.id}>
-                      <TableCell className="font-medium">{feeTitle(f)}</TableCell>
-                      <TableCell className="font-mono">₹{fPayable.toLocaleString()}</TableCell>
-                      <TableCell className="font-mono text-success">
-                        ₹{fPaid.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="font-mono text-destructive">
-                        ₹{fRemaining.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        <span className="inline-flex items-center gap-1">
-                          <Clock3 className="h-3.5 w-3.5" /> {f.due_date ?? "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={f.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" className="gap-1" onClick={() => setPayingFor(f)}>
-                          <CreditCard className="h-3.5 w-3.5" />
-                          {f.status === "Partial" ? "Pay Remaining" : "Pay Now"}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <>
+            <div className="space-y-3 p-3 md:hidden">
+              {rows.map((f) => (
+                <FeeCard
+                  key={f.id}
+                  title={feeTitle(f)}
+                  status={f.status}
+                  dueDate={f.due_date}
+                  total={payable(f)}
+                  paid={f.paid_amount ?? 0}
+                  action={
+                    <Button className="gap-1.5" onClick={() => setPayingFor(f)}>
+                      <CreditCard className="h-4 w-4" />
+                      {f.status === "Partial" ? "Pay Remaining" : "Pay Now"}
+                    </Button>
+                  }
+                />
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fee Type</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Paid</TableHead>
+                    <TableHead>Remaining</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((f) => {
+                    const fPayable = payable(f);
+                    const fPaid = f.paid_amount ?? 0;
+                    const fRemaining = Math.max(0, fPayable - fPaid);
+                    return (
+                      <TableRow key={f.id}>
+                        <TableCell className="font-medium">{feeTitle(f)}</TableCell>
+                        <TableCell className="font-mono">₹{fPayable.toLocaleString()}</TableCell>
+                        <TableCell className="font-mono text-success">
+                          ₹{fPaid.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-mono text-destructive">
+                          ₹{fRemaining.toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock3 className="h-3.5 w-3.5" /> {f.due_date ?? "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={f.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button size="sm" className="gap-1" onClick={() => setPayingFor(f)}>
+                            <CreditCard className="h-3.5 w-3.5" />
+                            {f.status === "Partial" ? "Pay Remaining" : "Pay Now"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </div>
 

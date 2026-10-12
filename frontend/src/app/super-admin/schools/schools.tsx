@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSchools, usePlans } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 function AddSchoolForm({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
@@ -76,7 +77,7 @@ function AddSchoolForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="phone">Contact Number</Label>
-        <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 (555) 000-0000" />
+        <PhoneInput id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
       </div>
       <div className="grid gap-1.5 sm:col-span-2">
         <Label>Subscription Plan</Label>

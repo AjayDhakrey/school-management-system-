@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { useMyStaffProfile } from "@/hooks/useApi";
 import { useAuth, toDisplayRole } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 export default function StaffProfilePage() {
   const { user } = useAuth();
@@ -107,7 +108,7 @@ export default function StaffProfilePage() {
                 <Phone className="mr-1 inline h-3.5 w-3.5" />
                 Phone
               </Label>
-              <Input id="s-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <PhoneInput id="s-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <PhotoField
               id="s-photo"

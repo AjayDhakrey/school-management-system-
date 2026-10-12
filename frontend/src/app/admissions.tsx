@@ -80,8 +80,8 @@ import {
   type ApiAdmissionDuplicateMatch,
   type ApiAdmissionDocument,
 } from "@/hooks/useApi";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
-const NONE = "__none__";
 
 const STAGE_LABEL: Record<AdmissionStage, string> = {
   ENQUIRY: "Enquiry",
@@ -441,12 +441,26 @@ export default function Page() {
 // New Enquiry / New Application
 // ---------------------------------------------------------------------------
 
+type AdmissionClass = {
+  id: string;
+  name: string;
+  section: string;
+  academic_year_id: string | null;
+  academic_year_name: string | null;
+};
+
+/** Each class name once ("class 1"), in the order the class list is already sorted in. */
+function uniqueClassNames(classes: AdmissionClass[]) {
+  return Array.from(new Set(classes.map((c) => c.name)));
+}
+
 type NewAdmissionForm = {
   applicant: string;
   dob: string;
   gender: string;
   address: string;
-  classId: string;
+  className: string;
+  section: string;
   academicYear: string;
   parentName: string;
   parentRelation: string;
@@ -463,7 +477,8 @@ const emptyForm: NewAdmissionForm = {
   dob: "",
   gender: "",
   address: "",
-  classId: NONE,
+  className: "",
+  section: "",
   academicYear: "",
   parentName: "",
   parentRelation: "",
@@ -485,7 +500,7 @@ function NewAdmissionDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   mode: "enquiry" | "application";
-  classes: { id: string; name: string; section: string; academic_year_id: string | null; academic_year_name: string | null }[];
+  classes: AdmissionClass[];
   onCreated: () => void;
 }) {
   const { data: school } = useSchoolProfile();
@@ -514,7 +529,12 @@ function NewAdmissionDialog({
       toast.error("Provide at least a contact phone or email");
       return;
     }
-    const selectedClass = classes.find((c) => c.id === form.classId);
+    // The section is decided later by the office (before approval), so only the class is taken here.
+    const classRow = classes.find((c) => c.name === form.className);
+    if (!classRow) {
+      toast.error("Select the class applied for");
+      return;
+    }
     setSubmitting(true);
     try {
       const resp = await api.post<{ id: string; applicationNo: string }>("/admissions", {
@@ -522,10 +542,10 @@ function NewAdmissionDialog({
         dob: form.dob || null,
         gender: form.gender || null,
         address: form.address.trim() || null,
-        classApplied: selectedClass?.name ?? null,
-        sectionApplied: selectedClass?.section ?? null,
-        classIdApplied: selectedClass?.id ?? null,
-        academicYearId: selectedClass?.academic_year_id ?? null,
+        classApplied: classRow.name,
+        sectionApplied: null,
+        classIdApplied: null,
+        academicYearId: classRow.academic_year_id ?? null,
         academicYear: form.academicYear.trim() || null,
         parentName: form.parentName.trim() || null,
         parentRelation: form.parentRelation || null,
@@ -617,12 +637,11 @@ function NewAdmissionDialog({
               </div>
             )}
             <div className="space-y-1">
-              <Label>Class Applied For</Label>
-              <Select value={form.classId} onValueChange={(v) => set("classId", v)}>
-                <SelectTrigger className="bg-surface"><SelectValue placeholder="Select class & section" /></SelectTrigger>
+              <Label>Class Applied For <span className="text-destructive">*</span></Label>
+              <Select value={form.className} onValueChange={(v) => set("className", v)}>
+                <SelectTrigger className="bg-surface"><SelectValue placeholder="Select class" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NONE}>Not decided yet</SelectItem>
-                  {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}-{c.section}</SelectItem>)}
+                  {uniqueClassNames(classes).map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -654,7 +673,7 @@ function NewAdmissionDialog({
             </div>
             <div className="space-y-1">
               <Label>Contact Phone</Label>
-              <Input value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} placeholder="Phone number" />
+              <PhoneInput value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>Contact Email</Label>
@@ -712,7 +731,7 @@ function AdmissionReviewPanel({
 }: {
   admissionId: string;
   canManage: boolean;
-  classes: { id: string; name: string; section: string; academic_year_id: string | null; academic_year_name: string | null }[];
+  classes: AdmissionClass[];
   onClose: () => void;
   onChanged: () => Promise<void>;
   onConverted: (studentId: string) => void;
@@ -1084,7 +1103,7 @@ function OverviewTab({
 }: {
   admission: ApiAdmission;
   canManage: boolean;
-  classes: { id: string; name: string; section: string; academic_year_id: string | null; academic_year_name: string | null }[];
+  classes: AdmissionClass[];
   editOpen: boolean;
   setEditOpen: (o: boolean) => void;
   onSaved: () => Promise<void>;
@@ -1094,7 +1113,8 @@ function OverviewTab({
     dob: admission.dob ?? "",
     gender: admission.gender ?? "",
     address: admission.address ?? "",
-    classId: admission.class_id_applied ?? NONE,
+    className: admission.class_applied ?? "",
+    section: admission.section_applied ?? "",
     academicYear: admission.academic_year ?? "",
     parentName: admission.parent_name ?? "",
     parentRelation: admission.parent_relation ?? "",
@@ -1112,7 +1132,16 @@ function OverviewTab({
   }
 
   async function save() {
-    const selectedClass = classes.find((c) => c.id === form.classId);
+    const classRow = classes.find((c) => c.name === form.className);
+    if (!classRow) {
+      toast.error("Select the class applied for");
+      return;
+    }
+    // A section is only known once the office places the applicant; until then the exact
+    // class-section stays empty (approval and conversion ask for it).
+    const placed = form.section
+      ? classes.find((c) => c.name === form.className && c.section === form.section)
+      : undefined;
     setSaving(true);
     try {
       await api.patch(`/admissions/${admission.id}`, {
@@ -1120,10 +1149,10 @@ function OverviewTab({
         dob: form.dob || null,
         gender: form.gender || null,
         address: form.address.trim() || null,
-        classApplied: selectedClass?.name ?? null,
-        sectionApplied: selectedClass?.section ?? null,
-        classIdApplied: selectedClass?.id ?? null,
-        academicYearId: selectedClass?.academic_year_id ?? null,
+        classApplied: classRow.name,
+        sectionApplied: placed?.section ?? null,
+        classIdApplied: placed?.id ?? null,
+        academicYearId: (placed ?? classRow).academic_year_id ?? null,
         academicYear: form.academicYear.trim() || null,
         parentName: form.parentName.trim() || null,
         parentRelation: form.parentRelation || null,
@@ -1156,12 +1185,28 @@ function OverviewTab({
               <SelectContent>{GENDERS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
-          <Field label="Class Applied For">
-            <Select value={form.classId} onValueChange={(v) => set("classId", v)}>
-              <SelectTrigger className="bg-surface"><SelectValue placeholder="Select" /></SelectTrigger>
+          <Field label="Class Applied For *">
+            <Select
+              value={form.className}
+              onValueChange={(v) => setForm((prev) => ({ ...prev, className: v, section: "" }))}
+            >
+              <SelectTrigger className="bg-surface"><SelectValue placeholder="Select class" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={NONE}>Not decided yet</SelectItem>
-                {classes.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}-{c.section}</SelectItem>)}
+                {uniqueClassNames(classes).map((name) => <SelectItem key={name} value={name}>{name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Section (assign before approval)">
+            <Select
+              value={form.section}
+              onValueChange={(v) => set("section", v)}
+              disabled={!form.className}
+            >
+              <SelectTrigger className="bg-surface"><SelectValue placeholder="Not assigned yet" /></SelectTrigger>
+              <SelectContent>
+                {classes
+                  .filter((c) => c.name === form.className)
+                  .map((c) => <SelectItem key={c.id} value={c.section}>Section {c.section}</SelectItem>)}
               </SelectContent>
             </Select>
           </Field>
@@ -1178,7 +1223,7 @@ function OverviewTab({
               <SelectContent>{RELATIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
             </Select>
           </Field>
-          <Field label="Phone"><Input value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} /></Field>
+          <Field label="Phone"><PhoneInput value={form.contactPhone} onChange={(e) => set("contactPhone", e.target.value)} /></Field>
           <Field label="Email"><Input type="email" value={form.contactEmail} onChange={(e) => set("contactEmail", e.target.value)} /></Field>
         </div>
         <Separator />

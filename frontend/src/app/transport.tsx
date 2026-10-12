@@ -6,6 +6,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   Bus,
+  Clock,
+  MapPin,
   Route as RouteIcon,
   Users,
   Wrench,
@@ -54,6 +56,8 @@ import {
   type TransportComplaintCategory,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 const COMPLAINT_CATEGORIES: TransportComplaintCategory[] = [
   "Safety",
@@ -96,12 +100,17 @@ function ReportIssueDialog({ vehicleId, onDone }: { vehicleId?: string; onDone: 
     <DialogContent className="max-w-md">
       <DialogHeader>
         <DialogTitle>Report a Transport Issue</DialogTitle>
-        <DialogDescription>Let the transport office know about a safety concern, delay or complaint.</DialogDescription>
+        <DialogDescription>
+          Let the transport office know about a safety concern, delay or complaint.
+        </DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="grid gap-3">
         <div className="grid gap-1.5">
           <Label>Category</Label>
-          <Select value={category} onValueChange={(v) => setCategory(v as TransportComplaintCategory)}>
+          <Select
+            value={category}
+            onValueChange={(v) => setCategory(v as TransportComplaintCategory)}
+          >
             <SelectTrigger className="bg-surface">
               <SelectValue />
             </SelectTrigger>
@@ -149,6 +158,55 @@ export default function Page() {
   return <AdminTransportView />;
 }
 
+/** One end of the student's daily trip, drawn as a point on a vertical timeline. */
+function JourneyStop({
+  tone,
+  label,
+  place,
+  time,
+  last,
+}: {
+  tone: "success" | "destructive";
+  label: string;
+  place: string | null | undefined;
+  time: string | null | undefined;
+  last?: boolean;
+}) {
+  return (
+    <li className="relative flex gap-3 pb-1">
+      <div className="flex flex-col items-center">
+        <span
+          className={cn(
+            "grid h-9 w-9 shrink-0 place-items-center rounded-full",
+            tone === "success"
+              ? "bg-success-soft text-success"
+              : "bg-destructive-soft text-destructive",
+          )}
+        >
+          <MapPin className="h-4 w-4" />
+        </span>
+        {!last && <span className="my-1 w-0.5 flex-1 border-l-2 border-dashed border-border" />}
+      </div>
+      <div className={cn("flex min-w-0 flex-1 items-start justify-between gap-2", !last && "pb-5")}>
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {label}
+          </p>
+          <p className="truncate text-[15px] font-bold">{place || "Not set"}</p>
+        </div>
+        <span
+          className={cn(
+            "flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold",
+            time ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+          )}
+        >
+          <Clock className="h-3 w-3" /> {time || "Time TBA"}
+        </span>
+      </div>
+    </li>
+  );
+}
+
 function StudentTransportView() {
   const { data: assignment, isLoading } = useMyTransport();
   const [reportOpen, setReportOpen] = useState(false);
@@ -182,43 +240,129 @@ function StudentTransportView() {
           icon={Bus}
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <SectionCard title="Vehicle" subtitle={assignment.number ?? "—"}>
-            <dl className="grid gap-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Route</dt>
-                <dd className="font-medium">{assignment.route ?? "—"}</dd>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid content-start gap-4">
+            {/* Bus */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary/80 p-4 text-primary-foreground shadow-md">
+              <span className="pointer-events-none absolute -top-10 -right-8 h-32 w-32 rounded-full bg-white/10" />
+              <span className="pointer-events-none absolute -bottom-12 right-20 h-24 w-24 rounded-full bg-white/5" />
+              <div className="relative flex items-start justify-between gap-3">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15">
+                  <Bus className="h-6 w-6" />
+                </span>
+                <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold">
+                  <span
+                    className={cn(
+                      "h-1.5 w-1.5 rounded-full",
+                      assignment.status === "On Route"
+                        ? "animate-pulse bg-success"
+                        : assignment.status === "Maintenance"
+                          ? "bg-warning"
+                          : "bg-white/70",
+                    )}
+                  />
+                  {assignment.status}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Driver</dt>
-                <dd className="font-medium">{assignment.driver ?? "—"}</dd>
+              <p className="relative mt-4 text-[10px] font-semibold uppercase tracking-wider opacity-75">
+                Your bus
+              </p>
+              <span className="relative mt-1 inline-block rounded-lg border-2 border-white/70 bg-white px-3 py-1 font-mono text-lg font-bold tracking-widest text-foreground shadow-sm">
+                {assignment.number ?? "—"}
+              </span>
+              <div className="relative mt-3 flex flex-wrap items-center gap-2 text-xs">
+                <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 font-medium">
+                  <RouteIcon className="h-3.5 w-3.5" /> Route {assignment.route ?? "—"}
+                </span>
+                {assignment.vehicle_type && (
+                  <span className="rounded-full bg-white/15 px-2.5 py-1 font-medium">
+                    {assignment.vehicle_type}
+                  </span>
+                )}
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Driver Contact</dt>
-                <dd className="font-medium">{assignment.driver_phone ?? "—"}</dd>
+            </div>
+
+            {/* Driver */}
+            <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-sm">
+              <Initials
+                name={assignment.driver ?? "Driver"}
+                tone="gold"
+                className="h-12 w-12 text-sm"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Driver
+                </p>
+                <p className="truncate text-[15px] font-bold capitalize">
+                  {assignment.driver?.toLowerCase() ?? "Not assigned"}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {assignment.driver_phone ?? "No contact number"}
+                </p>
               </div>
-            </dl>
-          </SectionCard>
-          <SectionCard title="Pickup & Drop">
-            <dl className="grid gap-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Pickup Point</dt>
-                <dd className="font-medium">{assignment.pickup_point ?? "—"}</dd>
+              {assignment.driver_phone && (
+                <a
+                  href={`tel:${assignment.driver_phone}`}
+                  aria-label="Call driver"
+                  className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-success px-4 text-sm font-semibold text-white shadow-sm transition-transform active:scale-95"
+                >
+                  <Phone className="h-4 w-4" /> Call
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Journey */}
+          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <h3 className="text-sm font-semibold">Your journey</h3>
+            <p className="text-xs text-muted-foreground">
+              Where the bus picks you up and drops you off
+            </p>
+            <ol className="mt-4">
+              <JourneyStop
+                tone="success"
+                label="Pickup"
+                place={assignment.pickup_point}
+                time={assignment.pickup_time}
+              />
+              <JourneyStop
+                tone="destructive"
+                label="Drop"
+                place={assignment.drop_point}
+                time={assignment.drop_time}
+                last
+              />
+            </ol>
+
+            {(assignment.stops ?? []).length > 0 && (
+              <div className="mt-4 border-t border-border pt-4">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  All stops on this route
+                </p>
+                <ul className="flex flex-wrap gap-1.5">
+                  {(assignment.stops ?? []).map((stop, i) => {
+                    const mine =
+                      stop.name === assignment.pickup_point || stop.name === assignment.drop_point;
+                    return (
+                      <li
+                        key={`${stop.name}-${i}`}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",
+                          mine
+                            ? "border-primary/40 bg-primary/10 font-semibold text-primary"
+                            : "border-border text-muted-foreground",
+                        )}
+                      >
+                        <MapPin className="h-3 w-3" />
+                        {stop.name}
+                        {stop.time && <span className="opacity-70">· {stop.time}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Pickup Time</dt>
-                <dd className="font-medium">{assignment.pickup_time ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Drop Point</dt>
-                <dd className="font-medium">{assignment.drop_point ?? "—"}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Drop Time</dt>
-                <dd className="font-medium">{assignment.drop_time ?? "—"}</dd>
-              </div>
-            </dl>
-          </SectionCard>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -655,11 +799,10 @@ function VehicleDialog({
             </div>
             <div className="space-y-1">
               <Label>Driver Contact</Label>
-              <Input
+              <PhoneInput
                 required
                 value={driverContact}
                 onChange={(e) => setDriverContact(e.target.value)}
-                placeholder="+1 (555) ..."
               />
             </div>
             <div className="space-y-1">
@@ -694,23 +837,43 @@ function VehicleDialog({
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label>Registration No.</Label>
-                <Input value={registrationNo} onChange={(e) => setRegistrationNo(e.target.value)} placeholder="RC number" />
+                <Input
+                  value={registrationNo}
+                  onChange={(e) => setRegistrationNo(e.target.value)}
+                  placeholder="RC number"
+                />
               </div>
               <div className="space-y-1">
                 <Label>Vehicle Type</Label>
-                <Input value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} placeholder="Bus, Van, Car…" />
+                <Input
+                  value={vehicleType}
+                  onChange={(e) => setVehicleType(e.target.value)}
+                  placeholder="Bus, Van, Car…"
+                />
               </div>
               <div className="space-y-1">
                 <Label>Insurance Expiry</Label>
-                <Input type="date" value={insuranceExpiry ?? ""} onChange={(e) => setInsuranceExpiry(e.target.value)} />
+                <Input
+                  type="date"
+                  value={insuranceExpiry ?? ""}
+                  onChange={(e) => setInsuranceExpiry(e.target.value)}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Fitness Cert. Expiry</Label>
-                <Input type="date" value={fitnessExpiry ?? ""} onChange={(e) => setFitnessExpiry(e.target.value)} />
+                <Input
+                  type="date"
+                  value={fitnessExpiry ?? ""}
+                  onChange={(e) => setFitnessExpiry(e.target.value)}
+                />
               </div>
               <div className="space-y-1">
                 <Label>Pollution Cert. Expiry</Label>
-                <Input type="date" value={pollutionExpiry ?? ""} onChange={(e) => setPollutionExpiry(e.target.value)} />
+                <Input
+                  type="date"
+                  value={pollutionExpiry ?? ""}
+                  onChange={(e) => setPollutionExpiry(e.target.value)}
+                />
               </div>
             </div>
           </div>

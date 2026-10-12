@@ -31,6 +31,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLeads, type ApiLead } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 const STATUSES = ["NEW", "CONTACTED", "DEMO_SCHEDULED", "CONVERTED", "LOST"];
 
@@ -79,7 +80,7 @@ function AddLeadForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="lead-phone">Phone</Label>
-        <Input id="lead-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <PhoneInput id="lead-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
       </div>
       <div className="grid gap-1.5 sm:col-span-2">
         <Label htmlFor="lead-notes">Notes</Label>

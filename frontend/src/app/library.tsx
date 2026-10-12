@@ -80,11 +80,13 @@ import {
   type ApiLibraryBorrower,
   type ApiLibraryCopy,
   type ApiLibraryLoan,
+  type ApiLibraryRecord,
   type ApiLibrarySettings,
   type LibraryBorrowerType,
   type LibraryCopyStatus,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 type Tone = "success" | "warning" | "danger" | "info" | "neutral" | "gold";
 
@@ -198,6 +200,163 @@ export default function Page() {
 // Students, teachers and staff: own loans + catalogue browsing
 // ============================================================================
 
+const TILE_TONE: Record<Tone, string> = {
+  success: "bg-success-soft text-success",
+  warning: "bg-warning-soft text-warning",
+  danger: "bg-destructive-soft text-destructive",
+  info: "bg-info-soft text-info",
+  gold: "bg-gold-soft text-gold-foreground",
+  neutral: "bg-muted text-muted-foreground",
+};
+const BAR_TONE: Record<Tone, string> = {
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-destructive",
+  info: "bg-info",
+  gold: "bg-gold",
+  neutral: "bg-muted-foreground",
+};
+
+/** One of the reader's own loans — book, status, and where the loan stands in time. */
+function LoanCard({
+  loan,
+  title,
+  author,
+  accessionNo,
+}: {
+  loan: ApiLibraryRecord;
+  title: string;
+  author: string | null;
+  accessionNo: string | undefined;
+}) {
+  const s = loanStatus(loan);
+  const returned = Boolean(loan.returned_on);
+  const today = todayIso();
+  const total =
+    loan.issued_on && loan.due_date ? Math.max(daysBetween(loan.issued_on, loan.due_date), 1) : 0;
+  const elapsed = loan.issued_on ? daysBetween(loan.issued_on, today) : 0;
+  const progress = total ? Math.min(100, Math.max(4, (elapsed / total) * 100)) : 0;
+  const daysLeft = loan.due_date ? daysBetween(today, loan.due_date) : null;
+
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-3.5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span
+          className={cn("grid h-12 w-10 shrink-0 place-items-center rounded-lg", TILE_TONE[s.tone])}
+        >
+          <BookOpen className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="line-clamp-2 text-[15px] font-bold capitalize leading-tight">{title}</h4>
+            <StatusBadge status={s.label} tone={s.tone} />
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+            {author && <span className="truncate">{author}</span>}
+            {accessionNo && (
+              <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono font-medium">
+                {accessionNo}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-auto pt-3">
+        <div className="rounded-xl bg-muted/50 p-2.5">
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Issued
+              </p>
+              <p className="truncate font-semibold">{fmtDate(loan.issued_on)}</p>
+            </div>
+            <div className="min-w-0 text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {returned ? "Returned" : "Due"}
+              </p>
+              <p
+                className={cn(
+                  "truncate font-semibold",
+                  !returned && s.key === "OVERDUE" && "text-destructive",
+                )}
+              >
+                {fmtDate(returned ? loan.returned_on : loan.due_date)}
+              </p>
+            </div>
+          </div>
+          {!returned && total > 0 && (
+            <>
+              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-border">
+                <div
+                  className={cn("h-full rounded-full transition-all", BAR_TONE[s.tone])}
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              {daysLeft !== null && (
+                <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">
+                  {daysLeft > 1
+                    ? `${daysLeft} days left to return`
+                    : daysLeft === 1
+                      ? "Due tomorrow"
+                      : daysLeft === 0
+                        ? "Due today"
+                        : "Please return it as soon as possible"}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** One title in the catalogue, with where to find it and whether a copy is free. */
+function CatalogueCard({
+  book: b,
+  info,
+}: {
+  book: ApiLibraryBook;
+  info: { total: number; available: number } | undefined;
+}) {
+  const free = Boolean(info && info.available > 0);
+  return (
+    <div className="flex h-full flex-col rounded-2xl border border-border bg-card p-3.5 shadow-sm">
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(
+            "grid h-12 w-10 shrink-0 place-items-center rounded-lg font-display text-lg font-bold uppercase",
+            free ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
+          )}
+        >
+          {b.title.trim().charAt(0) || "?"}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h4 className="line-clamp-2 text-[15px] font-bold capitalize leading-tight">{b.title}</h4>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {[b.author, b.edition && `${b.edition} ed.`].filter(Boolean).join(" · ") ||
+              "Unknown author"}
+          </p>
+        </div>
+      </div>
+      <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3 text-[11px]">
+        <AvailabilityBadge info={info} />
+        {b.category && (
+          <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">
+            {b.category}
+          </span>
+        )}
+        {b.shelf_location && (
+          <span className="rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground">
+            Shelf {b.shelf_location}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ReaderView() {
   const { data: booksData, isLoading: booksLoading } = useLibraryBooks();
   const { data: copiesData } = useLibraryCopies();
@@ -271,7 +430,7 @@ function ReaderView() {
           <TabsTrigger value="catalogue">Browse Catalogue</TabsTrigger>
         </TabsList>
         <TabsContent value="mine">
-          <div className="panel">
+          <div className="panel overflow-hidden">
             {isLoading ? (
               <TableSkeleton rows={4} cols={4} />
             ) : loans.length === 0 ? (
@@ -281,47 +440,18 @@ function ReaderView() {
                 icon={BookOpen}
               />
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Book</TableHead>
-                      <TableHead>Issued On</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead>Returned On</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loans.map((r) => {
-                      const s = loanStatus(r);
-                      const copy = r.copy_id ? copiesById.get(r.copy_id) : undefined;
-                      return (
-                        <TableRow key={r.id}>
-                          <TableCell>
-                            <p className="font-medium">{booksById.get(r.book_id)?.title ?? "—"}</p>
-                            {copy && (
-                              <p className="text-xs text-muted-foreground">
-                                Copy {copy.accession_no}
-                              </p>
-                            )}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {fmtDate(r.issued_on)}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">{fmtDate(r.due_date)}</TableCell>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {fmtDate(r.returned_on)}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={s.label} tone={s.tone} />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+              <ul className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3">
+                {loans.map((r) => (
+                  <li key={r.id}>
+                    <LoanCard
+                      loan={r}
+                      title={booksById.get(r.book_id)?.title ?? "Unknown book"}
+                      author={booksById.get(r.book_id)?.author ?? null}
+                      accessionNo={r.copy_id ? copiesById.get(r.copy_id)?.accession_no : undefined}
+                    />
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         </TabsContent>
@@ -357,39 +487,13 @@ function ReaderView() {
                 icon={BookOpen}
               />
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Shelf</TableHead>
-                      <TableHead>Availability</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((b) => (
-                      <TableRow key={b.id}>
-                        <TableCell>
-                          <p className="font-medium">{b.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {[b.author, b.edition && `${b.edition} ed.`]
-                              .filter(Boolean)
-                              .join(" · ") || "Unknown author"}
-                          </p>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{b.category ?? "—"}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {b.shelf_location ?? "—"}
-                        </TableCell>
-                        <TableCell>
-                          <AvailabilityBadge info={availability.get(b.id)} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <ul className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4 xl:grid-cols-3">
+                {rows.map((b) => (
+                  <li key={b.id}>
+                    <CatalogueCard book={b} info={availability.get(b.id)} />
+                  </li>
+                ))}
+              </ul>
             )}
             <Pager
               page={Math.min(page, pageCount)}

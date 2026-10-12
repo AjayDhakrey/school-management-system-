@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Eye, EyeOff, GraduationCap, Loader2 } from "lucide-react";
+import { ArrowLeft, Check, Eye, EyeOff, GraduationCap, Loader2 } from "lucide-react";
 import { useAuth, DASHBOARD_PATH_FOR_ROLE } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
 
@@ -97,12 +97,20 @@ export default function Login() {
           </div>
 
           <div className="hidden flex-col gap-6 md:flex">
-            <span
-              className="w-fit rounded-full border border-white/50 bg-white/10 px-8 py-2.5 text-[12px] font-semibold tracking-wide backdrop-blur-sm"
-              style={{ boxShadow: "0 6px 14px rgba(0,0,0,0.2)" }}
-            >
-              SIGN IN
-            </span>
+            <ul className="space-y-2.5 text-[12px] font-medium text-white/90">
+              {[
+                "Attendance, fees & results in one place",
+                "Your own dashboard for every role",
+                "Secure access for staff, parents & students",
+              ].map((line) => (
+                <li key={line} className="flex items-center gap-2.5">
+                  <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/20">
+                    <Check className="h-3 w-3" />
+                  </span>
+                  {line}
+                </li>
+              ))}
+            </ul>
             <p className="text-[10px] text-white/60">
               CREATOR <span className="font-semibold text-white">HERE</span> &nbsp;|&nbsp; DIRECTOR{" "}
               <span className="font-semibold text-white">HERE</span>

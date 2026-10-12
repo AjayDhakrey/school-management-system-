@@ -82,14 +82,74 @@ export function ordinal(n: number) {
 }
 
 const MONTH_LABEL = /^[A-Z][a-z]+ \d{4}$/;
+const TERM_LABEL = /^Term [1-3] \(.+\)$/;
+
+/** Term fees (e.g. Examination Fee) are billed three times a year, once per term. */
+export const TERMS_PER_YEAR = 3;
+
+export type BillingTerm = {
+  number: number;
+  /** "Term 1 (2026-2027)" — also what a generated term fee stores as its description. */
+  label: string;
+  /** "Apr – Jul" */
+  range: string;
+  months: BillingMonth[];
+};
+
+/** The academic year split into three terms of (nearly) equal length: Apr–Jul, Aug–Nov, Dec–Mar. */
+export function academicTerms(months: BillingMonth[], yearName: string): BillingTerm[] {
+  if (!months.length) return [];
+  const size = Math.ceil(months.length / TERMS_PER_YEAR);
+  const terms: BillingTerm[] = [];
+  for (let i = 0; i < TERMS_PER_YEAR; i++) {
+    const slice = months.slice(i * size, (i + 1) * size);
+    if (!slice.length) break;
+    terms.push({
+      number: i + 1,
+      label: `Term ${i + 1} (${yearName})`,
+      range: slice.length > 1 ? `${slice[0]!.short} – ${slice.at(-1)!.short}` : slice[0]!.short,
+      months: slice,
+    });
+  }
+  return terms;
+}
 
 /** Month a generated monthly fee covers ("April 2026"), or null for other fees. */
 export function billingMonthOf(fee: Pick<ApiFee, "description">) {
   return fee.description && MONTH_LABEL.test(fee.description) ? fee.description : null;
 }
 
-/** Fee name as shown to people: "Tuition Fee · April 2026" for a monthly due. */
+/** Term a generated term fee covers ("Term 1 (2026-2027)"), or null for other fees. */
+export function billingTermOf(fee: Pick<ApiFee, "description">) {
+  return fee.description && TERM_LABEL.test(fee.description) ? fee.description : null;
+}
+
+const ANNUAL_LABEL = /^Annual \(.+\)$/;
+/** What a generated one-time fee (e.g. Admission Fee) stores as its description. */
+export const ONE_TIME_LABEL = "One-time";
+
+/** "Annual (2026-2027)" — what a generated yearly fee stores as its description. */
+export function annualLabel(yearName: string) {
+  return `Annual (${yearName})`;
+}
+
+/** Whether a fee was generated as a yearly fee ("Annual (2026-2027)"). */
+export function isAnnualFee(fee: Pick<ApiFee, "description">) {
+  return Boolean(fee.description && ANNUAL_LABEL.test(fee.description));
+}
+
+/** Billing period a generated fee covers — a month, a term, a year or one-time — or null. */
+export function billingPeriodOf(fee: Pick<ApiFee, "description">) {
+  if (!fee.description) return null;
+  if (fee.description === ONE_TIME_LABEL || isAnnualFee(fee)) return fee.description;
+  return billingMonthOf(fee) ?? billingTermOf(fee);
+}
+
+/**
+ * Fee name as shown to people: "Tuition Fee · April 2026", "Examination Fee · Term 1 (2026-2027)",
+ * "Transport Fee · Annual (2026-2027)", "Admission Fee · One-time".
+ */
 export function feeTitle(fee: Pick<ApiFee, "fee_type" | "description">) {
-  const month = billingMonthOf(fee);
-  return month ? `${fee.fee_type} · ${month}` : fee.fee_type;
+  const period = billingPeriodOf(fee);
+  return period ? `${fee.fee_type} · ${period}` : fee.fee_type;
 }

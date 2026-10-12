@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Users, UserCheck, UserX, Percent, MoreHorizontal, Plus, Eye, EyeOff, Pencil, Trash2, ListFilter } from "lucide-react";
+import { Users, UserCheck, UserX, Percent, MoreHorizontal, Plus, Eye, EyeOff, Pencil, Trash2, ListFilter, Home, BedDouble } from "lucide-react";
 import {
   PageHeader,
   SearchInput,
@@ -49,6 +49,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useStudents, useParents, useClasses, useTransport, type ApiStudent } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 const PER_PAGE = 8;
 const NONE = "__none__";
@@ -73,6 +74,8 @@ export function StudentFormDialog({
   const [status, setStatus] = useState(initial?.status ?? "Active");
   const [vehicleId, setVehicleId] = useState(initial?.vehicle_id ?? NONE);
   const [bloodGroup, setBloodGroup] = useState(initial?.blood_group ?? NONE);
+  const [isHosteller, setIsHosteller] = useState(Boolean(initial?.is_hosteller));
+  const [hostelRoom, setHostelRoom] = useState(initial?.hostel_room ?? "");
   const [roll, setRoll] = useState(initial?.roll != null ? String(initial.roll) : "");
   const [rollTouched, setRollTouched] = useState(isEdit);
 
@@ -196,6 +199,11 @@ export function StudentFormDialog({
         phone: phone || null,
         bloodGroup: bloodGroup !== NONE ? bloodGroup : null,
         address: address || null,
+        // Only sent once someone is (or was) a hosteller, so saving keeps working on a database
+        // that hasn't run migration 60 yet.
+        ...(isHosteller || initial?.is_hosteller
+          ? { isHosteller, hostelRoom: isHosteller ? hostelRoom.trim() || null : null }
+          : {}),
         ...(isEdit
           ? {
               status,
@@ -319,7 +327,7 @@ export function StudentFormDialog({
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="phone">Phone</Label>
-          <Input id="phone" name="phone" defaultValue={initial?.phone ?? ""} placeholder="+1 (555) 123-4567" />
+          <PhoneInput id="phone" name="phone" defaultValue={initial?.phone ?? ""} />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="bloodGroup">Blood Group</Label>
@@ -340,6 +348,60 @@ export function StudentFormDialog({
         <div className="grid gap-1.5 sm:col-span-2">
           <Label htmlFor="address">Address</Label>
           <Input id="address" name="address" defaultValue={initial?.address ?? ""} placeholder="123 Maple Street, Springfield" />
+        </div>
+        <div className="grid gap-1.5 sm:col-span-2">
+          <Label>Accommodation</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                { value: false, title: "Day Scholar", note: "Goes home daily", icon: Home },
+                { value: true, title: "Hosteller", note: "Stays in school hostel", icon: BedDouble },
+              ] as const
+            ).map((option) => {
+              const on = isHosteller === option.value;
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.title}
+                  type="button"
+                  onClick={() => setIsHosteller(option.value)}
+                  aria-pressed={on}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors",
+                    on ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-surface hover:bg-muted/50",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "grid h-8 w-8 shrink-0 place-items-center rounded-lg",
+                      on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{option.title}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">{option.note}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {isHosteller && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="hostelRoom" className="text-xs text-muted-foreground">
+                Hostel room / block
+              </Label>
+              <Input
+                id="hostelRoom"
+                value={hostelRoom}
+                onChange={(e) => setHostelRoom(e.target.value)}
+                placeholder="e.g. Boys Block B · Room 12"
+                maxLength={60}
+              />
+              <p className="text-[11px] text-muted-foreground">Hostel fees are billed only to hostellers.</p>
+            </div>
+          )}
         </div>
         <div className="grid gap-1.5 sm:col-span-2">
           <div className="flex items-center justify-between">
@@ -394,10 +456,10 @@ export function StudentFormDialog({
                   placeholder="Parent full name"
                   className="bg-surface"
                 />
-                <Input
+                <PhoneInput
                   value={newParentPhone}
                   onChange={(e) => setNewParentPhone(e.target.value)}
-                  placeholder="Mobile number"
+                  placeholder="Parent's 10-digit mobile number"
                   className="bg-surface"
                 />
               </div>

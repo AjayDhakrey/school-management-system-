@@ -25,6 +25,9 @@ export interface ApiStudent {
   blood_group: string | null;
   admitted_on: string | null;
   vehicle_id: string | null;
+  /** Lives in the school hostel (migration 60); Hostel fees are billed only to hostellers. */
+  is_hosteller?: boolean | null;
+  hostel_room?: string | null;
   pickup_point: string | null;
   drop_point: string | null;
   gender: string | null;

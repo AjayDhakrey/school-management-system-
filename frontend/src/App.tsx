@@ -271,11 +271,11 @@ export default function App() {
                 <Route path="/settings" element={guarded("/settings", <SettingsPage />)} />
                 <Route
                   path="/teaching-staff"
-                  element={guarded("/teaching-staff", <Teachers mode="Teaching" />)}
+                  element={guarded("/teaching-staff", <Teachers key="teaching" mode="Teaching" />)}
                 />
                 <Route
                   path="/non-teaching-staff"
-                  element={guarded("/non-teaching-staff", <Teachers mode="Non-Teaching" />)}
+                  element={guarded("/non-teaching-staff", <Teachers key="non-teaching" mode="Non-Teaching" />)}
                 />
                 <Route path="/timetable" element={guarded("/timetable", <Timetable />)} />
                 <Route path="/transport" element={guarded("/transport", <Transport />)} />

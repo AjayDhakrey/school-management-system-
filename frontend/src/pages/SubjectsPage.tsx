@@ -20,7 +20,15 @@ import {
   MoreHorizontal,
   FolderSync,
 } from "lucide-react";
-import { PageHeader, SearchInput, FilterSelect, EmptyState, Pager, Initials, usePaged } from "@/components/shared/ui-kit";
+import {
+  PageHeader,
+  SearchInput,
+  FilterSelect,
+  EmptyState,
+  Pager,
+  Initials,
+  usePaged,
+} from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { InfoCard } from "@/components/shared/InfoCard";
@@ -38,8 +46,19 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   useSubjects,
   useClasses,
@@ -49,9 +68,25 @@ import {
   type ApiClassSubjectMapping,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 const SUBJECT_TYPES = ["Core", "Elective", "Language", "Practical", "Optional"];
 const UNASSIGNED = "__unassigned__";
+
+const SUBJECT_TONES = [
+  "bg-info-soft text-info",
+  "bg-gold-soft text-gold-foreground",
+  "bg-success-soft text-success",
+  "bg-primary/10 text-primary",
+  "bg-destructive-soft text-destructive",
+];
+
+/** A stable colour per subject name. */
+function subjectTone(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) % 1000;
+  return SUBJECT_TONES[hash % SUBJECT_TONES.length];
+}
 
 function typeTone(type: string | null | undefined) {
   if (type === "Core") return "info" as const;
@@ -109,7 +144,7 @@ export default function SubjectsPage() {
       ) {
         return false;
       }
-      if (allocClass !== "all" && m.class_id !== allocClass) return false;
+      if (allocClass !== "all" && `${m.class_name}-${m.section}` !== allocClass) return false;
       if (allocTeacher !== "all") {
         if (allocTeacher === UNASSIGNED && m.teacher_id) return false;
         if (allocTeacher !== UNASSIGNED && m.teacher_id !== allocTeacher) return false;
@@ -136,7 +171,11 @@ export default function SubjectsPage() {
     });
   }, [subjects, catalogSearch, catalogType]);
 
-  const { rows: catalogRows, pageCount: catalogPageCount } = usePaged(filteredSubjects, catalogPage, 10);
+  const { rows: catalogRows, pageCount: catalogPageCount } = usePaged(
+    filteredSubjects,
+    catalogPage,
+    10,
+  );
 
   // Stats
   const totalSubjects = subjects?.length ?? 0;
@@ -161,7 +200,11 @@ export default function SubjectsPage() {
   );
 
   async function handleDeleteSubject(s: ApiSubject) {
-    if (!confirm(`Are you sure you want to delete "${s.name}"? This will also remove any class assignments for this subject.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete "${s.name}"? This will also remove any class assignments for this subject.`,
+      )
+    ) {
       return;
     }
     try {
@@ -234,16 +277,39 @@ export default function SubjectsPage() {
 
       <div className="mt-5">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "allocations" | "catalog")}>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-            <TabsList className="grid w-full grid-cols-1 gap-1 sm:inline-flex sm:w-auto">
-              <TabsTrigger value="allocations" className="w-full justify-start gap-2 sm:w-auto sm:justify-center">
-                <FolderSync className="h-4 w-4" />
-                Class-Subject Allocations ({totalAllocations})
-              </TabsTrigger>
-              <TabsTrigger value="catalog" className="w-full justify-start gap-2 sm:w-auto sm:justify-center">
-                <BookOpen className="h-4 w-4" />
-                Subject Master Catalog ({totalSubjects})
-              </TabsTrigger>
+          <div className="mb-4">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-2xl p-1 sm:inline-grid sm:w-auto">
+              {(
+                [
+                  {
+                    value: "allocations",
+                    icon: FolderSync,
+                    short: "Allocations",
+                    full: "Class-Subject Allocations",
+                    count: totalAllocations,
+                  },
+                  {
+                    value: "catalog",
+                    icon: BookOpen,
+                    short: "Catalog",
+                    full: "Subject Master Catalog",
+                    count: totalSubjects,
+                  },
+                ] as const
+              ).map(({ value, icon: Icon, short, full, count }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="group h-10 gap-2 rounded-xl px-3 text-sm data-[state=active]:shadow-sm"
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate sm:hidden">{short}</span>
+                  <span className="hidden sm:inline">{full}</span>
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground group-data-[state=active]:bg-primary group-data-[state=active]:text-primary-foreground">
+                    {count}
+                  </span>
+                </TabsTrigger>
+              ))}
             </TabsList>
           </div>
 
@@ -253,7 +319,7 @@ export default function SubjectsPage() {
               title="Class & Section Allocations"
               subtitle={`${filteredMappings.length} subject-class assignments across all sections`}
               action={
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                   <SearchInput
                     value={allocSearch}
                     onChange={(v) => {
@@ -261,6 +327,7 @@ export default function SubjectsPage() {
                       setAllocPage(1);
                     }}
                     placeholder="Search class, subject, teacher…"
+                    className="col-span-2"
                   />
                   <FilterSelect
                     value={allocClass}
@@ -280,7 +347,7 @@ export default function SubjectsPage() {
                     options={SUBJECT_TYPES}
                     placeholder="Type"
                   />
-                  <div className="flex items-center gap-1 rounded-lg border border-border p-0.5">
+                  <div className="hidden items-center gap-1 rounded-lg border border-border p-0.5 md:flex">
                     <Button
                       variant={allocView === "table" ? "default" : "ghost"}
                       size="icon"
@@ -303,7 +370,9 @@ export default function SubjectsPage() {
               bodyClassName="p-0"
             >
               {loadingMappings ? (
-                <div className="p-8 text-center text-sm text-muted-foreground">Loading allocations…</div>
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  Loading allocations…
+                </div>
               ) : allocRows.length === 0 ? (
                 <div className="p-6 text-center">
                   <EmptyState
@@ -322,155 +391,262 @@ export default function SubjectsPage() {
                     <Plus className="h-4 w-4" /> Assign Subject to Class
                   </Button>
                 </div>
-              ) : allocView === "table" ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-                      <tr>
-                        <th className="px-4 py-2.5 font-medium">Class / Section</th>
-                        <th className="px-4 py-2.5 font-medium">Subject</th>
-                        <th className="px-4 py-2.5 font-medium">Code</th>
-                        <th className="px-4 py-2.5 font-medium">Assigned Teacher</th>
-                        <th className="px-4 py-2.5 font-medium">Type</th>
-                        <th className="px-4 py-2.5 font-medium text-center">Credits / Wk</th>
-                        <th className="px-4 py-2.5 font-medium text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allocRows.map((m) => (
-                        <tr key={m.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-2.5 font-medium whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-xs font-semibold">
-                              {m.class_name}-{m.section}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="font-semibold text-foreground">{m.subject_name}</div>
-                            {m.subject_description && (
-                              <div className="text-[11px] text-muted-foreground truncate max-w-xs">{m.subject_description}</div>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap">
-                            <span className="rounded-full bg-muted/80 px-2 py-0.5 text-[11px] font-mono font-medium">
-                              {m.subject_code ?? "—"}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap">
-                            {m.teacher_name ? (
-                              <div className="flex items-center gap-2">
-                                <Initials name={m.teacher_name} tone="navy" className="h-7 w-7 text-[10px]" />
-                                <div>
-                                  <span className="font-medium text-xs block">{m.teacher_name}</span>
-                                  {m.teacher_email && (
-                                    <span className="text-[10px] text-muted-foreground block">{m.teacher_email}</span>
-                                  )}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
-                                <AlertCircle className="h-3 w-3" /> Unassigned
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2.5 whitespace-nowrap">
-                            <StatusBadge status={m.subject_type ?? "Core"} tone={typeTone(m.subject_type)} />
-                          </td>
-                          <td className="px-4 py-2.5 text-center font-mono font-medium">
-                            {m.subject_credits ?? 3} hrs
-                          </td>
-                          <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => {
-                                  setEditingMapping(m);
-                                  setMappingDialogOpen(true);
-                                }}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive"
-                                onClick={() => handleDeleteMapping(m)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
               ) : (
-                <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {allocRows.map((m) => (
-                    <div key={m.id} className="panel p-3.5 flex flex-col justify-between">
-                      <div>
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold">
+                <>
+                  <ul className="divide-y divide-border md:hidden">
+                    {allocRows.map((m) => (
+                      <li key={m.id} className="flex items-center gap-3 px-3 py-2.5">
+                        <span
+                          className={cn(
+                            "grid h-10 w-10 shrink-0 place-items-center rounded-xl font-display text-base font-bold uppercase",
+                            subjectTone(m.subject_name),
+                          )}
+                        >
+                          {m.subject_name.trim().charAt(0) || "?"}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-1.5">
+                            <p className="truncate text-sm font-semibold capitalize">
+                              {m.subject_name}
+                            </p>
+                            <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold capitalize">
                               {m.class_name}-{m.section}
-                            </span>
-                            <h4 className="mt-1.5 font-bold text-sm">{m.subject_name}</h4>
-                            <span className="mt-0.5 inline-block text-[11px] font-mono text-muted-foreground">
-                              {m.subject_code ?? "No Code"}
                             </span>
                           </div>
-                          <StatusBadge status={m.subject_type ?? "Core"} tone={typeTone(m.subject_type)} />
-                        </div>
-
-                        <div className="mt-3 rounded-lg border border-border/60 bg-muted/20 p-2.5">
-                          <p className="text-[11px] font-semibold text-muted-foreground mb-1">Assigned Teacher</p>
                           {m.teacher_name ? (
-                            <div className="flex items-center gap-2">
-                              <Initials name={m.teacher_name} tone="navy" className="h-6 w-6 text-[10px]" />
-                              <div className="truncate">
-                                <p className="truncate text-xs font-medium">{m.teacher_name}</p>
-                                <p className="truncate text-[10px] text-muted-foreground">{m.teacher_email ?? m.teacher_phone ?? "—"}</p>
-                              </div>
-                            </div>
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                              {m.teacher_name} · {m.subject_credits ?? 3} hrs/wk
+                            </p>
                           ) : (
-                            <span className="text-xs text-destructive flex items-center gap-1 font-medium">
-                              <AlertCircle className="h-3 w-3" /> Needs Teacher Assignment
-                            </span>
+                            <p className="mt-0.5 flex items-center gap-1 text-xs font-medium text-destructive">
+                              <AlertCircle className="h-3 w-3" /> No teacher assigned
+                            </p>
                           )}
                         </div>
+                        <StatusBadge
+                          status={m.subject_type ?? "Core"}
+                          tone={typeTone(m.subject_type)}
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              aria-label="Actions"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingMapping(m);
+                                setMappingDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-3.5 w-3.5" /> Reassign
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDeleteMapping(m)}
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5" /> Remove
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="hidden md:block">
+                    {allocView === "table" ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+                            <tr>
+                              <th className="px-4 py-2.5 font-medium">Class / Section</th>
+                              <th className="px-4 py-2.5 font-medium">Subject</th>
+                              <th className="px-4 py-2.5 font-medium">Code</th>
+                              <th className="px-4 py-2.5 font-medium">Assigned Teacher</th>
+                              <th className="px-4 py-2.5 font-medium">Type</th>
+                              <th className="px-4 py-2.5 font-medium text-center">Credits / Wk</th>
+                              <th className="px-4 py-2.5 font-medium text-right">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {allocRows.map((m) => (
+                              <tr
+                                key={m.id}
+                                className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
+                              >
+                                <td className="px-4 py-2.5 font-medium whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-xs font-semibold">
+                                    {m.class_name}-{m.section}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2.5">
+                                  <div className="font-semibold text-foreground">
+                                    {m.subject_name}
+                                  </div>
+                                  {m.subject_description && (
+                                    <div className="text-[11px] text-muted-foreground truncate max-w-xs">
+                                      {m.subject_description}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2.5 whitespace-nowrap">
+                                  <span className="rounded-full bg-muted/80 px-2 py-0.5 text-[11px] font-mono font-medium">
+                                    {m.subject_code ?? "—"}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2.5 whitespace-nowrap">
+                                  {m.teacher_name ? (
+                                    <div className="flex items-center gap-2">
+                                      <Initials
+                                        name={m.teacher_name}
+                                        tone="navy"
+                                        className="h-7 w-7 text-[10px]"
+                                      />
+                                      <div>
+                                        <span className="font-medium text-xs block">
+                                          {m.teacher_name}
+                                        </span>
+                                        {m.teacher_email && (
+                                          <span className="text-[10px] text-muted-foreground block">
+                                            {m.teacher_email}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">
+                                      <AlertCircle className="h-3 w-3" /> Unassigned
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2.5 whitespace-nowrap">
+                                  <StatusBadge
+                                    status={m.subject_type ?? "Core"}
+                                    tone={typeTone(m.subject_type)}
+                                  />
+                                </td>
+                                <td className="px-4 py-2.5 text-center font-mono font-medium">
+                                  {m.subject_credits ?? 3} hrs
+                                </td>
+                                <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => {
+                                        setEditingMapping(m);
+                                        setMappingDialogOpen(true);
+                                      }}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-destructive"
+                                      onClick={() => handleDeleteMapping(m)}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
+                    ) : (
+                      <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {allocRows.map((m) => (
+                          <div key={m.id} className="panel p-3.5 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold">
+                                    {m.class_name}-{m.section}
+                                  </span>
+                                  <h4 className="mt-1.5 font-bold text-sm">{m.subject_name}</h4>
+                                  <span className="mt-0.5 inline-block text-[11px] font-mono text-muted-foreground">
+                                    {m.subject_code ?? "No Code"}
+                                  </span>
+                                </div>
+                                <StatusBadge
+                                  status={m.subject_type ?? "Core"}
+                                  tone={typeTone(m.subject_type)}
+                                />
+                              </div>
 
-                      <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5 text-xs text-muted-foreground">
-                        <span>{m.subject_credits ?? 3} Credit Hours</span>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs"
-                            onClick={() => {
-                              setEditingMapping(m);
-                              setMappingDialogOpen(true);
-                            }}
-                          >
-                            <Pencil className="h-3 w-3 mr-1" /> Reassign
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 px-2 text-xs text-destructive"
-                            onClick={() => handleDeleteMapping(m)}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
+                              <div className="mt-3 rounded-lg border border-border/60 bg-muted/20 p-2.5">
+                                <p className="text-[11px] font-semibold text-muted-foreground mb-1">
+                                  Assigned Teacher
+                                </p>
+                                {m.teacher_name ? (
+                                  <div className="flex items-center gap-2">
+                                    <Initials
+                                      name={m.teacher_name}
+                                      tone="navy"
+                                      className="h-6 w-6 text-[10px]"
+                                    />
+                                    <div className="truncate">
+                                      <p className="truncate text-xs font-medium">
+                                        {m.teacher_name}
+                                      </p>
+                                      <p className="truncate text-[10px] text-muted-foreground">
+                                        {m.teacher_email ?? m.teacher_phone ?? "—"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-destructive flex items-center gap-1 font-medium">
+                                    <AlertCircle className="h-3 w-3" /> Needs Teacher Assignment
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5 text-xs text-muted-foreground">
+                              <span>{m.subject_credits ?? 3} Credit Hours</span>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => {
+                                    setEditingMapping(m);
+                                    setMappingDialogOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3 mr-1" /> Reassign
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 px-2 text-xs text-destructive"
+                                  onClick={() => handleDeleteMapping(m)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    )}
+                  </div>
+                </>
               )}
-              <Pager page={allocPage} pageCount={allocPageCount} onPage={setAllocPage} total={filteredMappings.length} />
+              <Pager
+                page={allocPage}
+                pageCount={allocPageCount}
+                onPage={setAllocPage}
+                total={filteredMappings.length}
+              />
             </SectionCard>
           </TabsContent>
 
@@ -480,7 +656,7 @@ export default function SubjectsPage() {
               title="Subject Master Directory"
               subtitle="Master curriculum subjects configured for the institution"
               action={
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                   <SearchInput
                     value={catalogSearch}
                     onChange={(v) => {
@@ -488,6 +664,7 @@ export default function SubjectsPage() {
                       setCatalogPage(1);
                     }}
                     placeholder="Search subject catalog…"
+                    className="col-span-2"
                   />
                   <FilterSelect
                     value={catalogType}
@@ -500,7 +677,7 @@ export default function SubjectsPage() {
                   />
                   <Button
                     size="sm"
-                    className="gap-1.5"
+                    className="h-9 gap-1.5"
                     onClick={() => {
                       setEditingSubject(null);
                       setSubjectDialogOpen(true);
@@ -513,7 +690,9 @@ export default function SubjectsPage() {
               bodyClassName="p-0"
             >
               {loadingSubjects ? (
-                <div className="p-8 text-center text-sm text-muted-foreground">Loading subject catalog…</div>
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  Loading subject catalog…
+                </div>
               ) : catalogRows.length === 0 ? (
                 <div className="p-6 text-center">
                   <EmptyState
@@ -533,67 +712,154 @@ export default function SubjectsPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-                      <tr>
-                        <th className="px-4 py-2.5 font-medium">Subject Name</th>
-                        <th className="px-4 py-2.5 font-medium">Subject Code</th>
-                        <th className="px-4 py-2.5 font-medium">Classification Type</th>
-                        <th className="px-4 py-2.5 font-medium text-center">Credits / Wk</th>
-                        <th className="px-4 py-2.5 font-medium">Description</th>
-                        <th className="px-4 py-2.5 font-medium text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {catalogRows.map((s) => (
-                        <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                          <td className="px-4 py-2.5 font-medium">
-                            <div className="flex items-center gap-2">
-                              <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary font-bold text-xs">
-                                {s.name.charAt(0)}
+                <>
+                  <ul className="divide-y divide-border md:hidden">
+                    {catalogRows.map((sub) => (
+                      <li key={sub.id} className="flex items-center gap-3 px-3 py-2.5">
+                        <span
+                          className={cn(
+                            "grid h-10 w-10 shrink-0 place-items-center rounded-xl font-display text-base font-bold uppercase",
+                            subjectTone(sub.name),
+                          )}
+                        >
+                          {sub.name.trim().charAt(0) || "?"}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold capitalize">{sub.name}</p>
+                          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                            {sub.code && (
+                              <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 font-mono font-medium">
+                                {sub.code}
                               </span>
-                              <span>{s.name}</span>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2.5 font-mono text-xs">{s.code ?? "—"}</td>
-                          <td className="px-4 py-2.5">
-                            <StatusBadge status={s.type ?? "Core"} tone={typeTone(s.type)} />
-                          </td>
-                          <td className="px-4 py-2.5 text-center font-mono font-medium">{s.credits ?? 3}</td>
-                          <td className="px-4 py-2.5 text-muted-foreground text-xs max-w-sm truncate">
-                            {s.description ?? "—"}
-                          </td>
-                          <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => {
-                                  setEditingSubject(s);
-                                  setSubjectDialogOpen(true);
-                                }}
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-destructive"
-                                onClick={() => handleDeleteSubject(s)}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          </td>
+                            )}
+                            <span className="truncate">
+                              {sub.credits ?? 3} hrs/wk
+                              {sub.description ? ` · ${sub.description}` : ""}
+                            </span>
+                          </div>
+                        </div>
+                        <StatusBadge status={sub.type ?? "Core"} tone={typeTone(sub.type)} />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 shrink-0"
+                              aria-label="Actions"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingSubject(sub);
+                                setSubjectDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDeleteSubject(sub)}
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full text-left text-sm">
+                      <thead className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <tr>
+                          <th className="px-4 py-3">Subject</th>
+                          <th className="px-4 py-3">Code</th>
+                          <th className="px-4 py-3">Type</th>
+                          <th className="px-4 py-3 text-center">Hrs / Wk</th>
+                          <th className="px-4 py-3">Description</th>
+                          <th className="px-4 py-3 text-right">
+                            <span className="sr-only">Actions</span>
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {catalogRows.map((sub) => (
+                          <tr
+                            key={sub.id}
+                            className="border-b border-border transition-colors last:border-0 hover:bg-muted/30"
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2.5">
+                                <span
+                                  className={cn(
+                                    "grid h-8 w-8 shrink-0 place-items-center rounded-lg text-xs font-bold uppercase",
+                                    subjectTone(sub.name),
+                                  )}
+                                >
+                                  {sub.name.trim().charAt(0) || "?"}
+                                </span>
+                                <span className="font-semibold capitalize">{sub.name}</span>
+                              </div>
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3">
+                              {sub.code ? (
+                                <span className="rounded-md bg-muted px-2 py-0.5 font-mono text-xs font-medium">
+                                  {sub.code}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3">
+                              <StatusBadge status={sub.type ?? "Core"} tone={typeTone(sub.type)} />
+                            </td>
+                            <td className="px-4 py-3 text-center font-semibold tabular-nums">
+                              {sub.credits ?? 3}
+                            </td>
+                            <td className="max-w-sm truncate px-4 py-3 text-xs text-muted-foreground">
+                              {sub.description ?? "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-3 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  aria-label={`Edit ${sub.name}`}
+                                  onClick={() => {
+                                    setEditingSubject(sub);
+                                    setSubjectDialogOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive"
+                                  aria-label={`Delete ${sub.name}`}
+                                  onClick={() => handleDeleteSubject(sub)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
-              <Pager page={catalogPage} pageCount={catalogPageCount} onPage={setCatalogPage} total={filteredSubjects.length} />
+              <Pager
+                page={catalogPage}
+                pageCount={catalogPageCount}
+                onPage={setCatalogPage}
+                total={filteredSubjects.length}
+              />
             </SectionCard>
           </TabsContent>
         </Tabs>
@@ -701,7 +967,9 @@ function SubjectFormDialog({
     <DialogContent className="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>{isEdit ? "Edit Subject Head" : "Add Subject Head"}</DialogTitle>
-        <DialogDescription>Define standard curriculum subjects, codes, and credit hours.</DialogDescription>
+        <DialogDescription>
+          Define standard curriculum subjects, codes, and credit hours.
+        </DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="grid gap-3.5">
         <div className="grid gap-1.5">
@@ -832,7 +1100,9 @@ function MappingFormDialog({
   return (
     <DialogContent className="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>{isEdit ? "Reassign Subject & Teacher" : "Assign Subject to Class"}</DialogTitle>
+        <DialogTitle>
+          {isEdit ? "Reassign Subject & Teacher" : "Assign Subject to Class"}
+        </DialogTitle>
         <DialogDescription>
           Map a curriculum subject to a specific class/section and designate the instructor.
         </DialogDescription>
@@ -886,7 +1156,8 @@ function MappingFormDialog({
             </SelectContent>
           </Select>
           <p className="text-[11px] text-muted-foreground">
-            This teacher will automatically see this class and subject in their Teacher Portal and Grading sheets.
+            This teacher will automatically see this class and subject in their Teacher Portal and
+            Grading sheets.
           </p>
         </div>
 

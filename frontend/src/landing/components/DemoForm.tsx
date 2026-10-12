@@ -24,6 +24,7 @@ import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { CONTACT_ROLES, STUDENT_BANDS } from "../landing-data";
 import { LoginLink, Reveal, buttonStyles } from "./primitives";
+import { PHONE_INPUT_PROPS, cleanPhone } from "@/lib/phone";
 
 const NEXT_STEPS = [
   { title: "We confirm your slot", text: "Our team reaches out within one working day." },
@@ -204,9 +205,10 @@ export function DemoForm() {
                         value={form.email} onChange={set("email")} placeholder="you@school.edu" className={inputCls} />
                     </Field>
                     <Field label="Phone" required id="demo-phone" icon={Phone}>
-                      <input id="demo-phone" type="tel" required pattern="[\d\s+\-\(\)]{7,20}" autoComplete="tel"
-                        title="7–20 digits; + ( ) - and spaces allowed"
-                        value={form.phone} onChange={set("phone")} placeholder="+91 98765 43210" className={inputCls} />
+                      <input id="demo-phone" required {...PHONE_INPUT_PROPS} placeholder="98765 43210"
+                        value={form.phone}
+                        onChange={(e) => setForm((f) => ({ ...f, phone: cleanPhone(e.target.value) }))}
+                        className={inputCls} />
                     </Field>
                   </FieldGroup>
 

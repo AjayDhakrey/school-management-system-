@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useMyTeacherProfile, useClasses, useSubjects } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 export default function TeacherProfilePage() {
   const { data: teacher, isLoading } = useMyTeacherProfile();
@@ -134,7 +135,7 @@ export default function TeacherProfilePage() {
                 <Phone className="mr-1 inline h-3.5 w-3.5" />
                 Phone
               </Label>
-              <Input id="t-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <PhoneInput id="t-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <PhotoField
               id="t-photo"

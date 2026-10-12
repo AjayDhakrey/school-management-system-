@@ -14,7 +14,6 @@ import {
   LogOut,
   Clock3,
   AlertTriangle,
-  CheckCircle2,
   CircleDashed,
 } from "lucide-react";
 import { PageHeader, EmptyState, Initials, TableSkeleton } from "@/components/shared/ui-kit";
@@ -225,16 +224,34 @@ function StudentAttendanceMarker({ teacherClassIds }: { teacherClassIds?: string
     [classes, teacherClassIds],
   );
 
-  const [classId, setClassId] = useState("");
+  // Pick the class first, then one of its sections — the register loads once both are chosen.
+  const [className, setClassName] = useState("");
+  const [section, setSection] = useState("");
+  const classNames = useMemo(
+    () =>
+      Array.from(new Set(markableClasses.map((c) => c.name))).sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+      ),
+    [markableClasses],
+  );
+  const sectionRows = useMemo(
+    () =>
+      markableClasses
+        .filter((c) => c.name === className)
+        .sort((a, b) => a.section.localeCompare(b.section, undefined, { numeric: true })),
+    [markableClasses, className],
+  );
+  const classId = sectionRows.find((c) => c.section === section)?.id ?? "";
   const [date, setDate] = useState(todayStr());
   const [calendarStudentId, setCalendarStudentId] = useState("");
   // Future dates are closed: nothing is loaded or saved for them (the server refuses too).
   const isFuture = date > todayStr();
   const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
 
+  // A class with a single section needs no second choice.
   useEffect(() => {
-    if (!classId && markableClasses.length > 0) setClassId(markableClasses[0]!.id);
-  }, [classId, markableClasses]);
+    if (className && !section && sectionRows.length === 1) setSection(sectionRows[0]!.section);
+  }, [className, section, sectionRows]);
 
   const { data: roster, isLoading } = useAttendanceRoster(
     classId || undefined,
@@ -261,18 +278,38 @@ function StudentAttendanceMarker({ teacherClassIds }: { teacherClassIds?: string
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3">
-        <Select value={classId} onValueChange={setClassId}>
-          <SelectTrigger className="h-9 w-full bg-surface text-sm sm:w-[200px]">
-            <SelectValue placeholder="Class / Section" />
-          </SelectTrigger>
-          <SelectContent>
-            {markableClasses.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                Class {c.name}-{c.section}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+          <Select
+            value={className}
+            onValueChange={(v) => {
+              setClassName(v);
+              setSection("");
+            }}
+          >
+            <SelectTrigger className="h-9 w-full bg-surface text-sm capitalize sm:w-[150px]">
+              <SelectValue placeholder="Select class" />
+            </SelectTrigger>
+            <SelectContent>
+              {classNames.map((name) => (
+                <SelectItem key={name} value={name} className="capitalize">
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={section} onValueChange={setSection} disabled={!className}>
+            <SelectTrigger className="h-9 w-full bg-surface text-sm sm:w-[140px]">
+              <SelectValue placeholder="Select section" />
+            </SelectTrigger>
+            <SelectContent>
+              {sectionRows.map((c) => (
+                <SelectItem key={c.id} value={c.section}>
+                  Section {c.section}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <Input
           type="date"
           max={todayStr()}
@@ -280,16 +317,21 @@ function StudentAttendanceMarker({ teacherClassIds }: { teacherClassIds?: string
           onChange={(e) => setDate(e.target.value)}
           className="h-9 w-full bg-surface text-sm sm:w-44"
         />
-        <div className="flex-1" />
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <CheckCircle2 className="h-3.5 w-3.5 text-success" /> Each status saves automatically
-        </p>
       </div>
 
       {markableClasses.length === 0 ? (
         <EmptyState
           title="No classes available"
           description="Attendance needs an active class with enrolled students."
+        />
+      ) : !classId ? (
+        <EmptyState
+          title={className ? "Choose a section" : "Choose a class"}
+          description={
+            className
+              ? `Pick a section of ${className} to open its attendance register.`
+              : "Select a class, then its section, to see and mark attendance."
+          }
         />
       ) : isFuture ? (
         <EmptyState

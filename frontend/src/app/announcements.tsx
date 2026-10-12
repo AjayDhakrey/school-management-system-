@@ -3,10 +3,9 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, Plus } from "lucide-react";
+import { Bell, CalendarDays, ChevronRight, Megaphone, Plus, Users } from "lucide-react";
 import { PageHeader, EmptyState, TableSkeleton } from "@/components/shared/ui-kit";
 import { InfoCard } from "@/components/shared/InfoCard";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,8 +19,13 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { noticeAudienceLabel, useHasPermission, useNotices, type ApiNotice } from "@/hooks/useApi";
 import { ClassNoticeForm } from "@/components/shared/ClassNoticeForm";
 import { NoticeDetailDialog } from "@/components/shared/NoticeDetailDialog";
@@ -42,7 +46,13 @@ function NewAnnouncementForm({ onDone }: { onDone: () => void }) {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.post("/notices", { title, description, category: CATEGORY, priority: "Medium", audience });
+      await api.post("/notices", {
+        title,
+        description,
+        category: CATEGORY,
+        priority: "Medium",
+        audience,
+      });
       await queryClient.invalidateQueries({ queryKey: ["notices"] });
       toast.success("Announcement published");
       onDone();
@@ -61,7 +71,11 @@ function NewAnnouncementForm({ onDone }: { onDone: () => void }) {
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="an-desc">Message</Label>
-        <Textarea id="an-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
+        <Textarea
+          id="an-desc"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+        />
       </div>
       <div className="grid gap-1.5">
         <Label>Audience</Label>
@@ -87,6 +101,79 @@ function NewAnnouncementForm({ onDone }: { onDone: () => void }) {
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+/** "2026-09-19" → "Today", "Yesterday", "3 days ago" or "19 Sep 2026". */
+function friendlyDate(value: string | null | undefined) {
+  if (!value) return { label: "—", isNew: false };
+  const [y, m, d] = value.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return { label: value, isNew: false };
+  const date = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.round((today.getTime() - date.getTime()) / 86_400_000);
+  const isNew = days >= 0 && days <= 3;
+  if (days === 0) return { label: "Today", isNew };
+  if (days === 1) return { label: "Yesterday", isNew };
+  if (days > 1 && days < 7) return { label: `${days} days ago`, isNew };
+  return {
+    label: date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }),
+    isNew,
+  };
+}
+
+/** One announcement in the feed — tap anywhere on it to read the full message. */
+function AnnouncementCard({ notice: n, onOpen }: { notice: ApiNotice; onOpen: () => void }) {
+  const { label, isNew } = friendlyDate(n.date);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="group flex h-full w-full flex-col rounded-2xl border border-border bg-card p-3.5 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md active:scale-[0.99]"
+    >
+      <div className="flex w-full items-start gap-3">
+        <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+          <Megaphone className="h-5 w-5" />
+          {isNew && (
+            <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-destructive" />
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="line-clamp-1 text-[15px] font-bold capitalize leading-tight">
+              {n.title}
+            </h4>
+            {isNew && (
+              <span className="shrink-0 rounded-full bg-destructive-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-destructive">
+                New
+              </span>
+            )}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <CalendarDays className="h-3 w-3" /> {label}
+            </span>
+            <span className="flex items-center gap-1">
+              <Users className="h-3 w-3" /> {noticeAudienceLabel(n)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {n.description && (
+        <p className="mt-2.5 line-clamp-2 text-[13px] leading-relaxed text-foreground/75">
+          {n.description}
+        </p>
+      )}
+
+      <span className="mt-auto flex w-full items-center justify-between pt-3 text-xs font-semibold text-primary">
+        Read more
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 transition-transform group-hover:translate-x-0.5">
+          <ChevronRight className="h-4 w-4" />
+        </span>
+      </span>
+    </button>
   );
 }
 
@@ -142,48 +229,22 @@ export default function AnnouncementsPage() {
         <InfoCard label="Published" value={rows.length} icon={Bell} tone="navy" />
       </div>
 
-      <div className="panel">
+      <div className="panel overflow-hidden">
         {isLoading ? (
           <TableSkeleton rows={6} cols={3} />
         ) : rows.length === 0 ? (
-          <EmptyState title="No announcements yet" description="Publish one to notify the school." />
+          <EmptyState
+            title="No announcements yet"
+            description="Publish one to notify the school."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Audience</TableHead>
-                  <TableHead>Date</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((n) => (
-                  <TableRow key={n.id}>
-                    <TableCell>
-                      <button type="button" className="text-left" onClick={() => setSelected(n)}>
-                        <p className="font-medium">{n.title}</p>
-                        {n.description && (
-                          <>
-                            <p className="line-clamp-1 text-xs text-muted-foreground">
-                              {n.description}
-                            </p>
-                            <p className="mt-0.5 text-xs font-medium text-primary">Read more</p>
-                          </>
-                        )}
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={noticeAudienceLabel(n)} tone="info" />
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {n.date}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <ul className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">
+            {rows.map((n) => (
+              <li key={n.id}>
+                <AnnouncementCard notice={n} onOpen={() => setSelected(n)} />
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 

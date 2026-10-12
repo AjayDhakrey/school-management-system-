@@ -25,6 +25,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Separator } from "@/components/ui/separator";
 import {
   Wallet,
+  Layers,
+  BarChart3,
+  Percent,
   Clock3,
   AlertOctagon,
   CalendarCheck2,
@@ -47,8 +50,15 @@ import {
   type PaymentMethod,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
-import { feeTitle } from "@/lib/fees";
+import {
+  billingMonthOf,
+  billingTermOf,
+  feeTitle,
+  isAnnualFee,
+  ONE_TIME_LABEL,
+} from "@/lib/fees";
 import { FeeStructureTab } from "@/app/fee-structure";
+import { cn } from "@/lib/utils";
 
 const NONE = "__none__";
 const STATUS_OPTIONS = ["Pending", "Paid", "Overdue", "Partial"];
@@ -658,77 +668,306 @@ function FeeReceipt({
 
 type EnrichedFee = ApiFee & { studentName: string; className: string; admissionNo: string };
 
+const rupee = (n: number) => `₹${n.toLocaleString()}`;
+
+/** "2026-09-10" → "10 Sep 2026". */
+function readableDate(value: string | null | undefined) {
+  if (!value) return "—";
+  const [y, m, d] = value.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return value;
+  return new Date(y, m - 1, d).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+type PeriodKind = "month" | "term" | "year" | "once";
+/** Same colours as the fee structure chart: monthly blue, term gold, yearly green, one-time sky. */
+const PERIOD_TONE: Record<PeriodKind, string> = {
+  month: "bg-primary/10 text-primary",
+  term: "bg-gold-soft text-gold-foreground",
+  year: "bg-success-soft text-success",
+  once: "bg-info-soft text-info",
+};
+
+/** Whole days an overdue fee is past its due date (0 when it isn't overdue). */
+function daysLate(f: ApiFee, today: string) {
+  if (effectiveStatus(f) !== "Overdue" || !f.due_date || f.due_date >= today) return 0;
+  return Math.round((new Date(today).getTime() - new Date(f.due_date).getTime()) / 86_400_000);
+}
+
+/** Which billing period a generated fee covers, for the coloured chip under its name. */
+function feePeriod(f: ApiFee): { kind: PeriodKind; label: string } | null {
+  if (f.description === ONE_TIME_LABEL) return { kind: "once", label: "One-time" };
+  if (isAnnualFee(f)) return { kind: "year", label: f.description! };
+  const term = billingTermOf(f);
+  if (term) return { kind: "term", label: term };
+  const month = billingMonthOf(f);
+  if (month) return { kind: "month", label: month };
+  return null;
+}
+
 function FeesTable({
   rows,
+  summaryRows,
   onCollect,
 }: {
   rows: EnrichedFee[];
+  /** Every record matching the filters (not just this page), for the summary strip. */
+  summaryRows?: EnrichedFee[];
   onCollect?: (fee: EnrichedFee) => void;
 }) {
   const { data: school } = useSchoolProfile();
   const [viewing, setViewing] = useState<EnrichedFee | null>(null);
   const [receiptFor, setReceiptFor] = useState<EnrichedFee | null>(null);
 
-  if (rows.length === 0) return <EmptyState title="No fee records found" icon={Wallet} />;
+  const all = summaryRows ?? rows;
+  const billed = all.reduce((sum, f) => sum + payable(f), 0);
+  const collected = all.reduce((sum, f) => sum + Math.min(f.paid_amount ?? 0, payable(f)), 0);
+  const overdueCount = all.filter((f) => effectiveStatus(f) === "Overdue").length;
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted-foreground">
-              <th className="px-4 py-2.5 font-medium">Student</th>
-              <th className="px-4 py-2.5 font-medium">Class</th>
-              <th className="px-4 py-2.5 font-medium">Fee Head</th>
-              <th className="px-4 py-2.5 font-medium">Amount</th>
-              <th className="px-4 py-2.5 font-medium">Payable</th>
-              <th className="px-4 py-2.5 font-medium">Due Date</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 font-medium text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((f) => (
-              <tr key={f.id} className="border-b border-border last:border-0 hover:bg-muted/40 transition-colors">
-                <td className="px-4 py-2.5">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <Initials name={f.studentName} className="h-7 w-7 text-xs" />
-                    <div className="truncate">
-                      <span className="font-medium truncate block">{f.studentName}</span>
-                      {f.admissionNo && <span className="text-[11px] text-muted-foreground">{f.admissionNo}</span>}
+      <div className="grid grid-cols-2 gap-px border-b border-border bg-border sm:grid-cols-4">
+        {[
+          { label: "Records", value: all.length.toLocaleString(), tone: "" },
+          { label: "Billed", value: rupee(billed), tone: "" },
+          { label: "Collected", value: rupee(collected), tone: "text-success" },
+          {
+            label: "Outstanding",
+            value: rupee(Math.max(0, billed - collected)),
+            tone: billed - collected > 0 ? "text-destructive" : "text-success",
+            note: overdueCount ? `${overdueCount.toLocaleString()} overdue` : undefined,
+          },
+        ].map((stat) => (
+          <div key={stat.label} className="min-w-0 bg-card px-3 py-2.5 sm:px-4">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {stat.label}
+            </p>
+            <p className={cn("truncate font-display text-base font-bold tabular-nums", stat.tone)}>
+              {stat.value}
+            </p>
+            {"note" in stat && stat.note && (
+              <p className="truncate text-[10px] font-medium text-destructive">{stat.note}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {rows.length === 0 ? (
+        <EmptyState title="No fee records found" icon={Wallet} />
+      ) : (
+        <>
+          {/* Phones: one card per bill. */}
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-2.5 p-3 md:hidden">
+            {rows.map((f) => {
+              const status = effectiveStatus(f);
+              const due = payable(f);
+              const paid = f.paid_amount ?? 0;
+              const period = feePeriod(f);
+              const lateDays = daysLate(f, today);
+              return (
+                <li
+                  key={f.id}
+                  className={cn(
+                    "min-w-0 overflow-hidden rounded-2xl border bg-card p-3 shadow-sm",
+                    status === "Overdue" ? "border-destructive/25" : "border-border",
+                  )}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <Initials name={f.studentName} className="h-9 w-9 text-[11px]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold capitalize">{f.studentName}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        <span className="capitalize">{f.className}</span>
+                        {f.admissionNo ? ` · ${f.admissionNo}` : ""}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right tabular-nums">
+                      <p className="font-display text-base font-bold leading-tight">{rupee(due)}</p>
+                      {due !== f.amount && (
+                        <p className="text-[10px] text-muted-foreground line-through">{rupee(f.amount)}</p>
+                      )}
+                      {paid > 0 && paid < due && (
+                        <p className="text-[10px] font-medium text-success">Paid {rupee(paid)}</p>
+                      )}
                     </div>
                   </div>
-                </td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{f.className}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap">{feeTitle(f)}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap font-mono">₹{f.amount.toLocaleString()}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap font-medium font-mono">₹{payable(f).toLocaleString()}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{f.due_date ?? "—"}</td>
-                <td className="px-4 py-2.5 whitespace-nowrap">
-                  <StatusBadge status={f.status} />
-                </td>
-                <td className="px-4 py-2.5 whitespace-nowrap text-right">
-                  <div className="flex items-center justify-end gap-1.5">
+
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5 rounded-xl bg-muted/50 px-2.5 py-2">
+                    <span className="min-w-0 truncate text-xs font-medium capitalize">{f.fee_type}</span>
+                    {period && (
+                      <span
+                        className={cn(
+                          "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                          PERIOD_TONE[period.kind],
+                        )}
+                      >
+                        {period.label}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-2.5 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-muted-foreground">
+                        Due <span className="font-medium text-foreground/80">{readableDate(f.due_date)}</span>
+                      </p>
+                      {lateDays > 0 && (
+                        <p className="text-[10px] font-semibold text-destructive">
+                          {lateDays} day{lateDays === 1 ? "" : "s"} late
+                        </p>
+                      )}
+                    </div>
+                    <StatusBadge status={status} />
+                  </div>
+
+                  <div className="mt-2.5 flex gap-2">
                     {f.status !== "Paid" && onCollect && (
-                      <Button size="sm" variant="default" className="h-7 px-2 text-xs gap-1" onClick={() => onCollect(f)}>
-                        <CreditCard className="h-3 w-3" /> Collect
+                      <Button size="sm" className="h-9 flex-1 gap-1.5" onClick={() => onCollect(f)}>
+                        <CreditCard className="h-4 w-4" /> Collect
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" className="h-7 px-2 text-xs gap-1" onClick={() => setViewing(f)}>
-                      <Eye className="h-3 w-3" /> View
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 flex-1 gap-1.5"
+                      onClick={() => setViewing(f)}
+                    >
+                      <Eye className="h-4 w-4" /> View
                     </Button>
                     {f.status === "Paid" && (
-                      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1" onClick={() => setReceiptFor(f)}>
-                        <Receipt className="h-3 w-3" /> Receipt
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-9 flex-1 gap-1.5 text-success"
+                        onClick={() => setReceiptFor(f)}
+                      >
+                        <Receipt className="h-4 w-4" /> Receipt
                       </Button>
                     )}
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Tablets & desktop: the table. */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b-2 border-border bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="sticky left-0 z-10 bg-muted px-3 py-2.5 sm:px-4">Student</th>
+                  <th className="px-3 py-2.5 sm:px-4">Fee</th>
+                  <th className="px-3 py-2.5 text-right sm:px-4">Amount</th>
+                  <th className="px-3 py-2.5 sm:px-4">Due</th>
+                  <th className="px-3 py-2.5 sm:px-4">Status</th>
+                  <th className="px-3 py-2.5 text-right sm:px-4">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((f) => {
+                  const status = effectiveStatus(f);
+                  const due = payable(f);
+                  const paid = f.paid_amount ?? 0;
+                  const period = feePeriod(f);
+                  const lateDays = daysLate(f, today);
+                  return (
+                    <tr
+                      key={f.id}
+                      className={cn(
+                        "group/row border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40",
+                        status === "Overdue" && "bg-destructive/[0.025]",
+                      )}
+                    >
+                      <td className="sticky left-0 z-10 bg-card px-3 py-2.5 group-hover/row:bg-muted sm:px-4">
+                        <div className="flex min-w-[170px] items-center gap-2.5">
+                          <Initials name={f.studentName} className="h-8 w-8 text-[11px]" />
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold capitalize">{f.studentName}</p>
+                            <p className="truncate text-[11px] text-muted-foreground">
+                              <span className="capitalize">{f.className}</span>
+                              {f.admissionNo ? ` · ${f.admissionNo}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap sm:px-4">
+                        <p className="font-medium capitalize">{f.fee_type}</p>
+                        {period && (
+                          <span
+                            className={cn(
+                              "mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                              PERIOD_TONE[period.kind],
+                            )}
+                          >
+                            {period.label}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums sm:px-4">
+                        <p className="font-semibold">{rupee(due)}</p>
+                        {due !== f.amount && (
+                          <p className="text-[10px] text-muted-foreground line-through">{rupee(f.amount)}</p>
+                        )}
+                        {paid > 0 && paid < due && (
+                          <p className="text-[10px] font-medium text-success">Paid {rupee(paid)}</p>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap sm:px-4">
+                        <p className="text-foreground/80">{readableDate(f.due_date)}</p>
+                        {lateDays > 0 && (
+                          <p className="text-[10px] font-semibold text-destructive">
+                            {lateDays} day{lateDays === 1 ? "" : "s"} late
+                          </p>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap sm:px-4">
+                        <StatusBadge status={status} />
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap sm:px-4">
+                        <div className="flex items-center justify-end gap-1">
+                          {f.status !== "Paid" && onCollect && (
+                            <Button size="sm" className="h-8 gap-1 px-2.5 text-xs" onClick={() => onCollect(f)}>
+                              <CreditCard className="h-3.5 w-3.5" /> Collect
+                            </Button>
+                          )}
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-8 w-8"
+                            title="View details"
+                            aria-label={`View fee details for ${f.studentName}`}
+                            onClick={() => setViewing(f)}
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          {f.status === "Paid" && (
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 text-success"
+                              title="Receipt"
+                              aria-label={`Receipt for ${f.studentName}`}
+                              onClick={() => setReceiptFor(f)}
+                            >
+                              <Receipt className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       <Dialog open={!!viewing} onOpenChange={(o) => !o && setViewing(null)}>
         <DialogContent className="max-w-md">
@@ -753,7 +992,7 @@ function FeesTable({
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Due Date</p>
-                  <p className="font-medium">{viewing.due_date ?? "—"}</p>
+                  <p className="font-medium">{readableDate(viewing.due_date)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Amount</p>
@@ -769,7 +1008,7 @@ function FeesTable({
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Status</p>
-                  <StatusBadge status={viewing.status} />
+                  <StatusBadge status={effectiveStatus(viewing)} />
                 </div>
               </div>
               <div className="flex gap-2">
@@ -921,6 +1160,20 @@ export default function Page({
   }
 
 
+
+  const [activeTab, setActiveTab] = useState(TAB_VALUE[tab] ?? "recent");
+  useEffect(() => setActiveTab(TAB_VALUE[tab] ?? "recent"), [tab]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pendingCount = enriched.filter(
+    (f) => effectiveStatus(f) === "Pending" || effectiveStatus(f) === "Overdue",
+  ).length;
+  const feeTabs: { value: string; label: string; short: string; icon: typeof Wallet; count?: number }[] = [
+    { value: "structure", label: "Fee Structure", short: "Structure", icon: Layers },
+    { value: "recent", label: "Fee Collection", short: "Collection", icon: Wallet, count: enriched.length },
+    { value: "pending", label: "Pending Fees", short: "Pending", icon: Clock3, count: pendingCount },
+    { value: "reports", label: "Fee Reports", short: "Reports", icon: BarChart3 },
+    { value: "records", label: "Student Fee Records", short: "Students", icon: Users, count: students?.length ?? 0 },
+    { value: "discounts", label: "Discounts & Scholarships", short: "Discounts", icon: Percent, count: discountedFees.length },
+  ];
   return (
     <div>
       <PageHeader
@@ -936,17 +1189,47 @@ export default function Page({
         <InfoCard label="Today's Collection" value={`₹${todayCollection.toLocaleString()}`} icon={CalendarCheck2} tone="navy" />
       </div>
 
-      <Tabs key={tab} defaultValue={TAB_VALUE[tab] ?? "recent"} className="w-full">
-        <div className="scrollbar-slim mb-4 overflow-x-auto">
+      <Tabs key={tab} value={activeTab} onValueChange={setActiveTab} className="w-full">
+        {/* Phones: every section visible at once as a compact icon menu. */}
+        <div className="mb-4 grid grid-cols-3 gap-y-1 rounded-2xl border border-border bg-card p-1.5 shadow-sm sm:hidden">
+          {feeTabs.map(({ value, short, icon: Icon }) => {
+            const active = activeTab === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setActiveTab(value)}
+                aria-pressed={active}
+                className="flex flex-col items-center gap-1 rounded-xl py-1.5 transition-transform active:scale-95"
+              >
+                <span
+                  className={cn(
+                    "relative grid h-8 w-8 place-items-center rounded-full transition-colors",
+                    active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground",
+                  )}
+                >
+                  <Icon className="h-[18px] w-[18px]" />
+                </span>
+                <span
+                  className={cn(
+                    "w-full truncate px-0.5 text-center text-[10px] leading-none",
+                    active ? "font-semibold text-primary" : "font-medium text-muted-foreground",
+                  )}
+                >
+                  {short}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mb-4 hidden overflow-x-auto sm:block">
           <TabsList className="w-max flex-nowrap justify-start gap-1">
-            <TabsTrigger value="structure">Fee Structure</TabsTrigger>
-            <TabsTrigger value="recent">Fee Collection ({enriched.length})</TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending Fees ({enriched.filter((f) => effectiveStatus(f) === "Pending" || effectiveStatus(f) === "Overdue").length})
-            </TabsTrigger>
-            <TabsTrigger value="reports">Fee Reports</TabsTrigger>
-            <TabsTrigger value="records">Student Fee Records ({students?.length ?? 0})</TabsTrigger>
-            <TabsTrigger value="discounts">Discounts & Scholarships ({discountedFees.length})</TabsTrigger>
+            {feeTabs.map(({ value, label, count }) => (
+              <TabsTrigger key={value} value={value}>
+                {label}
+                {count !== undefined && ` (${count})`}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
 
@@ -989,13 +1272,18 @@ export default function Page({
               <p className="p-6 text-sm text-muted-foreground">Loading fee records…</p>
             ) : (
               <>
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <SearchInput value={search} onChange={setSearch} placeholder="Search student, admission, receipt…" />
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3 sm:p-4">
+                  <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+                    <SearchInput
+                      value={search}
+                      onChange={setSearch}
+                      placeholder="Search student, admission, receipt…"
+                      className="col-span-2"
+                    />
                     <FilterSelect value={classFilter} onChange={setClassFilter} options={classNames} placeholder="Class" />
                     <FilterSelect value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Status" />
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
                     <span>Page size:</span>
                     <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
                       <SelectTrigger className="h-8 w-16 bg-surface">
@@ -1009,7 +1297,7 @@ export default function Page({
                     </Select>
                   </div>
                 </div>
-                <FeesTable rows={rows} onCollect={(f) => setCollectingFee(f)} />
+                <FeesTable rows={rows} summaryRows={filtered} onCollect={(f) => setCollectingFee(f)} />
                 <Pager page={page} pageCount={pageCount} onPage={setPage} total={filtered.length} />
               </>
             )}
@@ -1023,7 +1311,11 @@ export default function Page({
             subtitle={`${pendingOverdue.length} unpaid fee accounts requiring collection`}
             bodyClassName="p-0"
           >
-            <FeesTable rows={pendingRows} onCollect={(f) => setCollectingFee(f)} />
+            <FeesTable
+              rows={pendingRows}
+              summaryRows={pendingOverdue}
+              onCollect={(f) => setCollectingFee(f)}
+            />
             <Pager page={pendingPage} pageCount={pendingPageCount} onPage={setPendingPage} total={pendingOverdue.length} />
           </SectionCard>
         </TabsContent>

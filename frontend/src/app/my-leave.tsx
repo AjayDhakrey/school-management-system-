@@ -7,82 +7,29 @@ import { ClipboardList, Clock3, CheckCircle2, XCircle, Plus } from "lucide-react
 import { PageHeader, EmptyState, TableSkeleton } from "@/components/shared/ui-kit";
 import { InfoCard } from "@/components/shared/InfoCard";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ApplyLeaveForm } from "@/components/shared/ApplyLeaveForm";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { LeaveRequestList } from "@/components/shared/LeaveRequestList";
 import { useLeaveRequests } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 
-const LEAVE_TYPES = ["Sick Leave", "Casual Leave", "Family Function", "Emergency", "Other"];
-
-function ApplyLeaveForm({ onDone }: { onDone: () => void }) {
+function StudentApplyLeave({ onDone }: { onDone: () => void }) {
   const queryClient = useQueryClient();
-  const [type, setType] = useState(LEAVE_TYPES[0]!);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [reason, setReason] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!fromDate || !toDate) { toast.error("Select start and end dates"); return; }
-    if (new Date(toDate) < new Date(fromDate)) { toast.error("End date must be after start date"); return; }
-    setSubmitting(true);
-    try {
-      await api.post("/leave", { fromDate, toDate, reason: `${type}: ${reason}` });
-      await queryClient.invalidateQueries({ queryKey: ["leave-all"] });
-      toast.success("Leave request submitted");
-      onDone();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to submit leave request");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4">
-      <div className="grid gap-1.5">
-        <Label>Leave Type</Label>
-        <Select value={type} onValueChange={setType}>
-          <SelectTrigger className="bg-surface">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {LEAVE_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {t}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="grid gap-1.5">
-          <Label htmlFor="leave-from">Start Date</Label>
-          <Input id="leave-from" type="date" required min={new Date().toISOString().slice(0, 10)} value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        </div>
-        <div className="grid gap-1.5">
-          <Label htmlFor="leave-to">End Date</Label>
-          <Input id="leave-to" type="date" required min={fromDate || new Date().toISOString().slice(0, 10)} value={toDate} onChange={(e) => setToDate(e.target.value)} />
-        </div>
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="leave-reason">Reason</Label>
-        <Textarea id="leave-reason" required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Briefly describe the reason" />
-      </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onDone}>
-          Cancel
-        </Button>
-        <Button type="submit" disabled={submitting}>
-          Submit Request
-        </Button>
-      </DialogFooter>
-    </form>
+    <ApplyLeaveForm
+      idPrefix="leave"
+      onCancel={onDone}
+      onSubmit={async (values) => {
+        try {
+          await api.post("/leave", values);
+          await queryClient.invalidateQueries({ queryKey: ["leave-all"] });
+          toast.success("Leave request submitted");
+          onDone();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Failed to submit leave request");
+        }
+      }}
+    />
   );
 }
 
@@ -108,11 +55,12 @@ export default function MyLeavePage() {
                 <Plus className="h-4 w-4" /> Apply Leave
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
+            <DialogContent className="max-h-[92vh] max-w-md overflow-y-auto rounded-2xl">
+              <DialogHeader className="text-left">
                 <DialogTitle>Apply for Leave</DialogTitle>
+                <DialogDescription>Submit a leave request for approval.</DialogDescription>
               </DialogHeader>
-              <ApplyLeaveForm onDone={() => setOpen(false)} />
+              <StudentApplyLeave onDone={() => setOpen(false)} />
             </DialogContent>
           </Dialog>
         }

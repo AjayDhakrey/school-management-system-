@@ -31,6 +31,7 @@ import {
   type PaymentMethod,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = ["Cash", "UPI", "Card", "Bank Transfer", "Cheque", "Online"];
 const NONE = "__none__";
@@ -251,7 +252,7 @@ function AddVendorDialog({ onDone }: { onDone: () => void }) {
         <div className="grid grid-cols-2 gap-3">
           <div className="grid gap-1.5">
             <Label>Phone</Label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+            <PhoneInput value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
           <div className="grid gap-1.5">
             <Label>Email</Label>

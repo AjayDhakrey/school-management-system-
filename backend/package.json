@@ -3,6 +3,7 @@
   "private": true,
   "description": "Supabase database migrations, edge functions and config for EduNex.",
   "scripts": {
+    "dev": "npm --prefix ../frontend run dev",
     "status": "supabase migration list --linked",
     "push": "supabase db push --linked",
     "functions:deploy": "supabase functions deploy manage-user-login --project-ref fppwmrfomuyrewngbuip"

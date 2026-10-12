@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAcademicYears, useRooms, useSchoolProfile } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 function SchoolProfileForm() {
   const { data: school, isLoading } = useSchoolProfile();
@@ -94,7 +95,7 @@ function SchoolProfileForm() {
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="sch-phone">Phone</Label>
-        <Input id="sch-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <PhoneInput id="sch-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
       </div>
       <div className="grid gap-1.5">
         <Label htmlFor="sch-email">Email</Label>

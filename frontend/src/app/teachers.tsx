@@ -40,7 +40,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -65,6 +64,8 @@ import {
   type ApiStaff,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 type Mode = "Teaching" | "Non-Teaching";
 
@@ -255,11 +256,29 @@ function staffToRow(s: ApiStaff): StaffRow {
   };
 }
 
-export default function Page({ mode: initialMode = "Teaching" }: { mode?: Mode }) {
-  // Merged into one page — mode is switched in-place via the tabs below, no navigation involved.
-  // The sidebar still links to /teaching-staff and /non-teaching-staff separately (unchanged),
-  // each just seeds which tab this shared page opens on.
-  const [mode, setMode] = useState<Mode>(initialMode);
+const MAX_CLASS_CHIPS = 3;
+
+const STAFF_STATUS: Record<string, { label: string; tone: "success" | "warning" | "neutral" }> = {
+  ACTIVE: { label: "Active", tone: "success" },
+  ON_LEAVE: { label: "On Leave", tone: "warning" },
+  INACTIVE: { label: "Inactive", tone: "neutral" },
+};
+
+/** "2025-09-07" → "7 Sep 2025". */
+function formatJoined(value: string | null | undefined) {
+  if (!value) return "—";
+  const [y, m, d] = value.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return value;
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export default function Page({ mode = "Teaching" }: { mode?: Mode }) {
+  // One page per sidebar link: /teaching-staff and /non-teaching-staff each show only their own
+  // list (App.tsx keys the routes so filters start fresh when switching between them).
   const isTeaching = mode === "Teaching";
   const [search, setSearch] = useState("");
   const [department, setDepartment] = useState("all");
@@ -318,9 +337,8 @@ export default function Page({ mode: initialMode = "Teaching" }: { mode?: Mode }
 
   const { rows, pageCount } = usePaged(filtered, page, 8);
 
-  const totalFaculty = allRows.length;
-  const teachingCount = isTeaching ? allRows.length : 0;
-  const nonTeachingCount = isTeaching ? 0 : allRows.length;
+  const totalCount = allRows.length;
+  const activeCount = allRows.filter((r) => r.status === "ACTIVE").length;
   const onLeave = allRows.filter((r) => r.status === "ON_LEAVE" || r.status === "INACTIVE").length;
 
   async function invalidate() {
@@ -356,24 +374,16 @@ export default function Page({ mode: initialMode = "Teaching" }: { mode?: Mode }
     }
   }
 
-  function switchMode(next: Mode) {
-    if (next === mode) return;
-    setMode(next);
-    // Filters from the previous tab rarely make sense on the other one (e.g. a teaching-only
-    // department), so start clean on switch.
-    setSearch("");
-    setDepartment("all");
-    setDesignation("all");
-    setStatus("all");
-    setPage(1);
-  }
-
   return (
     <div>
       <PageHeader
-        title="Staff Management"
-        description="Manage your school's teaching and non-teaching staff in one place."
-        breadcrumb={["Dashboard", "Staff Management"]}
+        title={isTeaching ? "Teaching Staff" : "Non-Teaching Staff"}
+        description={
+          isTeaching
+            ? "Manage your school's teachers, their subjects and classes."
+            : "Manage your school's administrative and support staff."
+        }
+        breadcrumb={["Dashboard", isTeaching ? "Teaching Staff" : "Non-Teaching Staff"]}
         actions={
           <Dialog open={addOpen} onOpenChange={setAddOpen}>
             <DialogTrigger asChild>
@@ -394,201 +404,229 @@ export default function Page({ mode: initialMode = "Teaching" }: { mode?: Mode }
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <InfoCard label="Total Faculty" value={totalFaculty} icon={Users} tone="navy" />
-        <InfoCard label="Teaching Staff" value={teachingCount} icon={GraduationCap} tone="info" />
         <InfoCard
-          label="Non-Teaching Staff"
-          value={nonTeachingCount}
+          label={isTeaching ? "Total Teachers" : "Total Staff"}
+          value={totalCount}
+          icon={isTeaching ? GraduationCap : Briefcase}
+          tone="navy"
+        />
+        <InfoCard label="Active" value={activeCount} icon={Users} tone="success" />
+        <InfoCard
+          label="Departments"
+          value={departmentOptions.length}
           icon={Briefcase}
-          tone="gold"
+          tone="info"
         />
         <InfoCard label="On Leave" value={onLeave} icon={UserX} tone="warning" />
       </div>
 
       <div className="mt-5">
-        <Tabs value={mode} onValueChange={(v) => switchMode(v as Mode)}>
-          <TabsList>
-            <TabsTrigger value="Teaching">Teaching Staff</TabsTrigger>
-            <TabsTrigger value="Non-Teaching">Non-Teaching Staff</TabsTrigger>
-          </TabsList>
-          <TabsContent value={mode} className="mt-4">
-            <SectionCard
-              title={mode === "Teaching" ? "Teaching Staff" : "Non-Teaching Staff"}
-              subtitle={`${filtered.length} staff members`}
-              action={
-                <div className="flex flex-wrap items-center gap-2">
-                  <SearchInput
-                    value={search}
-                    onChange={(v) => {
-                      setSearch(v);
-                      setPage(1);
-                    }}
-                    placeholder="Search staff…"
-                  />
-                  <FilterSelect
-                    value={department}
-                    onChange={(v) => {
-                      setDepartment(v);
-                      setPage(1);
-                    }}
-                    options={departmentOptions}
-                    placeholder="Department"
-                  />
-                  <FilterSelect
-                    value={designation}
-                    onChange={(v) => {
-                      setDesignation(v);
-                      setPage(1);
-                    }}
-                    options={designationOptions}
-                    placeholder="Designation"
-                  />
-                  <FilterSelect
-                    value={status}
-                    onChange={(v) => {
-                      setStatus(v);
-                      setPage(1);
-                    }}
-                    options={["Active", "On Leave", "Inactive"]}
-                    placeholder="Status"
-                  />
-                </div>
-              }
-              bodyClassName="p-0"
-            >
-              {isLoading ? (
-                <TableSkeleton rows={6} cols={9} />
-              ) : rows.length === 0 ? (
-                <EmptyState
-                  title="No staff found"
-                  description="Try adjusting your search or filters."
-                />
-              ) : (
-                <>
-                  <div className="hidden overflow-x-auto md:block">
-                    <table className="w-full text-left text-sm">
-                      <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-                        <tr>
-                          <th className="px-4 py-2.5 font-medium">Staff</th>
-                          <th className="px-4 py-2.5 font-medium">Designation</th>
-                          <th className="px-4 py-2.5 font-medium">Department</th>
-                          {isTeaching && <th className="px-4 py-2.5 font-medium">Subjects</th>}
-                          {isTeaching && <th className="px-4 py-2.5 font-medium">Classes</th>}
-                          <th className="px-4 py-2.5 font-medium">Contact</th>
-                          {isTeaching && <th className="px-4 py-2.5 font-medium">Joined</th>}
-                          <th className="px-4 py-2.5 font-medium">Status</th>
-                          <th className="px-4 py-2.5 font-medium"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((t) => (
-                          <tr
-                            key={t.id}
-                            className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30"
-                            onClick={() => setSelected(t)}
-                          >
-                            <td className="px-4 py-2.5">
-                              <div className="flex min-w-0 items-center gap-2.5">
-                                <Initials name={t.name} tone="navy" />
-                                <span className="truncate font-medium">{t.name}</span>
+        <SectionCard
+          title={mode === "Teaching" ? "Teaching Staff" : "Non-Teaching Staff"}
+          subtitle={`${filtered.length} staff members`}
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <SearchInput
+                value={search}
+                onChange={(v) => {
+                  setSearch(v);
+                  setPage(1);
+                }}
+                placeholder="Search staff…"
+              />
+              <FilterSelect
+                value={department}
+                onChange={(v) => {
+                  setDepartment(v);
+                  setPage(1);
+                }}
+                options={departmentOptions}
+                placeholder="Department"
+              />
+              <FilterSelect
+                value={designation}
+                onChange={(v) => {
+                  setDesignation(v);
+                  setPage(1);
+                }}
+                options={designationOptions}
+                placeholder="Designation"
+              />
+              <FilterSelect
+                value={status}
+                onChange={(v) => {
+                  setStatus(v);
+                  setPage(1);
+                }}
+                options={["Active", "On Leave", "Inactive"]}
+                placeholder="Status"
+              />
+            </div>
+          }
+          bodyClassName="p-0"
+        >
+          {isLoading ? (
+            <TableSkeleton rows={6} cols={9} />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              title="No staff found"
+              description="Try adjusting your search or filters."
+            />
+          ) : (
+            <>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-3">Staff member</th>
+                      {isTeaching && <th className="px-4 py-3">Subjects</th>}
+                      {isTeaching && <th className="px-4 py-3">Classes</th>}
+                      <th className="px-4 py-3">Phone</th>
+                      {isTeaching && <th className="px-4 py-3">Joined</th>}
+                      <th className="px-4 py-3">Status</th>
+                      <th className="w-12 px-4 py-3">
+                        <span className="sr-only">Actions</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((t) => {
+                      const shownClasses = t.classes.slice(0, MAX_CLASS_CHIPS);
+                      const hiddenClasses = t.classes.slice(MAX_CLASS_CHIPS);
+                      const st = STAFF_STATUS[t.status] ?? {
+                        label: t.status,
+                        tone: "neutral" as const,
+                      };
+                      return (
+                        <tr
+                          key={t.id}
+                          className="cursor-pointer border-b border-border align-middle transition-colors last:border-0 hover:bg-muted/30"
+                          onClick={() => setSelected(t)}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex min-w-[200px] items-center gap-3">
+                              <Initials name={t.name} tone="navy" className="h-9 w-9" />
+                              <div className="min-w-0">
+                                <p className="truncate font-semibold">{t.name}</p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {[t.designation, t.department].filter(Boolean).join(" · ") || "—"}
+                                </p>
                               </div>
+                            </div>
+                          </td>
+                          {isTeaching && (
+                            <td className="px-4 py-3">
+                              {t.subjects.length > 0 ? (
+                                <div className="flex max-w-[220px] flex-wrap gap-1">
+                                  {t.subjects.map((sid) => (
+                                    <span
+                                      key={sid}
+                                      className="whitespace-nowrap rounded-full bg-info-soft px-2.5 py-0.5 text-xs font-medium capitalize text-info"
+                                    >
+                                      {subjectName(sid)}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Not assigned</span>
+                              )}
                             </td>
-                            <td className="px-4 py-2.5">{t.designation ?? "—"}</td>
-                            <td className="px-4 py-2.5">{t.department ?? "—"}</td>
-                            {isTeaching && (
-                              <td className="px-4 py-2.5">
-                                <div className="flex flex-wrap gap-1">
-                                  {t.subjects.length > 0 ? (
-                                    t.subjects.map((s) => (
-                                      <span
-                                        key={s}
-                                        className="rounded-full bg-info-soft px-2 py-0.5 text-[11px] text-info"
-                                      >
-                                        {subjectName(s)}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                          {isTeaching && (
+                            <td className="px-4 py-3">
+                              {t.classes.length > 0 ? (
+                                <div className="flex flex-nowrap items-center gap-1">
+                                  {shownClasses.map((c) => (
+                                    <span
+                                      key={c}
+                                      className="whitespace-nowrap rounded-md bg-muted px-2 py-0.5 text-xs font-medium capitalize"
+                                    >
+                                      {classLabel(c)}
+                                    </span>
+                                  ))}
+                                  {hiddenClasses.length > 0 && (
+                                    <span
+                                      title={hiddenClasses.map(classLabel).join(", ")}
+                                      className="whitespace-nowrap rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+                                    >
+                                      +{hiddenClasses.length} more
+                                    </span>
                                   )}
                                 </div>
-                              </td>
-                            )}
-                            {isTeaching && (
-                              <td className="px-4 py-2.5">
-                                <div className="flex flex-wrap gap-1">
-                                  {t.classes.length > 0 ? (
-                                    t.classes.map((c) => (
-                                      <span
-                                        key={c}
-                                        className="rounded-full bg-muted px-2 py-0.5 text-[11px]"
-                                      >
-                                        {classLabel(c)}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">—</span>
-                                  )}
-                                </div>
-                              </td>
-                            )}
-                            <td className="px-4 py-2.5 text-muted-foreground">{t.phone ?? "—"}</td>
-                            {isTeaching && (
-                              <td className="px-4 py-2.5 text-muted-foreground">
-                                {t.joinedOn ?? "—"}
-                              </td>
-                            )}
-                            <td className="px-4 py-2.5">
-                              <StatusBadge status={t.status} />
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Not assigned</span>
+                              )}
                             </td>
-                            <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                              <RowActions
-                                t={t}
-                                onEdit={() => setEditing(t)}
-                                onToggleStatus={() => handleToggleStatus(t)}
-                                onDelete={() => handleDelete(t)}
-                              />
+                          )}
+                          <td className="whitespace-nowrap px-4 py-3">
+                            {t.phone ? (
+                              <span className="flex items-center gap-1.5 text-foreground/80">
+                                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                                {t.phone}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          {isTeaching && (
+                            <td className="whitespace-nowrap px-4 py-3 text-foreground/80">
+                              {formatJoined(t.joinedOn)}
                             </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                          )}
+                          <td className="whitespace-nowrap px-4 py-3">
+                            <StatusBadge status={st.label} tone={st.tone} />
+                          </td>
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            <RowActions
+                              t={t}
+                              onEdit={() => setEditing(t)}
+                              onToggleStatus={() => handleToggleStatus(t)}
+                              onDelete={() => handleDelete(t)}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                  <div className="grid gap-3 p-4 md:hidden">
-                    {rows.map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => setSelected(t)}
-                        className="panel flex items-start gap-3 p-3 text-left"
-                      >
-                        <Initials name={t.name} tone="navy" />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="truncate text-sm font-semibold">{t.name}</p>
-                            <StatusBadge status={t.status} />
-                          </div>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {t.designation ?? "—"} · {t.department ?? "—"}
-                          </p>
-                          <p className="mt-1 truncate text-xs text-muted-foreground">
-                            {t.phone ?? "—"}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+              <div className="grid gap-3 p-4 md:hidden">
+                {rows.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setSelected(t)}
+                    className="panel flex items-start gap-3 p-3 text-left"
+                  >
+                    <Initials name={t.name} tone="navy" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-sm font-semibold">{t.name}</p>
+                        <StatusBadge
+                          status={STAFF_STATUS[t.status]?.label ?? t.status}
+                          tone={STAFF_STATUS[t.status]?.tone ?? "neutral"}
+                        />
+                      </div>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {t.designation ?? "—"} · {t.department ?? "—"}
+                      </p>
+                      <p className="mt-1 truncate text-xs text-muted-foreground">
+                        {t.phone ?? "—"}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
 
-                  <Pager
-                    page={Math.min(page, pageCount)}
-                    pageCount={pageCount}
-                    onPage={setPage}
-                    total={filtered.length}
-                  />
-                </>
-              )}
-            </SectionCard>
-          </TabsContent>
-        </Tabs>
+              <Pager
+                page={Math.min(page, pageCount)}
+                pageCount={pageCount}
+                onPage={setPage}
+                total={filtered.length}
+              />
+            </>
+          )}
+        </SectionCard>
       </div>
 
       <Sheet open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
@@ -690,7 +728,10 @@ function StaffProfile({
             {t.designation ?? "—"} · {t.department ?? "—"}
           </p>
           <div className="mt-1">
-            <StatusBadge status={t.status} />
+            <StatusBadge
+              status={STAFF_STATUS[t.status]?.label ?? t.status}
+              tone={STAFF_STATUS[t.status]?.tone ?? "neutral"}
+            />
           </div>
         </div>
       </div>
@@ -831,6 +872,7 @@ function StaffFormDialog({
     const name = String(form.get("name") ?? "").trim();
     const phone = String(form.get("phone") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
+    const joiningDate = String(form.get("joiningDate") ?? "").trim();
 
     if (!name) {
       toast.error("Name is required");
@@ -854,6 +896,7 @@ function StaffFormDialog({
           designation: designation || null,
           email: email || null,
           phone: phone || null,
+          joiningDate: joiningDate || null,
           assignedClasses: selectedClasses,
           assignedSubjects: selectedSubjects,
           ...(createLogin ? { login: { email, password: portalPassword } } : {}),
@@ -943,14 +986,9 @@ function StaffFormDialog({
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="s-con">Contact</Label>
-          <Input
-            id="s-con"
-            name="phone"
-            defaultValue={initial?.phone ?? ""}
-            placeholder="+1 (555) 000-0000"
-          />
+          <PhoneInput id="s-con" name="phone" defaultValue={initial?.phone ?? ""} />
         </div>
-        <div className="grid gap-1.5 sm:col-span-2">
+        <div className={cn("grid gap-1.5", !isTeaching && "sm:col-span-2")}>
           <Label htmlFor="s-email">Email</Label>
           <Input
             id="s-email"
@@ -960,6 +998,20 @@ function StaffFormDialog({
             placeholder="name@everbright.edu"
           />
         </div>
+        {isTeaching && (
+          <div className="grid gap-1.5">
+            <Label htmlFor="s-joined">Joining Date</Label>
+            <Input
+              id="s-joined"
+              name="joiningDate"
+              type="date"
+              className="w-full min-w-0"
+              defaultValue={
+                initial?.joinedOn ?? (isEdit ? "" : new Date().toISOString().slice(0, 10))
+              }
+            />
+          </div>
+        )}
 
         <div className="grid gap-1.5 sm:col-span-2">
           <Label>Portal Access</Label>

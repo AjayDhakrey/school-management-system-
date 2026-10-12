@@ -29,6 +29,7 @@ import {
   type TransportPersonStatus,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { PhoneInput } from "@/components/shared/PhoneInput";
 
 const NONE = "__none__";
 type Kind = "drivers" | "attendants";
@@ -118,7 +119,7 @@ function PersonDialog({
             </div>
             <div className="space-y-1">
               <Label>Phone</Label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 (555) ..." />
+              <PhoneInput value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             {isDriver && (
               <>

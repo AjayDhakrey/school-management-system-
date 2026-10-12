@@ -28,6 +28,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { useMyStudentProfile, useParents } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { PHONE_INPUT_PROPS, cleanPhone } from "@/lib/phone";
 
 /** "2026-09-17" → local Date (avoids the UTC shift of `new Date("2026-09-17")`). */
 function parseDate(value: string | null | undefined) {
@@ -223,11 +224,9 @@ export default function ProfilePage() {
               id="p-phone"
               label="Phone"
               icon={Phone}
-              type="tel"
-              inputMode="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Mobile number"
+              {...PHONE_INPUT_PROPS}
+              value={cleanPhone(phone)}
+              onChange={(e) => setPhone(cleanPhone(e.target.value))}
             />
             <IconField
               id="p-address"

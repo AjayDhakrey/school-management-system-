@@ -231,6 +231,21 @@
   }
 }
 
+/* Phones and tablets behave like a native app: content still scrolls and swipes, but no
+   scrollbar is ever drawn. Unlayered + !important so it also beats scrollbar-slim and any
+   per-component overflow styling. Desktop (lg and up) keeps its slim scrollbars. */
+@media (max-width: 1023px) {
+  * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
 /* Printable report cards: any element with id="report-card" is the only thing that
    prints — sidebar, header, tabs, stat cards and everything else is suppressed,
    regardless of which page triggered window.print(). */

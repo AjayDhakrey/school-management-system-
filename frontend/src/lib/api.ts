@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { cleanPhone, isValidPhone } from "./phone";
 
 export class ApiError extends Error {
   status: number;
@@ -518,7 +519,23 @@ function parse(path: string) {
 
 async function get<T>(path: string): Promise<T> {
   const { parts, search } = parse(path);
-  return (await read(parts, search)) as T;
+  return cleanPhonesDeep(await read(parts, search)) as T;
+}
+
+// Older rows may hold numbers saved as "+91…"; every screen shows the plain 10-digit form.
+function cleanPhonesDeep(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(cleanPhonesDeep);
+  if (!value || typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) {
+    return value;
+  }
+  const out: Row = {};
+  for (const [key, item] of Object.entries(value as Row)) {
+    out[key] =
+      /phone$/i.test(key) && typeof item === "string" && item.trim()
+        ? cleanPhone(item)
+        : cleanPhonesDeep(item);
+  }
+  return out;
 }
 
 async function read(parts: string[], search: URLSearchParams): Promise<unknown> {
@@ -1552,7 +1569,21 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
 
 async function mutate<T>(method: Method, path: string, body?: unknown): Promise<T> {
   const { parts } = parse(path);
-  return (await write(method, parts, (body ?? {}) as Row)) as T;
+  return (await write(method, parts, normalizePhones((body ?? {}) as Row))) as T;
+}
+
+// Every phone field (phone, driverPhone, contactPhone, …) is a 10-digit mobile number with no
+// country code — enforced here so no screen can save anything else.
+function normalizePhones(body: Row): Row {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return body;
+  const out: Row = { ...body };
+  for (const [key, value] of Object.entries(out)) {
+    if (!/phone$/i.test(key) || typeof value !== "string" || !value.trim()) continue;
+    const phone = cleanPhone(value);
+    if (!isValidPhone(phone)) throw new ApiError(400, "Enter a valid 10-digit mobile number");
+    out[key] = phone;
+  }
+  return out;
 }
 
 async function write(method: Method, parts: string[], body: Row): Promise<unknown> {
@@ -2731,6 +2762,8 @@ async function saveStudent(method: "POST" | "PATCH", id: string | undefined, inp
       "drop_point",
       "gender",
       "previous_school",
+      "is_hosteller",
+      "hostel_room",
     ]),
   );
   if ("name" in row) {
@@ -3048,7 +3081,10 @@ async function requireAdmissionClass(admissionId: string, action: string) {
     .single();
   if (error) fail(error, 404);
   if (!data.class_id_applied) {
-    throw new ApiError(400, `Choose the class applied for before you ${action} this application`);
+    throw new ApiError(
+      400,
+      `Assign a section (Edit → Section) before you ${action} this application`,
+    );
   }
 }
 

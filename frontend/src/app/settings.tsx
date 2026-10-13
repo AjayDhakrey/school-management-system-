@@ -10,9 +10,10 @@ import { SignOutCard } from "@/components/shared/SignOutCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAcademicYears, useRooms, useSchoolProfile } from "@/hooks/useApi";
+import { useAcademicYears, useSchoolProfile } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 import { PhoneInput } from "@/components/shared/PhoneInput";
+import { SchoolTimingsEditor } from "@/components/shared/SchoolTimingsEditor";
 
 function SchoolProfileForm() {
   const { data: school, isLoading } = useSchoolProfile();
@@ -283,111 +284,16 @@ function AcademicYearsManager() {
   );
 }
 
-function RoomsManager() {
-  const { data: rooms, isLoading } = useRooms();
-  const queryClient = useQueryClient();
-  const [name, setName] = useState("");
-  const [number, setNumber] = useState("");
-  const [capacity, setCapacity] = useState("");
-  const [busy, setBusy] = useState(false);
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["rooms"] });
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await api.post("/rooms", { name, number, capacity: capacity ? Number(capacity) : undefined });
-      await refresh();
-      setName("");
-      setNumber("");
-      setCapacity("");
-      toast.success("Room created");
-    } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Failed to create room");
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function toggle(id: string, status: string) {
-    setBusy(true);
-    try {
-      await api.patch(`/rooms/${id}`, { status: status === "ACTIVE" ? "INACTIVE" : "ACTIVE" });
-      await refresh();
-    } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Failed to update room");
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function remove(id: string) {
-    setBusy(true);
-    try {
-      await api.delete(`/rooms/${id}`);
-      await refresh();
-      toast.success("Room deleted");
-    } catch (error) {
-      toast.error(error instanceof ApiError ? error.message : "Failed to delete room");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="space-y-4">
-      <form onSubmit={create} className="grid gap-3 sm:grid-cols-4">
-        <Input
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Science Lab"
-        />
-        <Input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="Room 101" />
-        <Input
-          type="number"
-          min="1"
-          value={capacity}
-          onChange={(e) => setCapacity(e.target.value)}
-          placeholder="Capacity"
-        />
-        <Button disabled={busy}>Add Room</Button>
-      </form>
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        (rooms ?? []).map((room) => (
-          <div
-            key={room.id}
-            className="flex items-center justify-between gap-2 rounded-lg border p-3"
-          >
-            <div>
-              <p className="font-medium">{room.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {room.number ?? "No number"} · {room.capacity ?? "—"} seats · {room.status}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => toggle(room.id, room.status)}
-              >
-                {room.status === "ACTIVE" ? "Deactivate" : "Activate"}
-              </Button>
-              <Button size="sm" variant="outline" disabled={busy} onClick={() => remove(room.id)}>
-                Delete
-              </Button>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
 const LINKS: { label: string; to: string; description: string }[] = [
   {
     label: "Classes & Sections",
     to: "/classes",
     description: "Manage class list, sections and class teachers.",
+  },
+  {
+    label: "Classrooms",
+    to: "/rooms",
+    description: "Add rooms and labs, and see which class uses each.",
   },
   { label: "Subjects", to: "/subjects", description: "Manage subjects and teacher assignments." },
   {
@@ -421,19 +327,19 @@ export default function Page() {
       </SectionCard>
 
       <SectionCard
+        title="School Timings"
+        subtitle="Working days and period times used by every class timetable"
+        className="mb-4"
+      >
+        <SchoolTimingsEditor />
+      </SectionCard>
+
+      <SectionCard
         title="Academic Years"
         subtitle="Create, activate, close and archive school-specific sessions"
         className="mb-4"
       >
         <AcademicYearsManager />
-      </SectionCard>
-
-      <SectionCard
-        title="Rooms & Classrooms"
-        subtitle="Database-backed rooms available for class assignment"
-        className="mb-4"
-      >
-        <RoomsManager />
       </SectionCard>
 
       <SectionCard

@@ -23,6 +23,7 @@ const NotFound = lazy(() => import("@/pages/NotFound"));
 const Admissions = lazy(() => import("@/app/admissions"));
 const Attendance = lazy(() => import("@/app/attendance"));
 const Classes = lazy(() => import("@/app/classes"));
+const Rooms = lazy(() => import("@/app/rooms"));
 const Events = lazy(() => import("@/app/events"));
 const Examinations = lazy(() => import("@/app/examinations"));
 const Fees = lazy(() => import("@/app/fees"));
@@ -192,6 +193,7 @@ export default function App() {
                 <Route path="/admissions" element={guarded("/admissions", <Admissions />)} />
                 <Route path="/attendance" element={guarded("/attendance", <Attendance />)} />
                 <Route path="/classes" element={guarded("/classes", <Classes />)} />
+                <Route path="/rooms" element={guarded("/rooms", <Rooms />)} />
                 <Route path="/events" element={guarded("/events", <Events />)} />
                 <Route path="/examinations" element={guarded("/examinations", <Examinations />)} />
                 <Route

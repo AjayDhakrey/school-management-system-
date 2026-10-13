@@ -41,7 +41,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { DAYS, PERIODS } from "@/data/mock";
+import { useSchoolTimings } from "@/lib/school-timings";
 import classes from "@/icons/add-class-icon.png"
 import students from "@/icons/add-student-icon.png"
 import subjectsIcon from "@/icons/subjects-icon.png";
@@ -899,8 +899,9 @@ function SchoolDashboard() {
   const { data: exams } = useExams(canExams);
   const { data: todaySlots } = useTimetable(canTimetable);
   const { data: holidays } = useHolidays();
+  const { periods: schoolPeriods } = useSchoolTimings();
 
-  const todayDay = DAYS[2] as string;
+  const todayDay = new Date().toLocaleDateString("en-US", { weekday: "long" });
   const today = (todaySlots ?? []).filter((s) => s.day === todayDay).sort((a, b) => a.period - b.period);
 
   const upcomingHolidays = (holidays ?? [])
@@ -1110,13 +1111,13 @@ function SchoolDashboard() {
           {today.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">No classes scheduled today.</p>
           ) : (
-            today.slice(0, 5).map((slot, i) => (
+            today.slice(0, 5).map((slot) => (
               <div key={slot.id} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{slot.subject}</p>
                   <p className="truncate text-[11px] text-muted-foreground">Period {slot.period}</p>
                 </div>
-                <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{PERIODS[i]?.time}</span>
+                <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{schoolPeriods[slot.period - 1]?.time}</span>
               </div>
             ))
           )}

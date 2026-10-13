@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/table";
 import { useFees, useMyStudentProfile, useSchoolProfile, type ApiFee } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
-import { feeTitle } from "@/lib/fees";
+import { feeTitle, sortStudentFees } from "@/lib/fees";
 import { FeeReceipt } from "@/components/shared/FeeReceipt";
 import { FeeCard } from "@/components/shared/FeeCard";
 
@@ -237,7 +237,7 @@ export default function MyFeesPage() {
     paidAmount?: number | undefined;
   } | null>(null);
 
-  const rows = useMemo(() => fees ?? [], [fees]);
+  const rows = useMemo(() => sortStudentFees(fees ?? []), [fees]);
   const total = rows.reduce((sum, f) => sum + payable(f), 0);
   const paid = rows.reduce((sum, f) => sum + (f.paid_amount ?? 0), 0);
   const pending = total - paid;

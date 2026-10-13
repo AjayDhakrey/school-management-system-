@@ -37,7 +37,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { DAYS, PERIODS } from "@/data/mock";
+import { isPeriodLive, useSchoolTimings } from "@/lib/school-timings";
+import { SchoolTimingsEditor } from "@/components/shared/SchoolTimingsEditor";
 import { useAuth } from "@/lib/auth-context";
 import {
   useMyTeacherProfile,
@@ -70,31 +71,17 @@ function toneFor(subject: string) {
   return PALETTE[hash % PALETTE.length];
 }
 
-function weekLabel(offset: number) {
+function weekLabel(offset: number, dayCount = 6) {
   const base = new Date(2026, 7, 3 + offset * 7);
   const end = new Date(base);
-  end.setDate(base.getDate() + (DAYS.length - 1));
+  end.setDate(base.getDate() + (dayCount - 1));
   const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return `${fmt(base)} – ${fmt(end)}, ${base.getFullYear()}`;
 }
 
-function todayName() {
+function todayName(days: string[]) {
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
-  return DAYS.includes(today) ? today : DAYS[0]!;
-}
-
-/** PERIODS times are 12-hour without am/pm ("01:15" is after lunch), so hours before 8 are PM. */
-function toMinutes(hhmm: string) {
-  const [h = 0, m = 0] = hhmm.split(":").map(Number);
-  return (h < 8 ? h + 12 : h) * 60 + m;
-}
-
-function isCurrentPeriod(day: string, period: number) {
-  const time = PERIODS[period - 1]?.time;
-  if (!time || day !== new Date().toLocaleDateString("en-US", { weekday: "long" })) return false;
-  const [start, end] = time.split("–").map((t) => toMinutes(t.trim()));
-  const now = new Date().getHours() * 60 + new Date().getMinutes();
-  return start !== undefined && end !== undefined && now >= start && now < end;
+  return days.includes(today) ? today : (days[0] ?? "Monday");
 }
 
 /** One period in the mobile schedule — a badge with the period number, subject and details. */
@@ -109,7 +96,8 @@ function PeriodCard({
   live?: boolean;
   children?: ReactNode;
 }) {
-  const time = PERIODS[period - 1]?.time ?? `Period ${period}`;
+  const { periods } = useSchoolTimings();
+  const time = periods[period - 1]?.time ?? `Period ${period}`;
 
   if (subject === "Break") {
     return (
@@ -186,7 +174,8 @@ function TeacherScheduleList({
   slots: ApiTimetableSlot[];
   classNameById: Map<string, string>;
 }) {
-  const [activeDay, setActiveDay] = useState(todayName);
+  const { days: DAYS, periods } = useSchoolTimings();
+  const [activeDay, setActiveDay] = useState(() => todayName(DAYS));
   const grid: Record<string, ApiTimetableSlot[]> = {};
   for (const day of DAYS)
     grid[day] = slots.filter((s) => s.day === day).sort((a, b) => a.period - b.period);
@@ -229,7 +218,7 @@ function TeacherScheduleList({
               key={slot.id}
               period={slot.period}
               subject={slot.subject}
-              live={isCurrentPeriod(activeDay, slot.period)}
+              live={isPeriodLive(activeDay, periods[slot.period - 1])}
             >
               {classNameById.size > 0 && (
                 <MetaItem icon={School}>
@@ -262,7 +251,8 @@ function TeacherClassTimetable() {
 
   const [classId, setClassId] = useState("");
   const activeClassId = classId || myClasses[0]?.id || "";
-  const [day, setDay] = useState(todayName);
+  const { days: DAYS, periods: PERIODS } = useSchoolTimings();
+  const [day, setDay] = useState(() => todayName(DAYS));
   const { data: slots, isLoading } = useClassTimetable(activeClassId || undefined);
   const byPeriod = new Map((slots ?? []).filter((s) => s.day === day).map((s) => [s.period, s]));
   const classLabel = (c: { name: string; section: string; class_teacher_id: string | null }) =>
@@ -297,7 +287,10 @@ function TeacherClassTimetable() {
             ))}
           </SelectContent>
         </Select>
-        <div className="grid grid-cols-6 gap-1.5 sm:max-w-md">
+        <div
+          className="grid gap-1.5 sm:max-w-md"
+          style={{ gridTemplateColumns: `repeat(${DAYS.length}, minmax(0, 1fr))` }}
+        >
           {DAYS.map((d) => (
             <button
               key={d}
@@ -326,7 +319,7 @@ function TeacherClassTimetable() {
                 key={p.period}
                 period={p.period}
                 subject={slot?.subject ?? null}
-                live={isCurrentPeriod(day, p.period)}
+                live={isPeriodLive(day, p)}
               >
                 <MetaItem icon={UserRound}>
                   {slot?.teacher_name ?? "No teacher set"}
@@ -430,6 +423,7 @@ function AssignSlotDialog({
     open,
   );
   const { data: rooms } = useRooms();
+  const { periods } = useSchoolTimings();
   const queryClient = useQueryClient();
   const [subject, setSubject] = useState(existing?.subject ?? NONE);
   const [teacherId, setTeacherId] = useState(existing?.teacher_id ?? NONE);
@@ -530,7 +524,7 @@ function AssignSlotDialog({
         <DialogHeader>
           <DialogTitle>{existing ? "Edit Period" : "Assign Period"}</DialogTitle>
           <DialogDescription>
-            {className} · {day} · {PERIODS[period - 1]?.time ?? `Period ${period}`}
+            {className} · {day} · {periods[period - 1]?.time ?? `Period ${period}`}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
@@ -653,6 +647,8 @@ function AssignSlotDialog({
 function AdminClassTimetable() {
   const { data: classes } = useClasses();
   const { data: slots, isLoading } = useTimetable();
+  const { days: DAYS, periods: PERIODS } = useSchoolTimings();
+  const [timingsOpen, setTimingsOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const classNames = useMemo(
@@ -693,7 +689,7 @@ function AdminClassTimetable() {
     <>
       <SectionCard
         title={classId ? `${activeClassName} – Section ${activeSection}` : "Select a class"}
-        subtitle={weekLabel(weekOffset)}
+        subtitle={weekLabel(weekOffset, DAYS.length)}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Select
@@ -726,6 +722,14 @@ function AdminClassTimetable() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={() => setTimingsOpen(true)}
+            >
+              <Clock className="h-4 w-4" /> Edit timings
+            </Button>
             <div className="flex items-center gap-1">
               <Button
                 variant="outline"
@@ -815,6 +819,18 @@ function AdminClassTimetable() {
           </div>
         )}
       </SectionCard>
+
+      <Dialog open={timingsOpen} onOpenChange={setTimingsOpen}>
+        <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>School Timings</DialogTitle>
+            <DialogDescription>
+              Working days and period times. These apply to every class's timetable.
+            </DialogDescription>
+          </DialogHeader>
+          <SchoolTimingsEditor onSaved={() => setTimingsOpen(false)} />
+        </DialogContent>
+      </Dialog>
 
       {dialogTarget && classId && (
         <AssignSlotDialog

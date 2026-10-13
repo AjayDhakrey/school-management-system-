@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  DoorOpen,
   GraduationCap,
   Users,
   UserCog,
@@ -210,6 +211,13 @@ export const NAV: NavGroup[] = [
         hideFromSidebar: ["School Admin", "Teacher"],
       },
       {
+        label: "Classrooms",
+        to: "/rooms",
+        icon: DoorOpen,
+        roles: [...admins],
+        hideFromSidebar: ["School Admin"],
+      },
+      {
         label: "Subjects",
         to: "/subjects",
         icon: BookOpen,
@@ -286,10 +294,10 @@ export const NAV: NavGroup[] = [
         to: "/fees/collection",
         icon: Wallet,
         roles: [...admins, "Accountant"],
-        hideFromSidebar: ["School Admin"],
+        hideFromSidebar: ["School Admin", "Accountant"],
       },
       {
-        label: "Fee Structure",
+        label: "Fees Management",
         to: "/fees/structure",
         icon: Wallet,
         roles: [...admins, "Accountant"],
@@ -300,7 +308,7 @@ export const NAV: NavGroup[] = [
         to: "/fees/pending",
         icon: Wallet,
         roles: [...admins, "Accountant"],
-        hideFromSidebar: ["School Admin"],
+        hideFromSidebar: ["School Admin", "Accountant"],
       },
       {
         label: "Overdue Fees",
@@ -310,7 +318,7 @@ export const NAV: NavGroup[] = [
         to: "/fees/pending",
         icon: Wallet,
         roles: [...admins, "Accountant"],
-        hideFromSidebar: ["School Admin"],
+        hideFromSidebar: ["School Admin", "Accountant"],
       },
       {
         label: "Discounts & Concessions",
@@ -318,7 +326,7 @@ export const NAV: NavGroup[] = [
         to: "/fees/discounts",
         icon: Wallet,
         roles: [...admins, "Accountant"],
-        hideFromSidebar: ["School Admin"],
+        hideFromSidebar: ["School Admin", "Accountant"],
       },
       {
         label: "Refunds",
@@ -658,15 +666,14 @@ export const SCHOOL_ADMIN_NAV: NavGroup[] = [
         icon: BadgeIndianRupee,
         roles: ["School Admin"],
       },
-      { label: "Fee Structure", to: "/fees/structure", icon: Wallet, roles: ["School Admin"] },
-      { label: "Fee Collection", to: "/fees/collection", icon: Wallet, roles: ["School Admin"] },
-      { label: "Pending Fees", to: "/fees/pending", icon: Wallet, roles: ["School Admin"] },
-      { label: "Fee Reports", to: "/fees/reports", icon: Wallet, roles: ["School Admin"] },
+      // One entry for the whole Fees page — Structure, Fees Record, Reports and Discounts are its tabs.
+      { label: "Fees Management", to: "/fees/structure", icon: Wallet, roles: ["School Admin"] },
     ],
   },
   {
     label: "Academics",
     items: [
+      { label: "Classrooms", to: "/rooms", icon: DoorOpen, roles: ["School Admin"] },
       { label: "Library", to: "/library", icon: Library, roles: ["School Admin"] },
       { label: "Timetable", to: "/timetable", icon: CalendarClock, roles: ["School Admin"] },
       {

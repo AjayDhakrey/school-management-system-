@@ -9,13 +9,13 @@ import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useFeesFor } from "@/hooks/useApi";
 import { useParentChild } from "@/lib/parent-child-context";
-import { feeTitle } from "@/lib/fees";
+import { feeTitle, sortStudentFees } from "@/lib/fees";
 
 export default function ParentFeeDetailsPage() {
   const { selectedChildId, isLoading: childrenLoading } = useParentChild();
   const { data: fees, isLoading } = useFeesFor(selectedChildId ?? undefined);
 
-  const rows = fees ?? [];
+  const rows = sortStudentFees(fees ?? []);
   const total = useMemo(() => rows.reduce((sum, f) => sum + f.amount - f.discount + f.fine, 0), [rows]);
   const paid = rows.filter((f) => f.status === "Paid").reduce((sum, f) => sum + f.amount - f.discount + f.fine, 0);
   const pending = total - paid;

@@ -26,9 +26,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Initials, PageHeader, EmptyState } from "@/components/shared/ui-kit";
 import { InfoCard, ProgressBar } from "@/components/shared/InfoCard";
 import { SectionCard } from "@/components/shared/SectionCard";
@@ -48,7 +67,8 @@ import {
   type ApiParent,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
-import { feeTitle } from "@/lib/fees";
+import { billNewStudent } from "@/lib/auto-billing";
+import { feeStatusOf, feeTitle, sortStudentFees } from "@/lib/fees";
 import { FeeCard } from "@/components/shared/FeeCard";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -124,7 +144,9 @@ function StatTile({
   return (
     <div className="min-w-0 rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
       <div className="flex items-center gap-2">
-        <span className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg", STAT_TONE[tone])}>
+        <span
+          className={cn("grid h-7 w-7 shrink-0 place-items-center rounded-lg", STAT_TONE[tone])}
+        >
           <Icon className="h-3.5 w-3.5" />
         </span>
         <p className="truncate text-[11px] font-medium text-muted-foreground">{label}</p>
@@ -197,7 +219,9 @@ function ParentsGuardiansSection({ studentId }: { studentId: string }) {
   const [open, setOpen] = useState(false);
   const [existingToLink, setExistingToLink] = useState("");
 
-  const linked = (allParents ?? []).filter((p) => (JSON.parse(p.linked_student_ids || "[]") as string[]).includes(studentId));
+  const linked = (allParents ?? []).filter((p) =>
+    (JSON.parse(p.linked_student_ids || "[]") as string[]).includes(studentId),
+  );
   const unlinked = (allParents ?? []).filter((p) => !linked.some((l) => l.id === p.id));
 
   async function linkExisting() {
@@ -245,16 +269,24 @@ function ParentsGuardiansSection({ studentId }: { studentId: string }) {
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : linked.length === 0 ? (
-        <EmptyState title="No guardians linked" description="Add a new guardian or link an existing parent account." />
+        <EmptyState
+          title="No guardians linked"
+          description="Add a new guardian or link an existing parent account."
+        />
       ) : (
         <div className="space-y-3">
           {linked.map((p) => (
-            <div key={p.id} className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              key={p.id}
+              className="flex flex-col gap-2 rounded-xl border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
+            >
               <div className="flex items-center gap-3">
                 <Initials name={p.name} tone="gold" />
                 <div>
                   <p className="text-sm font-semibold">{p.name}</p>
-                  <p className="text-xs text-muted-foreground">{p.email ?? "—"} · {p.phone ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.email ?? "—"} · {p.phone ?? "—"}
+                  </p>
                 </div>
               </div>
               <Button variant="outline" size="sm" onClick={() => unlink(p)}>
@@ -301,7 +333,7 @@ export default function StudentProfile() {
   const [tab, setTab] = useState<string>("overview");
 
   const { data: student, isLoading, isError } = useStudent(id);
-   const { data: allStudents } = useStudents();
+  const { data: allStudents } = useStudents();
   const { data: allParents } = useParents();
   const { data: subjects } = useSubjects();
   const { data: classSubjectMappings } = useSubjectMappings(
@@ -314,6 +346,37 @@ export default function StudentProfile() {
   const { data: exams } = useExams();
   const { data: certificates } = useCertificates(id);
   const { data: notices } = useNotices();
+
+  const [billing, setBilling] = useState(false);
+
+  /** Bills this student from their class's fee structure (same rules as on admission). */
+  async function billFromStructure() {
+    if (!student) return;
+    setBilling(true);
+    try {
+      const { count, total, reason } = await billNewStudent({
+        studentId: student.id,
+        classId: student.class_id,
+        academicYearId: student.academic_year_id,
+        admittedOn: student.admitted_on,
+        isHosteller: Boolean(student.is_hosteller),
+        hasTransport: Boolean(student.vehicle_id),
+      });
+      if (count) {
+        toast.success(
+          `Billed ${count} fee${count === 1 ? "" : "s"} (₹${total.toLocaleString()}) to ${student.name}`,
+        );
+        await queryClient.invalidateQueries({ queryKey: [`fees-${id}`] });
+        await queryClient.invalidateQueries({ queryKey: ["fees"] });
+      } else {
+        toast.info(`Nothing to bill — ${reason ?? "no fees are due"}.`);
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to bill fees");
+    } finally {
+      setBilling(false);
+    }
+  }
 
   async function invalidateStudent() {
     await queryClient.invalidateQueries({ queryKey: [`student-${id}`] });
@@ -333,7 +396,10 @@ export default function StudentProfile() {
     return (
       <div>
         <PageHeader title="Student not found" breadcrumb={["Dashboard", "Students"]} />
-        <EmptyState title="Student not found" description="This student record doesn't exist or you don't have access to it." />
+        <EmptyState
+          title="Student not found"
+          description="This student record doesn't exist or you don't have access to it."
+        />
       </div>
     );
   }
@@ -344,7 +410,10 @@ export default function StudentProfile() {
   const absentDays = studentAttendance.filter((a) => a.status === "Absent").length;
   const leaveDays = studentAttendance.filter((a) => a.status === "Leave").length;
 
-  const studentFees = (feeRecords ?? []).filter((f) => f.student_id === student.id);
+  const studentFees = sortStudentFees(
+    (feeRecords ?? []).filter((f) => f.student_id === student.id),
+  );
+  const feeStatus = feeStatusOf(studentFees);
   const feeTotal = studentFees.reduce((a, f) => a + f.amount, 0);
   const feePayableTotal = studentFees.reduce((a, f) => a + feePayable(f), 0);
   const feePaidTotal = studentFees.reduce((a, f) => a + (f.paid_amount ?? 0), 0);
@@ -352,9 +421,13 @@ export default function StudentProfile() {
   const examsById = new Map((exams ?? []).map((e) => [e.id, e]));
   const studentResults = (resultRecords ?? []).filter((r) => r.student_id === student.id);
 
-  const linkedParents = (allParents ?? []).filter((p) => (JSON.parse(p.linked_student_ids || "[]") as string[]).includes(student.id));
+  const linkedParents = (allParents ?? []).filter((p) =>
+    (JSON.parse(p.linked_student_ids || "[]") as string[]).includes(student.id),
+  );
   const siblingIds = new Set(
-    linkedParents.flatMap((p) => JSON.parse(p.linked_student_ids || "[]") as string[]).filter((sid) => sid !== student.id),
+    linkedParents
+      .flatMap((p) => JSON.parse(p.linked_student_ids || "[]") as string[])
+      .filter((sid) => sid !== student.id),
   );
   const siblings = (allStudents ?? []).filter((s) => siblingIds.has(s.id));
 
@@ -365,7 +438,9 @@ export default function StudentProfile() {
       await queryClient.invalidateQueries({ queryKey: [`certificates-${student.id}`] });
       toast.success("Transfer certificate generated");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Failed to generate transfer certificate");
+      toast.error(
+        err instanceof ApiError ? err.message : "Failed to generate transfer certificate",
+      );
     }
   }
 
@@ -391,14 +466,16 @@ export default function StudentProfile() {
             <Initials name={student.name} className="h-16 w-16 text-lg" />
             <div className="min-w-0">
               <h2 className="font-display text-lg font-bold">{student.name}</h2>
-              <p className="text-xs text-muted-foreground">{student.admission_no ?? "No admission no."}</p>
+              <p className="text-xs text-muted-foreground">
+                {student.admission_no ?? "No admission no."}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {student.class_name ?? "Unassigned"} {student.section ? `- ${student.section}` : ""}
                 {student.roll ? ` · Roll #${student.roll}` : ""}
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <StatusBadge status={student.status ?? "Active"} />
-                <StatusBadge status={student.fee_status ?? "Pending"} />
+                <StatusBadge status={feeStatus} />
               </div>
               <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
                 {student.phone && (
@@ -448,8 +525,14 @@ export default function StudentProfile() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={billing} onClick={billFromStructure}>
+                  {billing ? "Billing fees…" : "Bill fees from fee structure"}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={generateTC}>Generate TC</DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={toggleActive}>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={toggleActive}
+                >
                   {student.status === "Inactive" ? "Reactivate" : "Deactivate"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -474,7 +557,9 @@ export default function StudentProfile() {
                 <span
                   className={cn(
                     "grid h-8 w-8 place-items-center rounded-full transition-colors",
-                    active ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground",
                   )}
                 >
                   <Icon className="h-[18px] w-[18px]" />
@@ -508,27 +593,56 @@ export default function StudentProfile() {
                 <div
                   className={cn(
                     "h-full rounded-full",
-                    attendance >= 75 ? "bg-success" : attendance >= 50 ? "bg-warning" : "bg-destructive",
+                    attendance >= 75
+                      ? "bg-success"
+                      : attendance >= 50
+                        ? "bg-warning"
+                        : "bg-destructive",
                   )}
                   style={{ width: `${Math.min(100, attendance)}%` }}
                 />
               </div>
             </StatTile>
-            <StatTile icon={FileText} tone="gold" label="Fee Status" value={student.fee_status ?? "Pending"}>
+            <StatTile icon={FileText} tone="gold" label="Fee Status" value={feeStatus}>
               <p
                 className={cn(
                   "mt-1 text-[11px] font-medium",
-                  student.fee_status === "Paid" ? "text-success" : "text-warning",
+                  feeStatus === "Paid" || feeStatus === "No fees"
+                    ? "text-success"
+                    : feeStatus === "Overdue"
+                      ? "text-destructive"
+                      : "text-warning",
                 )}
               >
-                {student.fee_status === "Paid" ? "All dues cleared" : "Dues outstanding"}
+                {feeStatus === "Paid"
+                  ? "All dues cleared"
+                  : feeStatus === "No fees"
+                    ? "Nothing billed yet"
+                    : feeStatus === "Overdue"
+                      ? "Payment overdue"
+                      : "Dues outstanding"}
               </p>
             </StatTile>
-            <StatTile icon={CalendarDays} tone="navy" label="Admitted On" value={formatDate(student.admitted_on)} />
-            <StatTile icon={Droplet} tone="danger" label="Blood Group" value={student.blood_group || "Not recorded"} muted={!student.blood_group} />
+            <StatTile
+              icon={CalendarDays}
+              tone="navy"
+              label="Admitted On"
+              value={formatDate(student.admitted_on)}
+            />
+            <StatTile
+              icon={Droplet}
+              tone="danger"
+              label="Blood Group"
+              value={student.blood_group || "Not recorded"}
+              muted={!student.blood_group}
+            />
           </div>
           <SectionCard title="Attendance Summary">
-            <ProgressBar value={attendance} tone="success" label={<span>Overall attendance · {attendance}%</span>} />
+            <ProgressBar
+              value={attendance}
+              tone="success"
+              label={<span>Overall attendance · {attendance}%</span>}
+            />
           </SectionCard>
           <SectionCard title="Recent Notices">
             {(notices ?? []).length === 0 ? (
@@ -536,7 +650,10 @@ export default function StudentProfile() {
             ) : (
               <div className="space-y-3">
                 {(notices ?? []).slice(0, 3).map((n) => (
-                  <div key={n.id} className="flex items-start justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0">
+                  <div
+                    key={n.id}
+                    className="flex items-start justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0"
+                  >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{n.title}</p>
                       <p className="truncate text-xs text-muted-foreground">{n.description}</p>
@@ -583,7 +700,11 @@ export default function StudentProfile() {
             <SectionCard title="Linked Siblings">
               <div className="grid gap-3 sm:grid-cols-2">
                 {siblings.map((sib) => (
-                  <Link key={sib.id} to={`/students/${sib.id}`} className="panel flex items-center gap-3 p-3 hover:bg-muted">
+                  <Link
+                    key={sib.id}
+                    to={`/students/${sib.id}`}
+                    className="panel flex items-center gap-3 p-3 hover:bg-muted"
+                  >
                     <Initials name={sib.name} />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{sib.name}</p>
@@ -620,7 +741,9 @@ export default function StudentProfile() {
                       </span>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                          <p className="truncate text-sm font-bold capitalize">{sub.subject_name}</p>
+                          <p className="truncate text-sm font-bold capitalize">
+                            {sub.subject_name}
+                          </p>
                           <StatusBadge status={sub.subject_type ?? "Core"} />
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -630,14 +753,19 @@ export default function StudentProfile() {
                             </span>
                           )}
                           <span className="flex items-center gap-1">
-                            <CalendarClock className="h-3 w-3" /> {sub.subject_credits ?? 3} hrs / week
+                            <CalendarClock className="h-3 w-3" /> {sub.subject_credits ?? 3} hrs /
+                            week
                           </span>
                         </div>
                       </div>
                     </div>
                     <div className="mt-2.5 flex items-center gap-2 rounded-xl bg-muted/50 px-2.5 py-2">
                       {sub.teacher_name ? (
-                        <Initials name={sub.teacher_name} tone="navy" className="h-7 w-7 text-[10px]" />
+                        <Initials
+                          name={sub.teacher_name}
+                          tone="navy"
+                          className="h-7 w-7 text-[10px]"
+                        />
                       ) : (
                         <span className="grid h-7 w-7 place-items-center rounded-full bg-muted text-muted-foreground">
                           <UserRound className="h-3.5 w-3.5" />
@@ -666,12 +794,21 @@ export default function StudentProfile() {
 
         <TabsContent value="attendance" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <InfoCard label="Present Days" value={presentDays} icon={CalendarClock} tone="success" />
+            <InfoCard
+              label="Present Days"
+              value={presentDays}
+              icon={CalendarClock}
+              tone="success"
+            />
             <InfoCard label="Absent Days" value={absentDays} icon={CalendarClock} tone="danger" />
             <InfoCard label="Leaves" value={leaveDays} icon={CalendarClock} tone="warning" />
           </div>
           <SectionCard title="Attendance Records">
-            <ProgressBar value={attendance} tone="success" label={<span>{attendance}% overall attendance</span>} />
+            <ProgressBar
+              value={attendance}
+              tone="success"
+              label={<span>{attendance}% overall attendance</span>}
+            />
             {studentAttendance.length === 0 ? (
               <p className="mt-4 text-sm text-muted-foreground">No attendance records yet.</p>
             ) : (
@@ -694,9 +831,20 @@ export default function StudentProfile() {
         </TabsContent>
 
         <TabsContent value="fees" className="mt-4 space-y-4">
-          <SectionCard title="Fee Records" subtitle={`Total billed · ₹${feeTotal.toLocaleString()}`}>
+          <SectionCard
+            title="Fee Records"
+            subtitle={`Total billed · ₹${feeTotal.toLocaleString()}`}
+          >
             {studentFees.length === 0 ? (
-              <EmptyState title="No fee records" description="No fees have been billed to this student yet." />
+              <EmptyState
+                title="No fee records"
+                description="No fees have been billed to this student yet. Bill them from the class fee structure — monthly fees from the admission month, the current term, yearly and one-time fees."
+                action={
+                  <Button size="sm" disabled={billing} onClick={billFromStructure}>
+                    {billing ? "Billing…" : "Bill fees from fee structure"}
+                  </Button>
+                }
+              />
             ) : (
               <>
                 <div className="mb-3 grid grid-cols-3 divide-x divide-border rounded-2xl bg-muted/50 py-2.5 text-center">
@@ -706,14 +854,20 @@ export default function StudentProfile() {
                     {
                       label: "Due",
                       value: Math.max(0, feePayableTotal - feePaidTotal),
-                      tone: feePayableTotal - feePaidTotal > 0 ? "text-destructive" : "text-success",
+                      tone:
+                        feePayableTotal - feePaidTotal > 0 ? "text-destructive" : "text-success",
                     },
                   ].map((item) => (
                     <div key={item.label} className="min-w-0 px-1">
                       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {item.label}
                       </p>
-                      <p className={cn("truncate text-sm font-bold tabular-nums sm:text-base", item.tone)}>
+                      <p
+                        className={cn(
+                          "truncate text-sm font-bold tabular-nums sm:text-base",
+                          item.tone,
+                        )}
+                      >
                         ₹{item.value.toLocaleString()}
                       </p>
                     </div>
@@ -751,7 +905,9 @@ export default function StudentProfile() {
                       {studentFees.map((f) => (
                         <TableRow key={f.id}>
                           <TableCell className="font-medium">{feeTitle(f)}</TableCell>
-                          <TableCell className="text-right tabular-nums">₹{f.amount.toLocaleString()}</TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            ₹{f.amount.toLocaleString()}
+                          </TableCell>
                           <TableCell className="text-right tabular-nums text-muted-foreground">
                             {f.discount ? `−₹${f.discount.toLocaleString()}` : "—"}
                           </TableCell>
@@ -761,8 +917,12 @@ export default function StudentProfile() {
                           <TableCell className="text-right tabular-nums">
                             ₹{(f.paid_amount ?? 0).toLocaleString()}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap">{formatDate(f.due_date)}</TableCell>
-                          <TableCell className="whitespace-nowrap">{formatDate(f.paid_on)}</TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {formatDate(f.due_date)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            {formatDate(f.paid_on)}
+                          </TableCell>
                           <TableCell>
                             <StatusBadge status={f.status} />
                           </TableCell>
@@ -779,7 +939,10 @@ export default function StudentProfile() {
         <TabsContent value="results" className="mt-4 space-y-4">
           <SectionCard title="Exam Results">
             {studentResults.length === 0 ? (
-              <EmptyState title="No results yet" description="No exam results have been published for this student." />
+              <EmptyState
+                title="No results yet"
+                description="No exam results have been published for this student."
+              />
             ) : (
               <div className="overflow-x-auto">
                 <Table>
@@ -794,13 +957,18 @@ export default function StudentProfile() {
                   <TableBody>
                     {studentResults.map((r) => {
                       const exam = r.exam_id ? examsById.get(r.exam_id) : undefined;
-                      const percentage = r.marks !== null && r.max_marks ? Math.round((r.marks / r.max_marks) * 100) : null;
+                      const percentage =
+                        r.marks !== null && r.max_marks
+                          ? Math.round((r.marks / r.max_marks) * 100)
+                          : null;
                       return (
                         <TableRow key={r.id}>
                           <TableCell className="font-medium">
                             {exam ? `${exam.subject ?? "—"} · ${exam.term}` : "—"}
                           </TableCell>
-                          <TableCell>{r.marks ?? "—"}/{r.max_marks}</TableCell>
+                          <TableCell>
+                            {r.marks ?? "—"}/{r.max_marks}
+                          </TableCell>
                           <TableCell>{percentage !== null ? `${percentage}%` : "—"}</TableCell>
                           <TableCell>{r.grade ? <GradeBadge grade={r.grade} /> : "—"}</TableCell>
                         </TableRow>
@@ -816,16 +984,25 @@ export default function StudentProfile() {
         <TabsContent value="documents" className="mt-4">
           <SectionCard title="Documents & Certificates">
             {(certificates ?? []).length === 0 ? (
-              <EmptyState title="No documents yet" description="No certificates have been issued for this student." />
+              <EmptyState
+                title="No documents yet"
+                description="No certificates have been issued for this student."
+              />
             ) : (
               <div className="space-y-3">
                 {(certificates ?? []).map((d) => (
-                  <div key={d.id} className="flex items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0">
+                  <div
+                    key={d.id}
+                    className="flex items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0"
+                  >
                     <div className="flex min-w-0 items-center gap-2.5">
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                       <div className="min-w-0">
                         <span className="block truncate text-sm font-medium">{d.type}</span>
-                        <span className="block text-xs text-muted-foreground">Issued {d.issued_on}{d.issued_by ? ` · ${d.issued_by}` : ""}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          Issued {d.issued_on}
+                          {d.issued_by ? ` · ${d.issued_by}` : ""}
+                        </span>
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">

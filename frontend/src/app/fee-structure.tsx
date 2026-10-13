@@ -65,7 +65,10 @@ import {
   ONE_TIME_LABEL,
   TERMS_PER_YEAR,
   type BillingTerm,
+  categoryLabel,
   dueDayOf,
+  displayFeeName,
+  type FeeKind,
   monthlyDueDate,
   ordinal,
   DEFAULT_DUE_DAY,
@@ -73,6 +76,14 @@ import {
   type BillingMonth,
 } from "@/lib/fees";
 import { cn } from "@/lib/utils";
+import {
+  BILLING_GROUPS,
+  GROUP_ACCENT,
+  GROUP_BAND,
+  GROUP_ICON,
+  GROUP_TONE,
+  type BillingFrequency,
+} from "@/lib/fee-groups";
 import { escapeHtml, printHtml } from "@/lib/print";
 import { useSchoolBranding } from "@/hooks/use-school-branding";
 
@@ -90,51 +101,7 @@ const isActive = (s: ApiFeeStructure) => (s.status ?? "ACTIVE") === "ACTIVE";
 const isTerm = (s: ApiFeeStructure) => s.frequency === "Term";
 
 /** How a class-wise fee is charged; each gets its own section on the Fee Structure page. */
-type BillingFrequency = "Monthly" | "Term" | "Annual" | "One-Time";
 
-const BILLING_GROUPS: {
-  frequency: BillingFrequency;
-  title: string;
-  note: string;
-  examples: string;
-  /** "month" → "₹1,500/month" */
-  per: string;
-  /** Option label in the class-wise form. */
-  option: string;
-}[] = [
-  {
-    frequency: "Monthly",
-    title: "Monthly Fees",
-    note: "Charged every month",
-    examples: "Tuition Fee, Hostel Fee",
-    per: "month",
-    option: "Every month",
-  },
-  {
-    frequency: "Term",
-    title: "Term Fees",
-    note: `Charged ${TERMS_PER_YEAR} times a year — Term 1, Term 2 and Term 3`,
-    examples: "Examination Fee",
-    per: "term",
-    option: "Every term",
-  },
-  {
-    frequency: "Annual",
-    title: "Yearly Fees",
-    note: "Charged once a year",
-    examples: "Transport, Library, Activity Fee",
-    per: "year",
-    option: "Once a year",
-  },
-  {
-    frequency: "One-Time",
-    title: "One-Time Fees",
-    note: "Charged once per student, when they join",
-    examples: "Admission Fee",
-    per: "one-time",
-    option: "One time",
-  },
-];
 const BILLING_FREQUENCIES = BILLING_GROUPS.map((g) => g.frequency) as string[];
 /** Fees the class-wise sections and fee generation handle (everything except Quarterly). */
 const isBillable = (s: ApiFeeStructure) => BILLING_FREQUENCIES.includes(s.frequency ?? "");
@@ -156,7 +123,7 @@ const fitCategory = (category: string, frequency: string) => {
   return (allowed as string[]).includes(category) ? category : allowed[0]!;
 };
 
-/** The school's billing rules: tuition & hostel monthly, exams per term, transport / library /
+/** The school's billing rules: school fee & hostel monthly, exams per term, transport / library /
  *  activity yearly, admission once. */
 function frequencyForCategory(category: string): BillingFrequency {
   switch (category) {
@@ -302,19 +269,6 @@ function DueField({
   );
 }
 
-const GROUP_ICON: Record<BillingFrequency, typeof Wallet> = {
-  Monthly: CalendarDays,
-  Term: BookOpenCheck,
-  Annual: CalendarRange,
-  "One-Time": UserPlus,
-};
-const GROUP_TONE: Record<BillingFrequency, string> = {
-  Monthly: "bg-primary/10 text-primary",
-  Term: "bg-gold-soft text-gold-foreground",
-  Annual: "bg-success-soft text-success",
-  "One-Time": "bg-info-soft text-info",
-};
-
 /** Numbered step heading inside the class-wise fee form. */
 function StepTitle({ n, title, aside }: { n: number; title: string; aside?: string }) {
   return (
@@ -418,7 +372,7 @@ function ClassWiseFeesDialog({
       return;
     }
     if (looksLikeAmount(name)) {
-      toast.error("Fee head name can't be a number — use a name like “Tuition Fee”");
+      toast.error("Fee head name can't be a number — use a name like “Monthly School Fee”");
       return;
     }
     const renamed = Boolean(head) && !sameHead(name, head ?? "");
@@ -531,7 +485,9 @@ function ClassWiseFeesDialog({
           </span>
           <div className="min-w-0">
             <DialogTitle className="truncate text-lg">
-              {head ? `Edit ${head}` : `Add ${group.title.replace(/s$/, "")}`}
+              {head
+                ? `Edit ${displayFeeName(head, FREQUENCY_KIND[frequency])}`
+                : `Add ${group.title.replace(/s$/, "")}`}
             </DialogTitle>
             <DialogDescription className="text-xs">
               {year.name} · one amount per standard, applied to every section
@@ -650,7 +606,7 @@ function ClassWiseFeesDialog({
                   <SelectContent>
                     {categoriesFor(frequency).map((c) => (
                       <SelectItem key={c} value={c}>
-                        {c}
+                        {categoryLabel(c)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -927,6 +883,8 @@ function GenerateFeesDialog({
         if (structure.class_id && structure.class_id !== s.class_id) continue;
         // Hostel fees are only for students who live in the hostel.
         if (structure.category === "Hostel" && !s.is_hosteller) continue;
+        // Transport fees are only for students assigned to a bus route.
+        if (structure.category === "Transport" && !s.vehicle_id) continue;
         const first = targetMonths[0];
         if (!first) continue;
         switch (structure.frequency) {
@@ -999,8 +957,9 @@ function GenerateFeesDialog({
         <DialogTitle>Generate Fees</DialogTitle>
         <DialogDescription>
           Monthly fees are billed every month, term fees when a term starts, yearly fees once a year
-          and one-time fees once per student. Anything already billed is skipped, so it's safe to
-          run again.
+          and one-time fees once per student. Hostel fees go only to hostellers and transport fees
+          only to students with a bus route. Anything already billed is skipped, so it's safe to run
+          again.
         </DialogDescription>
       </DialogHeader>
       <div className="grid gap-3">
@@ -1084,22 +1043,16 @@ function GenerateFeesDialog({
   );
 }
 
-/** Faint column tint per billing group, so each group reads as one band in the table. */
-const GROUP_BAND: Record<BillingFrequency, string> = {
-  Monthly: "bg-primary/[0.03]",
-  Term: "bg-gold-soft/30",
-  Annual: "bg-success-soft/30",
-  "One-Time": "bg-info-soft/30",
-};
 const titleCase = (text: string) => text.replace(/\b\p{Ll}/gu, (c) => c.toUpperCase());
-
-/** Coloured underline under each group's header band. */
-const GROUP_ACCENT: Record<BillingFrequency, string> = {
-  Monthly: "border-b-primary/50",
-  Term: "border-b-gold/60",
-  Annual: "border-b-success/50",
-  "One-Time": "border-b-info/50",
+const FREQUENCY_KIND: Record<BillingFrequency, FeeKind> = {
+  Monthly: "month",
+  Term: "term",
+  Annual: "year",
+  "One-Time": "once",
 };
+/** Fee head as shown in the chart: title-cased, and never just an amount like "15,000". */
+const headLabel = (head: string, frequency: BillingFrequency) =>
+  displayFeeName(titleCase(head), FREQUENCY_KIND[frequency]);
 
 /** Stylesheet for the printed class fee chart (landscape A4, colour bands kept). */
 const FEE_CHART_PRINT_CSS = `
@@ -1229,7 +1182,7 @@ function ClassFeesCard({
     const headRow = columns
       .map(
         ({ head, group }, i) =>
-          `<th class="num band-${group.frequency}${i === 0 || columns[i - 1]!.group !== group ? " edge" : ""}">${escapeHtml(titleCase(head))}</th>`,
+          `<th class="num band-${group.frequency}${i === 0 || columns[i - 1]!.group !== group ? " edge" : ""}">${escapeHtml(headLabel(head, group.frequency))}</th>`,
       )
       .join("");
     const bodyRows = rows
@@ -1251,7 +1204,7 @@ function ClassFeesCard({
           `<span class="chip grp-${g.frequency}"><b>${escapeHtml(g.title)}</b> — ${escapeHtml(
             columns
               .filter((c) => c.group === g)
-              .map((c) => titleCase(c.head))
+              .map((c) => headLabel(c.head, c.group.frequency))
               .join(", "),
           )}</span>`,
       )
@@ -1425,7 +1378,7 @@ function ClassFeesCard({
                 title={`Edit ${head} for all classes`}
               >
                 <Pencil className="h-3 w-3 text-muted-foreground opacity-0 transition-opacity group-hover/head:opacity-100" />
-                {titleCase(head)}
+                {headLabel(head, group.frequency)}
               </button>
             </th>
           ))}

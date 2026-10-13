@@ -46,7 +46,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useStudents, useParents, useClasses, useTransport, type ApiStudent } from "@/hooks/useApi";
+import {
+  useFees,
+  useStudents,
+  useParents,
+  useClasses,
+  useTransport,
+  type ApiFee,
+  type ApiStudent,
+} from "@/hooks/useApi";
+import { feeStatusOf } from "@/lib/fees";
+import { billNewStudent } from "@/lib/auto-billing";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { PhoneInput } from "@/components/shared/PhoneInput";
@@ -75,6 +85,8 @@ export function StudentFormDialog({
   const [vehicleId, setVehicleId] = useState(initial?.vehicle_id ?? NONE);
   const [bloodGroup, setBloodGroup] = useState(initial?.blood_group ?? NONE);
   const [isHosteller, setIsHosteller] = useState(Boolean(initial?.is_hosteller));
+  // New admissions are billed straight away from their class's fee structure.
+  const [autoBill, setAutoBill] = useState(true);
   const [hostelRoom, setHostelRoom] = useState(initial?.hostel_room ?? "");
   const [roll, setRoll] = useState(initial?.roll != null ? String(initial.roll) : "");
   const [rollTouched, setRollTouched] = useState(isEdit);
@@ -221,6 +233,31 @@ export function StudentFormDialog({
       } else {
         const createdStudent = await api.post<{ id: string }>("/students", body);
         studentId = createdStudent.id;
+
+        if (autoBill && selectedClass) {
+          try {
+            const { count, total, reason } = await billNewStudent({
+              studentId,
+              classId: selectedClass.id,
+              academicYearId: selectedClass.academic_year_id,
+              admittedOn: admittedOn || null,
+              isHosteller,
+              hasTransport: false,
+            });
+            if (count) {
+              toast.success(
+                `Billed ${count} fee${count === 1 ? "" : "s"} (₹${total.toLocaleString()}) from the ${selectedClass.name} fee structure`,
+              );
+              queryClient.invalidateQueries({ queryKey: ["fees"] });
+            } else {
+              toast.info(`No fees billed — ${reason ?? "nothing is due yet"}`);
+            }
+          } catch (err) {
+            toast.warning(
+              `Student added, but fees couldn't be billed: ${err instanceof ApiError ? err.message : "unknown error"}. Use Generate Fees on the Fee Structure page.`,
+            );
+          }
+        }
       }
 
       if (createStudentLogin) {
@@ -480,6 +517,19 @@ export function StudentFormDialog({
           )}
         </div>
 
+        {!isEdit && (
+          <label className="flex items-start gap-2.5 rounded-xl border border-primary/25 bg-primary/5 p-3 sm:col-span-2">
+            <Checkbox className="mt-0.5" checked={autoBill} onCheckedChange={(v) => setAutoBill(v === true)} />
+            <span className="text-xs">
+              <span className="block font-semibold">Bill fees from the class fee structure</span>
+              <span className="text-muted-foreground">
+                One-time & yearly fees, the current term and every month from the admission month to now
+                {isHosteller ? " (hostel fees included)" : ""}.
+              </span>
+            </span>
+          </label>
+        )}
+
         <div className="grid gap-1.5 sm:col-span-2">
           <Label>Portal Access</Label>
           <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
@@ -550,6 +600,11 @@ export function StudentFormDialog({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {vehicleId === NONE
+                  ? "No transport — transport fees won't be billed."
+                  : "Transport fees will be billed to this student."}
+              </p>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="pickupPoint">Pickup Point</Label>
@@ -605,6 +660,13 @@ export default function StudentsPage() {
     await queryClient.invalidateQueries({ queryKey: ["students"] });
   }
 
+  // Fee status comes from each student's real bills, not the stored (never-updated) column.
+  const { data: fees } = useFees();
+  const feesByStudent = useMemo(() => {
+    const map = new Map<string, ApiFee[]>();
+    for (const f of fees ?? []) map.set(f.student_id, [...(map.get(f.student_id) ?? []), f]);
+    return map;
+  }, [fees]);
   const parentsById = useMemo(() => {
     const map = new Map<string, string>();
     for (const p of parents ?? []) map.set(p.id, p.name);
@@ -648,7 +710,7 @@ export default function StudentsPage() {
     try {
       const result = await api.delete<{ archived: boolean }>(`/students/${s.id}`);
       await invalidate();
-      toast.success(result.archived ? `${s.name} archived because linked records exist` : `${s.name} deleted`);
+      toast.success(result.archived ? `${s.name} archived` : `${s.name} deleted permanently`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to delete student");
     }
@@ -773,7 +835,7 @@ export default function StudentsPage() {
                       <TableCell>{s.section}</TableCell>
                       <TableCell className="truncate">{s.parent_id ? parentsById.get(s.parent_id) : "—"}</TableCell>
                       <TableCell>
-                        <StatusBadge status={s.fee_status ?? "Pending"} />
+                        <StatusBadge status={feeStatusOf(feesByStudent.get(s.id) ?? [])} />
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={s.status ?? "Active"} />
@@ -880,7 +942,9 @@ function RowActions({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {student.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently remove the student record.
+              This permanently deletes {student.name} and everything linked to them — fees and
+              payments, attendance, results, homework, leave and their student portal login. This
+              cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -15,8 +15,20 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+/** Projects on Supabase's new API keys expose them as JSON maps ({ default: "sb_…" }). */
+function newKey(name: string): string | undefined {
+  try {
+    const keys = JSON.parse(Deno.env.get(name) ?? "{}") as Record<string, string>;
+    return keys["default"] ?? Object.values(keys)[0];
+  } catch {
+    return undefined;
+  }
+}
+// Prefer the new secret key; fall back to the legacy service-role JWT. (Legacy keys can be
+// switched off in the dashboard, which made the old anon-key caller check always fail.)
+const SERVICE_ROLE_KEY =
+  newKey("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -57,15 +69,25 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return json({ error: "Missing Authorization header" }, 401);
 
-  const caller = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
   });
+
+  // Verify the caller's session token directly with the Auth server (works with both the new
+  // and the legacy API keys), then read their role with the trusted client.
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   const {
     data: { user },
-  } = await caller.auth.getUser();
-  if (!user) return json({ error: "Unauthorized" }, 401);
+    error: authError,
+  } = await admin.auth.getUser(token);
+  if (!user) {
+    return json(
+      { error: `Your session could not be verified (${authError?.message ?? "no user"}). Sign out and sign in again.` },
+      401,
+    );
+  }
 
-  const { data: callerProfile } = await caller
+  const { data: callerProfile } = await admin
     .from("user_profiles")
     .select("role, school_id")
     .eq("id", user.id)
@@ -73,10 +95,6 @@ Deno.serve(async (req) => {
   if (!callerProfile) return json({ error: "Forbidden" }, 403);
   const callerRole = callerProfile.role as Role;
   const callerSchool = callerProfile.school_id as string | null;
-
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const canManageSchool = (schoolId: string | null) =>
     callerRole === "SUPER_ADMIN" ||

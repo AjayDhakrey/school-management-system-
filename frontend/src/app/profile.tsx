@@ -26,7 +26,8 @@ import { PhotoField } from "@/components/shared/PhotoField";
 import { SignOutCard } from "@/components/shared/SignOutCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { useMyStudentProfile, useParents } from "@/hooks/useApi";
+import { useFees, useMyStudentProfile, useParents } from "@/hooks/useApi";
+import { feeStatusOf } from "@/lib/fees";
 import { api } from "@/lib/api";
 import { PHONE_INPUT_PROPS, cleanPhone } from "@/lib/phone";
 
@@ -75,6 +76,8 @@ function sinceLabel(admittedOn: string | null | undefined) {
 
 export default function ProfilePage() {
   const { data: student, isLoading } = useMyStudentProfile();
+  // Students only receive their own bills; the stored fee_status column is never updated.
+  const { data: myFees } = useFees();
   const { data: parents } = useParents();
   const queryClient = useQueryClient();
 
@@ -146,7 +149,7 @@ export default function ProfilePage() {
         badges={
           <>
             <StatusBadge status={student.status ?? "Active"} />
-            <StatusBadge status={student.fee_status ?? "Pending"} />
+            <StatusBadge status={feeStatusOf(myFees ?? [])} />
           </>
         }
         stats={[

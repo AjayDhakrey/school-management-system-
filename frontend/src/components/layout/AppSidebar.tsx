@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { ChevronDown, LogOut, MoreVertical, User } from "lucide-react";
+import { LogOut, MoreVertical, User } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { useAuth, toDisplayRole } from "@/lib/auth-context";
 import { navForRole, PROFILE_PATH_FOR_ROLE } from "@/lib/navigation";
@@ -28,94 +27,51 @@ export function SidebarNav({
   const { pathname } = useLocation();
   const groups = navForRole(toDisplayRole(user));
 
-  // Collapsible ("dropdown") groups start open only if they contain the active route —
-  // this only affects groups that opt in via `collapsible: true` (currently just the
-  // School Admin sidebar), every other role's groups render exactly as before.
-  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
-    const initial = new Set<string>();
-    for (const g of groups) {
-      if (g.collapsible && g.items.some((item) => pathname.startsWith(item.to))) {
-        initial.add(g.label);
-      }
-    }
-    return initial;
-  });
-
-  function toggleGroup(label: string) {
-    setOpenGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
-      return next;
-    });
-  }
-
   return (
     <nav
       className={cn(
         "scrollbar-slim flex-1 overflow-y-auto",
-        mobile ? "space-y-3 px-4 pb-5" : "space-y-3 px-3 pb-5",
+        mobile ? "space-y-0.5 px-4 pb-5" : "space-y-0.5 px-3 pb-5",
       )}
     >
       {groups.map((g, gi) => {
-        // In icon-only rail mode the dropdown toggle isn't shown, so always render items there.
-        const isOpen = !g.collapsible || collapsed || openGroups.has(g.label);
+        // No group headings — every group's items are listed straight through.
         return (
           <div key={g.label || gi}>
-            {g.label && !collapsed && g.collapsible && (
-              <button
-                type="button"
-                onClick={() => toggleGroup(g.label)}
-                className="flex w-full items-center justify-between rounded-lg px-3 pt-2 pb-1.5 text-[10px] font-bold tracking-[0.12em] text-muted-foreground/80 uppercase hover:text-foreground"
-              >
-                {g.label}
-                <ChevronDown
-                  className={cn(
-                    "h-3.5 w-3.5 shrink-0 transition-transform",
-                    !isOpen && "-rotate-90",
-                  )}
-                />
-              </button>
-            )}
-            {g.label && !collapsed && !g.collapsible && (
-              <p className="px-3 pt-2 pb-1.5 text-[10px] font-bold tracking-[0.12em] text-muted-foreground/80 uppercase">
-                {g.label}
-              </p>
-            )}
-            {g.label && collapsed && <div className="mx-3 my-2 h-px bg-border" />}
-            {isOpen && (
-              <ul className="space-y-0.5">
-                {g.items.map((item) => {
-                  const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
-                  return (
-                    <li key={item.to}>
-                      <Link
-                        to={item.to}
-                        onClick={() => onNavigate?.()}
-                        title={item.label}
+            <ul className="space-y-0.5">
+              {g.items.map((item) => {
+                const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+                return (
+                  <li key={item.to}>
+                    <Link
+                      to={item.to}
+                      onClick={() => onNavigate?.()}
+                      title={item.label}
+                      className={cn(
+                        "group relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
+                        mobile && "min-h-10 gap-3 px-3 text-[13px]",
+                        collapsed && "justify-center px-0",
+                        active
+                          ? "bg-primary/10 font-semibold text-primary before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary"
+                          : "text-slate-600 hover:bg-muted hover:text-slate-900 dark:text-slate-300 dark:hover:text-white",
+                      )}
+                    >
+                      <item.icon
                         className={cn(
-                          "group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition-colors",
-                          mobile && "min-h-10 gap-3 px-3 text-[13px]",
-                          collapsed && "justify-center px-0",
+                          "h-5 w-5 shrink-0 transition-colors",
                           active
-                            ? "bg-primary/10 text-foreground font-semibold"
-                            : "text-foreground/70 hover:bg-muted hover:text-foreground",
+                            ? "text-primary"
+                            : "text-slate-500 group-hover:text-slate-700 dark:text-slate-400 dark:group-hover:text-slate-200",
+                          mobile && "h-[18px] w-[18px]",
+                          !mobile && !collapsed && "h-[18px] w-[18px]",
                         )}
-                      >
-                        <item.icon
-                          className={cn(
-                            "h-5 w-5 shrink-0 text-primary",
-                            mobile && "h-[18px] w-[18px]",
-                            !mobile && !collapsed && "h-[18px] w-[18px]",
-                          )}
-                        />
-                        {!collapsed && <span className="truncate">{item.label}</span>}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                      />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         );
       })}
@@ -196,7 +152,9 @@ export function AppSidebar() {
               <span className="block truncate text-xs font-semibold text-foreground">
                 {user?.name}
               </span>
-              <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">{role}</span>
+              <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                {role}
+              </span>
             </Link>
             <DropdownMenu>
               <DropdownMenuTrigger

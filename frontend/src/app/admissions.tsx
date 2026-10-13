@@ -69,6 +69,7 @@ import {
   CalendarIcon,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { billNewStudent } from "@/lib/auto-billing";
 import { useAuth } from "@/lib/auth-context";
 import {
   useAdmissions,
@@ -454,6 +455,9 @@ function uniqueClassNames(classes: AdmissionClass[]) {
   return Array.from(new Set(classes.map((c) => c.name)));
 }
 
+/** Saved values can come back as numbers (e.g. previous_percentage 91); the form edits text. */
+const asText = (value: unknown) => (value === null || value === undefined ? "" : String(value));
+
 type NewAdmissionForm = {
   applicant: string;
   dob: string;
@@ -768,6 +772,25 @@ function AdmissionReviewPanel({
     try {
       const resp = await api.post<{ studentId: string; admissionNo: string }>(`/admissions/${admissionId}/convert`);
       toast.success(`Converted to student — Admission No. ${resp.admissionNo}`);
+      // Bill the new student straight away from their class's fee structure.
+      const placed = classes.find((c) => c.id === detail?.class_id_applied);
+      if (placed && resp.studentId) {
+        try {
+          const { count, total } = await billNewStudent({
+            studentId: resp.studentId,
+            classId: placed.id,
+            academicYearId: placed.academic_year_id,
+            admittedOn: new Date().toISOString().slice(0, 10),
+          });
+          if (count) {
+            toast.success(`Billed ${count} fee${count === 1 ? "" : "s"} (₹${total.toLocaleString()}) from the ${placed.name} fee structure`);
+          }
+        } catch (err) {
+          toast.warning(
+            `Fees couldn't be billed automatically: ${err instanceof ApiError ? err.message : "unknown error"}. Use Generate Fees on the Fee Structure page.`,
+          );
+        }
+      }
       setConvertOpen(false);
       await onChanged();
       onConverted(resp.studentId);
@@ -1109,21 +1132,21 @@ function OverviewTab({
   onSaved: () => Promise<void>;
 }) {
   const [form, setForm] = useState<NewAdmissionForm>({
-    applicant: admission.applicant,
-    dob: admission.dob ?? "",
-    gender: admission.gender ?? "",
-    address: admission.address ?? "",
-    className: admission.class_applied ?? "",
-    section: admission.section_applied ?? "",
-    academicYear: admission.academic_year ?? "",
-    parentName: admission.parent_name ?? "",
-    parentRelation: admission.parent_relation ?? "",
-    contactPhone: admission.contact_phone ?? "",
-    contactEmail: admission.contact_email ?? "",
-    previousSchool: admission.previous_school ?? "",
-    previousClass: admission.previous_class ?? "",
-    previousBoard: admission.previous_board ?? "",
-    previousPercentage: admission.previous_percentage ?? "",
+    applicant: asText(admission.applicant),
+    dob: asText(admission.dob),
+    gender: asText(admission.gender),
+    address: asText(admission.address),
+    className: asText(admission.class_applied),
+    section: asText(admission.section_applied),
+    academicYear: asText(admission.academic_year),
+    parentName: asText(admission.parent_name),
+    parentRelation: asText(admission.parent_relation),
+    contactPhone: asText(admission.contact_phone),
+    contactEmail: asText(admission.contact_email),
+    previousSchool: asText(admission.previous_school),
+    previousClass: asText(admission.previous_class),
+    previousBoard: asText(admission.previous_board),
+    previousPercentage: asText(admission.previous_percentage),
   });
   const [saving, setSaving] = useState(false);
 
@@ -1167,7 +1190,11 @@ function OverviewTab({
       setEditOpen(false);
       await onSaved();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Failed to update application");
+      toast.error(
+        err instanceof ApiError
+          ? err.message
+          : `Failed to update application${err instanceof Error ? `: ${err.message}` : ""}`,
+      );
     } finally {
       setSaving(false);
     }

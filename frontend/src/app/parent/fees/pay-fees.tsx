@@ -39,7 +39,7 @@ import {
 import { useFeesFor, useStudent, useSchoolProfile, type ApiFee } from "@/hooks/useApi";
 import { useParentChild } from "@/lib/parent-child-context";
 import { api, ApiError } from "@/lib/api";
-import { feeTitle } from "@/lib/fees";
+import { feeTitle, sortStudentFees } from "@/lib/fees";
 import { FeeReceipt } from "@/components/shared/FeeReceipt";
 import { FeeCard } from "@/components/shared/FeeCard";
 
@@ -240,7 +240,7 @@ export default function ParentPayFeesPage() {
     paidAmount?: number | undefined;
   } | null>(null);
 
-  const rows = (fees ?? []).filter((f) => f.status !== "Paid");
+  const rows = sortStudentFees((fees ?? []).filter((f) => f.status !== "Paid"));
 
   function handlePaymentDone(receiptNo?: string, paidAmount?: number) {
     const fee = payingFor;

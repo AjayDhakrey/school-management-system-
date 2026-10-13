@@ -213,7 +213,15 @@ function fail(error: DbError, status = 400): never {
 // supabase-js reports every non-2xx function response as a generic "non-2xx status code"
 // error; the function's own `{ error }` body is what the user needs to see.
 async function invokeFunction(name: string, body: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke(name, { body });
+  // Send the current (auto-refreshed) session token explicitly so the function can verify the caller.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new ApiError(401, "Session expired, please sign in again");
+  const { data, error } = await supabase.functions.invoke(name, {
+    body,
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
   if (error) {
     const response: unknown = (error as { context?: unknown }).context;
     if (response instanceof Response) {
@@ -286,6 +294,39 @@ const PAGE_SIZE = 1000;
 type Pageable = {
   range(from: number, to: number): PromiseLike<{ data: unknown[] | null; error: DbError }>;
 };
+/**
+ * A period's room is the room assigned to its class (Classes → Edit → Room), unless the period
+ * was given a different, specific room (a lab, say). Old placeholder names like "Classroom 10-A"
+ * and empty rooms give way to the class's room. If the class rooms can't be read, slots are
+ * returned unchanged.
+ */
+async function withClassRooms(slots: Row[]): Promise<Row[]> {
+  if (!Array.isArray(slots) || !slots.length) return slots;
+  const classIds = Array.from(
+    new Set(
+      slots.map((slot) => slot["class_id"]).filter((id): id is string => typeof id === "string"),
+    ),
+  );
+  if (!classIds.length) return slots;
+  const { data, error } = await supabase
+    .from("classes")
+    .select("id,rooms(name)")
+    .in("id", classIds);
+  if (error || !data) return slots;
+  const roomByClass = new Map<string, string>();
+  for (const row of data as Row[]) {
+    const room = row["rooms"] as { name?: string } | { name?: string }[] | null;
+    const name = Array.isArray(room) ? room[0]?.name : room?.name;
+    if (typeof row["id"] === "string" && name) roomByClass.set(row["id"], name);
+  }
+  return slots.map((slot) => {
+    const classRoom = roomByClass.get(String(slot["class_id"] ?? ""));
+    const own = typeof slot["room"] === "string" ? slot["room"].trim() : "";
+    if (!classRoom || (own && !/^classroom\b/i.test(own))) return slot;
+    return { ...slot, room: classRoom };
+  });
+}
+
 async function selectAll(build: () => Pageable): Promise<Row[]> {
   const all: Row[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
@@ -803,7 +844,13 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
         flatten(row, "rooms", { name: "room_name" });
         flatten(row, "teachers", { name: "class_teacher_name" });
       }
-      return second ? rows[0] : byKeys(rows, "name", "section", "id");
+      if (second) return rows[0];
+      // Archived classes (removed while past records still used them) stay out of every class
+      // list and dropdown; pass ?includeArchived=1 to get them too.
+      const listed = param("includeArchived")
+        ? rows
+        : rows.filter((row) => row["status"] !== "ARCHIVED");
+      return byKeys(listed, "name", "section", "id");
     }
 
     case "rooms":
@@ -1439,15 +1486,19 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
 
     case "timetable": {
       // One class's full timetable with each period's teacher name (teacher's class view).
-      if (second === "class" && third) return rpc("class_timetable", { p_class_id: third });
+      if (second === "class" && third) {
+        return withClassRooms(await rpc<Row[]>("class_timetable", { p_class_id: third }));
+      }
       const child = await ownedChild(param("studentId"));
       if (param("studentId") && child && !child["class_id"]) return [];
-      return selectAll(() => {
-        let query = supabase.from("timetable_slots").select("*");
-        if (typeof child?.["class_id"] === "string")
-          query = query.eq("class_id", child["class_id"]);
-        return query.order("day").order("period").order("id");
-      });
+      return withClassRooms(
+        await selectAll(() => {
+          let query = supabase.from("timetable_slots").select("*");
+          if (typeof child?.["class_id"] === "string")
+            query = query.eq("class_id", child["class_id"]);
+          return query.order("day").order("period").order("id");
+        }),
+      );
     }
 
     case "transport": {
@@ -1685,6 +1736,8 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
         "board",
         "affiliation",
       ]);
+      // School timings (School Settings → School Timings) are JSON, not text.
+      const timings = body["timings"];
       for (const [key, value] of Object.entries(update)) {
         if (value !== null && typeof value !== "string") {
           throw new ApiError(400, `${key} must be a string within the allowed length`);
@@ -1697,6 +1750,12 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
           throw new ApiError(400, `${key} must be a valid HTTP(S) URL`);
         }
         update[key] = text;
+      }
+      if (timings !== undefined) {
+        if (timings !== null && (typeof timings !== "object" || Array.isArray(timings))) {
+          throw new ApiError(400, "timings must be an object");
+        }
+        update["timings"] = timings;
       }
       if (!Object.keys(update).length) throw new ApiError(400, "No valid fields to update");
       return updateRow("schools", current.school_id, update);
@@ -2276,7 +2335,7 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
         if (!Object.keys(update).length) throw new ApiError(400, "No valid fields to update");
         return updateRow("students", current.linked_student_id, blanksToNull(update));
       }
-      if (method === "DELETE" && second) return rpc("delete_student", { p_student_id: second });
+      if (method === "DELETE" && second) return deleteStudent(second);
       if (method === "POST" || method === "PATCH") return saveStudent(method, second, values());
       break;
 
@@ -2363,7 +2422,9 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
           previousVehicleId = (existing?.assigned_vehicle_id as string | null) ?? null;
         }
         const row =
-          method === "POST" ? await insertRow(table, input) : await updateRow(table, second!, input);
+          method === "POST"
+            ? await insertRow(table, input)
+            : await updateRow(table, second!, input);
         if (table === "transport_drivers") {
           const newVehicleId = (row["assigned_vehicle_id"] as string | null) ?? null;
           if (previousVehicleId && previousVehicleId !== newVehicleId) {
@@ -2444,7 +2505,8 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
             update["resolved_at"] = new Date().toISOString();
           }
         }
-        if (input["resolution_notes"] !== undefined) update["resolution_notes"] = input["resolution_notes"];
+        if (input["resolution_notes"] !== undefined)
+          update["resolution_notes"] = input["resolution_notes"];
         if (!Object.keys(update).length) throw new ApiError(400, "Nothing to update");
         return updateRow("transport_complaints", second, update);
       }
@@ -2547,7 +2609,10 @@ async function syncVehicleDriverFields(vehicleId: string) {
     .select("name,phone")
     .eq("assigned_vehicle_id", vehicleId)
     .maybeSingle();
-  await updateRow("vehicles", vehicleId, { driver: data?.name ?? null, driver_phone: data?.phone ?? null });
+  await updateRow("vehicles", vehicleId, {
+    driver: data?.name ?? null,
+    driver_phone: data?.phone ?? null,
+  });
 }
 
 function pick(values: Row, keys: string[]) {
@@ -2739,6 +2804,42 @@ async function createLeave(body: Row) {
     reason,
   });
   return { id: row["id"] };
+}
+
+/**
+ * Permanently deletes a student. Their fees, payments, attendance, results and other records go
+ * with them (foreign keys cascade), and their student portal login is removed so it isn't left
+ * pointing at nothing. Unlike the old delete_student RPC this never falls back to archiving.
+ */
+async function deleteStudent(studentId: string) {
+  // Preferred: the database does it all in one transaction (migration 61), including the login.
+  try {
+    await rpc("delete_student_permanently", { p_student_id: studentId });
+    return { archived: false };
+  } catch (err) {
+    const missing =
+      err instanceof ApiError &&
+      /delete_student_permanently|schema cache|could not find the function/i.test(err.message);
+    if (!missing) throw err;
+  }
+
+  // Fallback until migration 61 is applied: delete directly, then remove the login.
+  const { data: logins } = await supabase
+    .from("user_profiles")
+    .select("id")
+    .eq("linked_student_id", studentId);
+
+  const { data, error } = await supabase.from("students").delete().eq("id", studentId).select("id");
+  if (error) fail(error);
+  if (!data?.length)
+    throw new ApiError(404, "Student not found or you don't have permission to delete it");
+
+  for (const login of (logins ?? []) as { id: string }[]) {
+    await invokeFunction("manage-user-login", { action: "delete", user_id: login.id }).catch(
+      () => undefined,
+    );
+  }
+  return { archived: false };
 }
 
 // Students form: the class decides class_name/section/academic year (database trigger), and a

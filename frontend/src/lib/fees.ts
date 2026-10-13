@@ -12,6 +12,10 @@ export const FEE_CATEGORIES = [
   "Hostel",
   "Other",
 ] as const;
+/** How a stored category reads on screen ("Tuition" is the database value for the school fee). */
+export const categoryLabel = (category: string) =>
+  category === "Tuition" ? "School Fee" : category;
+
 export const FEE_FREQUENCIES = ["Monthly", "Quarterly", "Term", "Annual", "One-Time"] as const;
 
 export const DEFAULT_DUE_DAY = 10;
@@ -114,6 +118,29 @@ export function academicTerms(months: BillingMonth[], yearName: string): Billing
   return terms;
 }
 
+export type StudentFeeStatus = "No fees" | "Paid" | "Partial" | "Pending" | "Overdue";
+
+/**
+ * A student's fee status worked out from their actual bills — the stored students.fee_status
+ * column is only ever its default ("Pending") and never kept up to date.
+ */
+export function feeStatusOf(fees: ApiFee[]): StudentFeeStatus {
+  let billed = 0;
+  let paid = 0;
+  let overdue = false;
+  for (const f of fees) {
+    const bill = Math.max(0, f.amount - f.discount + f.fine);
+    const got = Math.min(f.paid_amount ?? (f.status === "Paid" ? bill : 0), bill);
+    billed += bill;
+    paid += got;
+    if (got < bill && (f.calculated_status ?? f.status) === "Overdue") overdue = true;
+  }
+  if (billed === 0) return "No fees";
+  if (paid >= billed) return "Paid";
+  if (overdue) return "Overdue";
+  return paid > 0 ? "Partial" : "Pending";
+}
+
 /** Month a generated monthly fee covers ("April 2026"), or null for other fees. */
 export function billingMonthOf(fee: Pick<ApiFee, "description">) {
   return fee.description && MONTH_LABEL.test(fee.description) ? fee.description : null;
@@ -146,10 +173,64 @@ export function billingPeriodOf(fee: Pick<ApiFee, "description">) {
 }
 
 /**
- * Fee name as shown to people: "Tuition Fee · April 2026", "Examination Fee · Term 1 (2026-2027)",
+ * Fee name as shown to people: "Monthly School Fee · April 2026", "Examination Fee · Term 1 (2026-2027)",
  * "Transport Fee · Annual (2026-2027)", "Admission Fee · One-time".
  */
 export function feeTitle(fee: Pick<ApiFee, "fee_type" | "description">) {
   const period = billingPeriodOf(fee);
-  return period ? `${fee.fee_type} · ${period}` : fee.fee_type;
+  const name = feeName(fee);
+  return period ? `${name} · ${period}` : name;
+}
+
+export type FeeKind = "month" | "term" | "year" | "once";
+const AMOUNT_ONLY = /^[\s₹$,.\d-]+$/;
+
+/**
+ * A fee head's display name. Some heads were saved with an amount typed into the name box
+ * (e.g. "15,000"); those show as what they are — "Monthly School Fee", "Term Fee", … — instead.
+ */
+export function displayFeeName(name: string, kind?: FeeKind | null) {
+  if (!AMOUNT_ONLY.test(name.trim())) return name;
+  switch (kind) {
+    case "term":
+      return "Term Fee";
+    case "year":
+      return "Annual Fee";
+    case "once":
+      return "One-time Fee";
+    default:
+      return "Monthly School Fee";
+  }
+}
+
+/**
+ * The order a student's fees are listed in: admission (one-time) fees first, then the monthly
+ * school fee, then transport, then everything else — each group in due-date order.
+ */
+export function sortStudentFees<T extends ApiFee>(fees: T[]): T[] {
+  const rank = (f: ApiFee) => {
+    const name = feeName(f).toLowerCase();
+    if (f.description === ONE_TIME_LABEL || name.includes("admission")) return 0;
+    if (billingMonthOf(f) && (name.includes("school") || name.includes("tuition"))) return 1;
+    if (name.includes("transport") || name.includes("bus")) return 2;
+    return 3;
+  };
+  return [...fees].sort(
+    (a, b) => rank(a) - rank(b) || (a.due_date ?? "").localeCompare(b.due_date ?? ""),
+  );
+}
+
+/** A bill's fee name for display (see displayFeeName). */
+export function feeName(fee: Pick<ApiFee, "fee_type" | "description">) {
+  const kind: FeeKind | null =
+    fee.description === ONE_TIME_LABEL
+      ? "once"
+      : isAnnualFee(fee)
+        ? "year"
+        : billingTermOf(fee)
+          ? "term"
+          : billingMonthOf(fee)
+            ? "month"
+            : null;
+  return displayFeeName(fee.fee_type, kind);
 }

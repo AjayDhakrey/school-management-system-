@@ -70,9 +70,13 @@ import {
   Trash2,
   Ban,
   Lock,
+  Check,
   ShieldAlert,
   MapPin,
   School,
+  Printer,
+  BookOpen,
+  DoorOpen,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -96,23 +100,33 @@ import {
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { escapeHtml, printHtml } from "@/lib/print";
+import { useSchoolBranding, type SchoolBranding } from "@/hooks/use-school-branding";
 
-// Mirrors public.exam_type_options() in supabase/migrations/54_exam_scheduling.sql.
+// The exams CBSE and UP Board schools actually hold. Values are the stored exam types allowed
+// by public.exam_type_options() (supabase/migrations/54_exam_scheduling.sql); labels are what
+// the school calls them.
 const EXAM_TYPES = [
-  "Unit Test",
-  "Monthly Test",
   "Periodic Test",
+  "Monthly Test",
   "Mid-Term",
   "Half-Yearly",
   "Pre-Final",
-  "End-Term",
   "Final",
   "Practical",
-  "Re-Test",
-  "Improvement",
   "Compartment",
-  "Other",
 ];
+const EXAM_TYPE_LABEL: Record<string, string> = {
+  "Periodic Test": "Periodic Test (PT)",
+  "Monthly Test": "Monthly Test",
+  "Mid-Term": "Quarterly Exam",
+  "Half-Yearly": "Half-Yearly Exam",
+  "Pre-Final": "Pre-Board Exam",
+  Final: "Annual Exam",
+  Practical: "Practical Exam",
+  Compartment: "Compartment Exam",
+};
+const examTypeLabel = (type: string) => EXAM_TYPE_LABEL[type] ?? type;
 // Exams that repeat an earlier one; they get their own papers and marks, the original is kept.
 const REPEAT_TYPES = ["Re-Test", "Improvement", "Compartment"];
 const TERM_SUGGESTIONS = [
@@ -638,9 +652,13 @@ function ExaminationFormDialog({
                   <SelectValue placeholder="Select exam type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {EXAM_TYPES.map((t) => (
+                  {/* An older exam may have a type that's no longer offered — keep it selectable. */}
+                  {(examType && !EXAM_TYPES.includes(examType)
+                    ? [...EXAM_TYPES, examType]
+                    : EXAM_TYPES
+                  ).map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {examTypeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -762,29 +780,80 @@ function ExaminationFormDialog({
                 No active classes in this academic year.
               </p>
             ) : (
-              <div className="grid max-h-60 gap-2 overflow-y-auto rounded-xl border border-border p-3 sm:grid-cols-2">
+              <div className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto rounded-2xl border border-border bg-muted/20 p-2 sm:grid-cols-3">
                 {classGroups.map(([groupName, group]) => {
-                  const all = group.every((c) => classIds.includes(c.id));
+                  const picked = group.filter((c) => classIds.includes(c.id)).length;
+                  const all = picked === group.length;
                   return (
-                    <div key={groupName} className="rounded-lg bg-muted/40 p-2">
-                      <label className="mb-1 flex items-center gap-2 text-sm font-medium">
-                        <Checkbox
-                          checked={all}
-                          onCheckedChange={(v) => toggleGroup(group, v === true)}
-                        />
-                        {groupName}
-                      </label>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 pl-6">
-                        {group.map((c) => (
-                          <label key={c.id} className="flex items-center gap-1.5 text-xs">
-                            <Checkbox
-                              checked={classIds.includes(c.id)}
-                              disabled={usedClassIds.has(c.id) && classIds.includes(c.id)}
-                              onCheckedChange={(v) => toggleClass(c.id, v === true)}
-                            />
-                            Section {c.section}
-                          </label>
-                        ))}
+                    <div
+                      key={groupName}
+                      className={cn(
+                        "rounded-xl border bg-card p-2.5 transition-colors",
+                        picked ? "border-primary/50 ring-1 ring-primary/20" : "border-border",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group, !all)}
+                        className="flex w-full items-center gap-2 text-left"
+                      >
+                        <span
+                          className={cn(
+                            "grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-colors",
+                            all
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : picked
+                                ? "border-primary bg-primary/15 text-primary"
+                                : "border-muted-foreground/40",
+                          )}
+                        >
+                          {all ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : picked ? (
+                            <span className="h-0.5 w-2.5 rounded bg-current" />
+                          ) : null}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold capitalize">
+                          {groupName}
+                        </span>
+                        <span
+                          className={cn(
+                            "shrink-0 text-[10px] font-semibold tabular-nums",
+                            picked ? "text-primary" : "text-muted-foreground",
+                          )}
+                        >
+                          {picked}/{group.length}
+                        </span>
+                      </button>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {group.map((c) => {
+                          const on = classIds.includes(c.id);
+                          const locked = usedClassIds.has(c.id) && on;
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              disabled={locked}
+                              title={
+                                locked ? "Has papers — can't be removed" : `Section ${c.section}`
+                              }
+                              onClick={() => toggleClass(c.id, !on)}
+                              className={cn(
+                                "inline-flex min-w-9 items-center justify-center gap-1 rounded-lg border px-2 py-1 text-xs font-semibold transition-colors disabled:cursor-not-allowed",
+                                on
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-primary",
+                              )}
+                            >
+                              {locked ? (
+                                <Lock className="h-3 w-3" />
+                              ) : (
+                                on && <Check className="h-3 w-3" />
+                              )}
+                              {c.section}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -877,10 +946,12 @@ function ExaminationsTab({
     });
   }
 
-  function remove(x: ApiExamination) {
+  function remove(x: ApiExamination, paperCount: number) {
     confirm.ask({
       title: "Delete examination?",
-      description: `"${x.name}" will be removed. This cannot be undone.`,
+      description: paperCount
+        ? `"${x.name}" and its ${paperCount} paper${paperCount === 1 ? "" : "s"} — including any marks and published results — will be permanently deleted. This cannot be undone.`
+        : `"${x.name}" will be removed. This cannot be undone.`,
       confirmLabel: "Delete",
       destructive: true,
       run: async () => {
@@ -966,7 +1037,7 @@ function ExaminationsTab({
                   <div className="min-w-0">
                     <p className="truncate font-semibold">{x.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {x.exam_type}
+                      {examTypeLabel(x.exam_type)}
                       {x.term ? ` · ${x.term}` : ""}
                       {x.academic_year_name ? ` · ${x.academic_year_name}` : ""}
                     </p>
@@ -1003,8 +1074,7 @@ function ExaminationsTab({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive focus:text-destructive"
-                          disabled={allPapers.length > 0}
-                          onSelect={() => remove(x)}
+                          onSelect={() => remove(x, allPapers.length)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" /> Delete
                         </DropdownMenuItem>
@@ -1119,6 +1189,14 @@ function PaperFormDialog({
   const [invigilatorId, setInvigilatorId] = useState("");
   const [instructions, setInstructions] = useState("");
   const [saving, setSaving] = useState(false);
+  // Date sheet (new papers): one subject per exam day across a date range.
+  const [rangeFrom, setRangeFrom] = useState("");
+  const [rangeTo, setRangeTo] = useState("");
+  const [skipSundays, setSkipSundays] = useState(true);
+  const [sheet, setSheet] = useState<Record<string, string>>({});
+  // Per section: the room it sits in and who invigilates (new papers).
+  const [sectionRoom, setSectionRoom] = useState<Record<string, string>>({});
+  const [sectionInvigilator, setSectionInvigilator] = useState<Record<string, string>>({});
 
   const pct = examination.passing_percentage;
   const suggestPass = (max: string) => {
@@ -1139,6 +1217,12 @@ function PaperFormDialog({
     setRoomId(initial?.room_id ?? "");
     setInvigilatorId(initial?.invigilator_id ?? "");
     setInstructions(initial?.instructions ?? "");
+    setRangeFrom(examination.start_date);
+    setRangeTo(examination.end_date);
+    setSkipSundays(true);
+    setSheet({});
+    setSectionRoom({});
+    setSectionInvigilator({});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial]);
 
@@ -1171,17 +1255,81 @@ function PaperFormDialog({
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [classIds, mappings]);
 
+  // Every exam day in the chosen range (Sundays left out unless asked for).
+  const sheetDates = useMemo(() => {
+    const out: string[] = [];
+    if (!rangeFrom || !rangeTo || rangeTo < rangeFrom) return out;
+    const d = new Date(`${rangeFrom}T00:00:00Z`);
+    const end = new Date(`${rangeTo}T00:00:00Z`);
+    while (d <= end && out.length < 62) {
+      if (!(skipSundays && d.getUTCDay() === 0)) out.push(d.toISOString().slice(0, 10));
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
+    return out;
+  }, [rangeFrom, rangeTo, skipSundays]);
+
+  // Fill the date sheet in order — first subject on the first day, and so on.
+  const autoFill = () =>
+    setSheet(Object.fromEntries(sheetDates.map((d, i) => [d, subjectOptions[i]?.id ?? ""])));
+  const sheetKey = `${classIds.join(",")}|${sheetDates.join(",")}|${subjectOptions.map((o) => o.id).join(",")}`;
+  useEffect(() => {
+    if (!initial) autoFill();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetKey]);
+
+  const sheetRows = sheetDates
+    .map((d) => ({ date: d, subjectId: sheet[d] ?? "" }))
+    .filter((r) => r.subjectId);
+  const usedSubjects = new Set(sheetRows.map((r) => r.subjectId));
+  const unscheduled = subjectOptions.filter((o) => !usedSubjects.has(o.id));
+  const duplicate = sheetRows.length !== usedSubjects.size;
+
+  /** A section's exam room: what was picked here, else the room the class sits in. */
+  const roomFor = (classId: string) => {
+    if (classId in sectionRoom) return sectionRoom[classId] ?? "";
+    const own = classes.find((c) => c.id === classId)?.room_id ?? "";
+    return rooms.some((r) => r.id === own) ? own : "";
+  };
+  const roomLabel = (id: string) => {
+    const r = rooms.find((x) => x.id === id);
+    return r ? `${r.name}${r.number ? ` (${r.number})` : ""}` : "";
+  };
+  // Two sections can't sit in the same room at the same time.
+  const roomClash = (() => {
+    const seen = new Map<string, string>();
+    for (const id of classIds) {
+      const room = roomFor(id);
+      if (!room) continue;
+      if (seen.has(room)) return roomLabel(room);
+      seen.set(room, id);
+    }
+    return "";
+  })();
+
   const multi = classIds.length > 1;
   const max = Number(maxMarks);
   const pass = Number(passMarks);
   const problems: string[] = [];
   if (classIds.length === 0) problems.push("Select a class");
-  if (!subjectId) problems.push("Select a subject");
-  if (!date) problems.push("Choose the exam date");
-  else if (date < examination.start_date || date > examination.end_date)
-    problems.push(
-      `Date must be between ${fmtDate(examination.start_date)} and ${fmtDate(examination.end_date)}`,
-    );
+  if (initial) {
+    if (!subjectId) problems.push("Select a subject");
+    if (!date) problems.push("Choose the exam date");
+    else if (date < examination.start_date || date > examination.end_date)
+      problems.push(
+        `Date must be between ${fmtDate(examination.start_date)} and ${fmtDate(examination.end_date)}`,
+      );
+  } else {
+    if (!rangeFrom || !rangeTo) problems.push("Choose the first and last exam date");
+    else if (rangeTo < rangeFrom) problems.push("The last exam date is before the first");
+    else if (rangeFrom < examination.start_date || rangeTo > examination.end_date)
+      problems.push(
+        `Dates must be between ${fmtDate(examination.start_date)} and ${fmtDate(examination.end_date)}`,
+      );
+    if (classIds.length && !sheetRows.length) problems.push("Pick a subject for at least one day");
+    if (duplicate) problems.push("A subject is on more than one day — each subject once");
+    if (roomClash)
+      problems.push(`${roomClash} is set for two sections — give each section its own room`);
+  }
   if (!startTime || !endTime) problems.push("Enter start and end time");
   else if (endTime <= startTime) problems.push("End time must be after start time");
   if (!(max > 0)) problems.push("Maximum marks must be greater than 0");
@@ -1213,25 +1361,37 @@ function PaperFormDialog({
         toast.success("Paper updated");
       } else {
         const failures: string[] = [];
-        for (const classId of classIds) {
-          try {
-            await api.post("/exams", { ...body, examinationId: examination.id, classId });
-          } catch (err) {
-            failures.push(
-              `${classLabel(classes.find((c) => c.id === classId))}: ${errorMessage(err, "failed")}`,
-            );
+        const done = new Set<string>();
+        const subjectName = (id: string) => subjectOptions.find((o) => o.id === id)?.label ?? "";
+        for (const row of sheetRows) {
+          for (const classId of classIds) {
+            try {
+              await api.post("/exams", {
+                ...body,
+                subjectId: row.subjectId,
+                date: row.date,
+                examinationId: examination.id,
+                classId,
+                roomId: roomFor(classId) || null,
+                invigilatorId: sectionInvigilator[classId] || null,
+              });
+              done.add(row.date);
+            } catch (err) {
+              failures.push(
+                `${classLabel(classes.find((c) => c.id === classId))} · ${subjectName(row.subjectId)}: ${errorMessage(err, "failed")}`,
+              );
+            }
           }
         }
-        const created = classIds.length - failures.length;
+        const created = sheetRows.length * classIds.length - failures.length;
         if (created > 0)
           toast.success(created === 1 ? "Paper scheduled" : `${created} papers scheduled`);
         if (failures.length) {
-          toast.error(failures.join("\n"), { duration: 8000 });
+          toast.error(failures.slice(0, 6).join("\n"), { duration: 10000 });
           await queryClient.invalidateQueries({ queryKey: ["exams"] });
-          setClassIds(
-            classIds.filter((id) =>
-              failures.some((f) => f.startsWith(classLabel(classes.find((c) => c.id === id)))),
-            ),
+          // Keep only the days that still need attention.
+          setSheet((prev) =>
+            Object.fromEntries(Object.entries(prev).filter(([d]) => !done.has(d))),
           );
           return;
         }
@@ -1255,7 +1415,7 @@ function PaperFormDialog({
         </DialogHeader>
         <div className="grid gap-4">
           <div>
-            <Label className="mb-1.5 text-xs">{initial ? "Class" : "Class & Section *"}</Label>
+            <Label className="mb-1.5 text-xs">{initial ? "Class" : "Class *"}</Label>
             {initial ? (
               <p className="rounded-lg bg-muted px-3 py-2 text-sm">
                 {classLabel(classes.find((c) => c.id === initial.class_id))}
@@ -1266,67 +1426,229 @@ function PaperFormDialog({
               </p>
             ) : (
               <>
-                <div className="flex max-h-40 flex-wrap gap-x-4 gap-y-2 overflow-y-auto rounded-xl border border-border p-3">
-                  {examClasses.map((c) => (
-                    <label key={c.id} className="flex items-center gap-1.5 text-sm">
-                      <Checkbox
-                        checked={classIds.includes(c.id)}
-                        onCheckedChange={(v) => {
-                          setClassIds((prev) =>
-                            v === true ? [...prev, c.id] : prev.filter((id) => id !== c.id),
-                          );
-                          setSubjectId("");
-                        }}
-                      />
-                      {classLabel(c)}
-                    </label>
-                  ))}
+                {/* One choice per class — picking a class schedules the paper for all its sections. */}
+                <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-xl border border-border p-2.5">
+                  {Array.from(
+                    examClasses.reduce((map, c) => {
+                      map.set(c.name, [...(map.get(c.name) ?? []), c.id]);
+                      return map;
+                    }, new Map<string, string[]>()),
+                  )
+                    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+                    .map(([name, ids]) => {
+                      const on = ids.every((id) => classIds.includes(id));
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => {
+                            setClassIds((prev) =>
+                              on
+                                ? prev.filter((id) => !ids.includes(id))
+                                : [...prev.filter((id) => !ids.includes(id)), ...ids],
+                            );
+                            setSubjectId("");
+                          }}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium capitalize transition-colors",
+                            on
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-card text-foreground/80 hover:border-primary/40 hover:text-primary",
+                          )}
+                        >
+                          {on && <Check className="h-3.5 w-3.5" />}
+                          {name}
+                        </button>
+                      );
+                    })}
                 </div>
                 <p className="mt-1 text-[11px] text-muted-foreground">
-                  Select several sections to schedule the same paper for all of them at once.
+                  The paper is scheduled for every section of each class you pick.
                 </p>
               </>
             )}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label className="mb-1.5 text-xs">Subject *</Label>
-              <Select
-                value={subjectId}
-                onValueChange={setSubjectId}
-                disabled={classIds.length === 0}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue
-                    placeholder={classIds.length ? "Select subject" : "Select a class first"}
+            {initial ? (
+              <>
+                <div className="sm:col-span-2">
+                  <Label className="mb-1.5 text-xs">Subject *</Label>
+                  <Select
+                    value={subjectId}
+                    onValueChange={setSubjectId}
+                    disabled={classIds.length === 0}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue
+                        placeholder={classIds.length ? "Select subject" : "Select a class first"}
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjectOptions.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {classIds.length > 0 && subjectOptions.length === 0 && (
+                    <p className="mt-1 text-[11px] text-destructive">
+                      No subject is assigned to all selected classes. Assign subjects under Subjects
+                      first.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <Label className="mb-1.5 text-xs">Exam Date *</Label>
+                  <Input
+                    type="date"
+                    className="h-9"
+                    value={date}
+                    min={examination.start_date}
+                    max={examination.end_date}
+                    onChange={(e) => setDate(e.target.value)}
                   />
-                </SelectTrigger>
-                <SelectContent>
-                  {subjectOptions.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {classIds.length > 0 && subjectOptions.length === 0 && (
-                <p className="mt-1 text-[11px] text-destructive">
-                  No subject is assigned to all selected classes. Assign subjects under Subjects
-                  first.
-                </p>
-              )}
-            </div>
-            <div>
-              <Label className="mb-1.5 text-xs">Exam Date *</Label>
-              <Input
-                type="date"
-                className="h-9"
-                value={date}
-                min={examination.start_date}
-                max={examination.end_date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </div>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2.5 sm:col-span-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="mb-1.5 text-xs">First exam date *</Label>
+                    <Input
+                      type="date"
+                      className="h-9"
+                      value={rangeFrom}
+                      min={examination.start_date}
+                      max={examination.end_date}
+                      onChange={(e) => setRangeFrom(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1.5 text-xs">Last exam date *</Label>
+                    <Input
+                      type="date"
+                      className="h-9"
+                      value={rangeTo}
+                      min={rangeFrom || examination.start_date}
+                      max={examination.end_date}
+                      onChange={(e) => setRangeTo(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 text-xs font-medium">
+                    <Checkbox
+                      checked={skipSundays}
+                      onCheckedChange={(v) => setSkipSundays(v === true)}
+                    />
+                    Skip Sundays
+                  </label>
+                  {classIds.length > 0 && (
+                    <p className="text-[11px] text-muted-foreground">
+                      <b className="text-foreground">{subjectOptions.length}</b> subjects ·{" "}
+                      <b className="text-foreground">{sheetDates.length}</b> exam days
+                    </p>
+                  )}
+                </div>
+
+                {classIds.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-border p-3 text-center text-xs text-muted-foreground">
+                    Pick a class above to build its date sheet.
+                  </p>
+                ) : subjectOptions.length === 0 ? (
+                  <p className="rounded-xl border border-dashed border-destructive/40 p-3 text-xs text-destructive">
+                    No subject is assigned to all selected classes. Assign subjects under Subjects
+                    first.
+                  </p>
+                ) : (
+                  <div className="overflow-hidden rounded-xl border border-border">
+                    <div className="flex items-center justify-between gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
+                      <p className="text-xs font-semibold">Date sheet</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={autoFill}
+                      >
+                        Auto-fill
+                      </Button>
+                    </div>
+                    <ul className="max-h-72 divide-y divide-border overflow-y-auto">
+                      {sheetDates.map((d) => {
+                        const day = new Date(`${d}T00:00:00Z`);
+                        const value = sheet[d] ?? "";
+                        const clash =
+                          value && sheetRows.filter((r) => r.subjectId === value).length > 1;
+                        return (
+                          <li key={d} className="flex items-center gap-3 px-3 py-2">
+                            <div className="w-24 shrink-0">
+                              <p className="text-sm font-semibold">
+                                {day.toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  timeZone: "UTC",
+                                })}
+                              </p>
+                              <p
+                                className={cn(
+                                  "text-[11px]",
+                                  day.getUTCDay() === 0
+                                    ? "font-semibold text-destructive"
+                                    : "text-muted-foreground",
+                                )}
+                              >
+                                {day.toLocaleDateString("en-IN", {
+                                  weekday: "long",
+                                  timeZone: "UTC",
+                                })}
+                              </p>
+                            </div>
+                            <Select
+                              value={value || "none"}
+                              onValueChange={(v) =>
+                                setSheet((prev) => ({ ...prev, [d]: v === "none" ? "" : v }))
+                              }
+                            >
+                              <SelectTrigger
+                                className={cn(
+                                  "h-9 flex-1",
+                                  clash && "border-destructive text-destructive",
+                                  !value && "text-muted-foreground",
+                                )}
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No exam</SelectItem>
+                                {subjectOptions.map((o) => (
+                                  <SelectItem key={o.id} value={o.id}>
+                                    {o.label}
+                                    {usedSubjects.has(o.id) && o.id !== value
+                                      ? " · already set"
+                                      : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {unscheduled.length > 0 && (
+                      <p className="border-t border-border bg-warning-soft/40 px-3 py-2 text-[11px] text-warning">
+                        Not on the date sheet: {unscheduled.map((o) => o.label).join(", ")}
+                        {sheetDates.length < subjectOptions.length
+                          ? ` — add ${subjectOptions.length - sheetDates.length} more day${subjectOptions.length - sheetDates.length === 1 ? "" : "s"} to fit every subject.`
+                          : ""}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <Label className="mb-1.5 text-xs">Start Time *</Label>
@@ -1377,51 +1699,128 @@ function PaperFormDialog({
                 Suggested from {pct}% of maximum marks.
               </p>
             </div>
-            <div>
-              <Label className="mb-1.5 text-xs">Room</Label>
-              <Select
-                value={roomId || "none"}
-                onValueChange={(v) => setRoomId(v === "none" ? "" : v)}
-                disabled={multi}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Optional" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No room</SelectItem>
-                  {rooms.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.name}
-                      {r.number ? ` (${r.number})` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="mb-1.5 text-xs">Invigilator</Label>
-              <Select
-                value={invigilatorId || "none"}
-                onValueChange={(v) => setInvigilatorId(v === "none" ? "" : v)}
-                disabled={multi}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Optional" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No invigilator</SelectItem>
-                  {teachers.map((t) => (
-                    <SelectItem key={t.id} value={t.id}>
-                      {t.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {multi && (
-              <p className="text-[11px] text-muted-foreground sm:col-span-2">
-                Room and invigilator are set per section — edit each paper after scheduling.
-              </p>
+            {initial ? (
+              <>
+                <div>
+                  <Label className="mb-1.5 text-xs">Room</Label>
+                  <Select
+                    value={roomId || "none"}
+                    onValueChange={(v) => setRoomId(v === "none" ? "" : v)}
+                    disabled={multi}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Optional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No room</SelectItem>
+                      {rooms.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name}
+                          {r.number ? ` (${r.number})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="mb-1.5 text-xs">Invigilator</Label>
+                  <Select
+                    value={invigilatorId || "none"}
+                    onValueChange={(v) => setInvigilatorId(v === "none" ? "" : v)}
+                    disabled={multi}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Optional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No invigilator</SelectItem>
+                      {teachers.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            ) : (
+              classIds.length > 0 && (
+                <div className="sm:col-span-2">
+                  <Label className="mb-1.5 text-xs">Room &amp; invigilator for each section</Label>
+                  <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+                    {classIds
+                      .map((id) => classes.find((c) => c.id === id))
+                      .filter((c): c is ApiClass => Boolean(c))
+                      .sort((x, y) =>
+                        classLabel(x).localeCompare(classLabel(y), undefined, { numeric: true }),
+                      )
+                      .map((c) => {
+                        const room = roomFor(c.id);
+                        const clash = room && roomClash === roomLabel(room);
+                        return (
+                          <li
+                            key={c.id}
+                            className="grid grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,1fr)] items-center gap-2 px-3 py-2"
+                          >
+                            <span className="text-sm font-semibold capitalize">
+                              {classLabel(c)}
+                            </span>
+                            <Select
+                              value={room || "none"}
+                              onValueChange={(v) =>
+                                setSectionRoom((p) => ({ ...p, [c.id]: v === "none" ? "" : v }))
+                              }
+                            >
+                              <SelectTrigger
+                                className={cn(
+                                  "h-9",
+                                  clash && "border-destructive text-destructive",
+                                )}
+                              >
+                                <SelectValue placeholder="Room" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No room</SelectItem>
+                                {rooms.map((r) => (
+                                  <SelectItem key={r.id} value={r.id}>
+                                    {r.name}
+                                    {r.number ? ` (${r.number})` : ""}
+                                    {r.id === c.room_id ? " · class room" : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={sectionInvigilator[c.id] || "none"}
+                              onValueChange={(v) =>
+                                setSectionInvigilator((p) => ({
+                                  ...p,
+                                  [c.id]: v === "none" ? "" : v,
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="h-9">
+                                <SelectValue placeholder="Invigilator" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">No invigilator</SelectItem>
+                                {teachers.map((t) => (
+                                  <SelectItem key={t.id} value={t.id}>
+                                    {t.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Each section&apos;s own classroom is filled in for you; the room applies to
+                    every day on the date sheet.
+                  </p>
+                </div>
+              )
             )}
             <div className="sm:col-span-2">
               <Label className="mb-1.5 text-xs">Instructions</Label>
@@ -1440,12 +1839,343 @@ function PaperFormDialog({
           </Button>
           <Button onClick={save} disabled={saving}>
             <Save className="mr-1.5 h-4 w-4" />
-            {saving ? "Saving…" : initial ? "Save Paper" : "Schedule Paper"}
+            {saving
+              ? "Saving…"
+              : initial
+                ? "Save Paper"
+                : sheetRows.length > 1
+                  ? `Schedule ${sheetRows.length} Papers`
+                  : "Schedule Paper"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+/**
+ * The exam schedule as a date sheet — same idea as the Class Fee Structure chart: one row per
+ * exam day, one column per class (its sections merged), the subject in each cell.
+ */
+/** Class name of a paper ("class 1"), sections merged. */
+const paperClassName = (p: ApiExam, classesById: Map<string, ApiClass>) =>
+  classesById.get(p.class_id ?? "")?.name ?? paperClassLabel(p, classesById);
+
+// Date sheet colours — the same tinted bands as the Class Fee Structure chart.
+const SHEET_TONE = {
+  primary: {
+    band: "bg-primary/[0.03]",
+    accent: "border-b-primary/50",
+    chip: "bg-primary/10 text-primary",
+  },
+  gold: {
+    band: "bg-gold-soft/30",
+    accent: "border-b-gold/60",
+    chip: "bg-gold-soft text-gold-foreground",
+  },
+  success: {
+    band: "bg-success-soft/30",
+    accent: "border-b-success/50",
+    chip: "bg-success-soft text-success",
+  },
+  info: { band: "bg-info-soft/30", accent: "border-b-info/50", chip: "bg-info-soft text-info" },
+} as const;
+const SHEET_COLUMNS: { label: string; icon: typeof CalendarDays; tone: keyof typeof SHEET_TONE }[] =
+  [
+    { label: "Date", icon: CalendarDays, tone: "primary" },
+    { label: "Day", icon: CalendarDays, tone: "primary" },
+    { label: "Subject", icon: BookOpen, tone: "gold" },
+    { label: "Time", icon: Clock, tone: "success" },
+    { label: "Room", icon: DoorOpen, tone: "info" },
+  ];
+
+function DateSheetChart({
+  papers,
+  classesById,
+  onlyClass = "all",
+}: {
+  papers: ApiExam[];
+  classesById: Map<string, ApiClass>;
+  /** A class name to show on its own, or "all". */
+  onlyClass?: string;
+}) {
+  const live = papers.filter(
+    (p) =>
+      p.status !== "CANCELLED" &&
+      (onlyClass === "all" || paperClassName(p, classesById) === onlyClass),
+  );
+  const classOf = (p: ApiExam) => classesById.get(p.class_id ?? "");
+  const classNames = [
+    ...new Set(live.map((p) => classOf(p)?.name ?? paperClassLabel(p, classesById))),
+  ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  const dates = [...new Set(live.map((p) => p.date ?? ""))].filter(Boolean).sort();
+  const subjects = new Set(live.map((p) => p.subject_name ?? p.subject ?? ""));
+
+  const cell = (date: string, className: string) =>
+    live
+      .filter(
+        (p) =>
+          p.date === date && (classOf(p)?.name ?? paperClassLabel(p, classesById)) === className,
+      )
+      .sort((a, b) => (classOf(a)?.section ?? "").localeCompare(classOf(b)?.section ?? ""));
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-px border-b border-border bg-border sm:grid-cols-4">
+        {[
+          { label: "Exam days", value: dates.length },
+          { label: "Classes", value: classNames.length },
+          { label: "Subjects", value: subjects.size },
+          { label: "Papers", value: live.length },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-card px-4 py-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {stat.label}
+            </p>
+            <p className="font-display text-lg font-bold tabular-nums">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+      {/* One date sheet per class: #, Date, Day, Subject, Time, Room. */}
+      <div className="space-y-5 p-3 sm:p-4">
+        {classNames.map((name) => {
+          const classDates = dates.filter((d) => cell(d, name).length > 0);
+          return (
+            <div key={name}>
+              {classNames.length > 1 && <p className="mb-2 text-sm font-bold capitalize">{name}</p>}
+              <div className="overflow-x-auto">
+                <table className="w-full overflow-hidden rounded-xl border border-border text-sm">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="w-12 border-b-2 border-border bg-muted px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        #
+                      </th>
+                      {SHEET_COLUMNS.map((col) => (
+                        <th
+                          key={col.label}
+                          className={cn(
+                            "border-b-2 border-l border-border px-3 py-2",
+                            SHEET_TONE[col.tone].band,
+                            SHEET_TONE[col.tone].accent,
+                          )}
+                        >
+                          <span className="flex items-center gap-1.5 whitespace-nowrap">
+                            <span
+                              className={cn(
+                                "grid h-6 w-6 shrink-0 place-items-center rounded-lg",
+                                SHEET_TONE[col.tone].chip,
+                              )}
+                            >
+                              <col.icon className="h-3.5 w-3.5" />
+                            </span>
+                            <span className="text-xs font-bold text-foreground">{col.label}</span>
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {classDates.map((date, i) => {
+                      const list = cell(date, name);
+                      const day = new Date(`${date}T00:00:00Z`);
+                      const subjectsHere = [
+                        ...new Set(list.map((p) => p.subject_name ?? p.subject ?? "")),
+                      ];
+                      const times = [...new Set(list.map(timeRange))];
+                      const sec = (p: ApiExam) => classOf(p)?.section;
+                      return (
+                        <tr
+                          key={date}
+                          className="border-b border-border/60 last:border-0 hover:bg-muted/40"
+                        >
+                          <td className="bg-card px-3 py-2.5 text-center text-xs font-semibold text-muted-foreground tabular-nums">
+                            {i + 1}
+                          </td>
+                          <td
+                            className={cn(
+                              "border-l border-border px-3 py-2.5 font-semibold whitespace-nowrap",
+                              SHEET_TONE.primary.band,
+                            )}
+                          >
+                            {fmtDate(date)}
+                          </td>
+                          <td
+                            className={cn(
+                              "border-l border-border px-3 py-2.5 whitespace-nowrap text-foreground/80",
+                              SHEET_TONE.primary.band,
+                            )}
+                          >
+                            {day.toLocaleDateString("en-IN", { weekday: "long", timeZone: "UTC" })}
+                          </td>
+                          <td
+                            className={cn(
+                              "border-l border-border px-3 py-2.5 font-bold whitespace-nowrap",
+                              SHEET_TONE.gold.band,
+                            )}
+                          >
+                            {subjectsHere.length === 1
+                              ? subjectsHere[0]
+                              : list.map((p) => (
+                                  <p key={p.id}>
+                                    {sec(p) ? `${sec(p)}: ` : ""}
+                                    {p.subject_name ?? p.subject}
+                                  </p>
+                                ))}
+                          </td>
+                          <td
+                            className={cn(
+                              "border-l border-border px-3 py-2.5 whitespace-nowrap text-foreground/80",
+                              SHEET_TONE.success.band,
+                            )}
+                          >
+                            {times.length === 1
+                              ? times[0]
+                              : list.map((p) => (
+                                  <p key={p.id}>
+                                    {sec(p) ? `${sec(p)}: ` : ""}
+                                    {timeRange(p)}
+                                  </p>
+                                ))}
+                          </td>
+                          <td
+                            className={cn(
+                              "border-l border-border px-3 py-2.5 whitespace-nowrap text-foreground/80",
+                              SHEET_TONE.info.band,
+                            )}
+                          >
+                            {list.every((p) => !p.room_name)
+                              ? "—"
+                              : list.map((p) => (
+                                  <p key={p.id}>
+                                    {list.length > 1 && sec(p) ? `${sec(p)}: ` : ""}
+                                    {p.room_name ?? "—"}
+                                  </p>
+                                ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+const DATESHEET_CSS = `
+  @page { size: A4 portrait; margin: 14mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: "Segoe UI", Roboto, Arial, sans-serif; color: #0f172a; margin: 0; font-size: 12px; }
+  .page { break-after: page; }
+  .page:last-child { break-after: auto; }
+  header { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 14px; }
+  header img { height: 48px; margin-bottom: 4px; }
+  h1 { font-size: 20px; margin: 0; color: #1e3a8a; }
+  header p { margin: 2px 0 0; color: #475569; }
+  h2 { text-align: center; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 4px; }
+  .sub { text-align: center; color: #475569; margin: 0 0 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; vertical-align: middle; }
+  th { background: #eef2ff; color: #334155; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; }
+  td.c, th.c { text-align: center; width: 40px; }
+  td.date { font-weight: 700; white-space: nowrap; }
+  td.subject { font-weight: 700; }
+  td div { line-height: 1.5; }
+  tr { break-inside: avoid; }
+  .notes { margin-top: 14px; font-size: 11px; color: #475569; line-height: 1.6; }
+  footer { display: flex; justify-content: flex-end; margin-top: 40px; }
+  .sign { border-top: 1px solid #94a3b8; padding-top: 4px; width: 170px; text-align: center; color: #475569; }
+`;
+
+/**
+ * Prints the date sheet exactly as it looks on screen: one page per class with
+ * #, Date, Day, Subject, Time and Room (sections listed where they differ).
+ */
+function printDateSheet(
+  school: SchoolBranding,
+  examination: ApiExamination,
+  papers: ApiExam[],
+  classesById: Map<string, ApiClass>,
+  onlyClass: string,
+) {
+  const live = papers.filter(
+    (p) =>
+      p.status !== "CANCELLED" &&
+      (onlyClass === "all" || paperClassName(p, classesById) === onlyClass),
+  );
+  if (!live.length) {
+    toast.error("Nothing to print — no papers scheduled");
+    return;
+  }
+  const classNames = [...new Set(live.map((p) => paperClassName(p, classesById)))].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true }),
+  );
+  const section = (p: ApiExam) => classesById.get(p.class_id ?? "")?.section ?? "";
+  const subjectOf = (p: ApiExam) => p.subject_name ?? p.subject ?? "";
+  const perSection = (list: ApiExam[], value: (p: ApiExam) => string, always = false) => {
+    const values = [...new Set(list.map(value))];
+    if (values.length === 1 && !always) return escapeHtml(values[0]);
+    return list
+      .map(
+        (p) =>
+          `<div>${section(p) ? `${escapeHtml(section(p))}: ` : ""}${escapeHtml(value(p))}</div>`,
+      )
+      .join("");
+  };
+
+  const pages = classNames
+    .map((name) => {
+      const own = live
+        .filter((p) => paperClassName(p, classesById) === name)
+        .sort((a, b) => section(a).localeCompare(section(b)));
+      const dates = [...new Set(own.map((p) => p.date ?? ""))].filter(Boolean).sort();
+      const rows = dates
+        .map((date, i) => {
+          const list = own.filter((p) => p.date === date);
+          const weekday = new Date(`${date}T00:00:00Z`).toLocaleDateString("en-IN", {
+            weekday: "long",
+            timeZone: "UTC",
+          });
+          const room = list.every((p) => !p.room_name)
+            ? "—"
+            : perSection(list, (p) => p.room_name ?? "—", list.length > 1);
+          return `<tr><td class="c">${i + 1}</td><td class="date">${escapeHtml(fmtDate(date))}</td><td>${escapeHtml(
+            weekday,
+          )}</td><td class="subject">${perSection(list, subjectOf)}</td><td>${perSection(
+            list,
+            timeRange,
+          )}</td><td>${room}</td></tr>`;
+        })
+        .join("");
+      return `<section class="page">
+        <header>
+          ${school.logoUrl ? `<img src="${escapeHtml(school.logoUrl)}" alt="" />` : ""}
+          <h1>${escapeHtml(school.name)}</h1>
+          <p>${escapeHtml([school.address, school.phone].filter(Boolean).join(" · "))}</p>
+        </header>
+        <h2>Date Sheet</h2>
+        <p class="sub">${escapeHtml(examination.name)} · <span style="text-transform:capitalize">${escapeHtml(
+          name,
+        )}</span>${school.session ? ` · Session ${escapeHtml(school.session)}` : ""}</p>
+        <table>
+          <thead><tr><th class="c">#</th><th>Date</th><th>Day</th><th>Subject</th><th>Time</th><th>Room</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="notes">
+          • Reach the exam room 15 minutes before the exam starts.<br />
+          • Carry your admit card / school ID card.<br />
+          • Electronic devices are not allowed in the exam hall.
+        </div>
+        <footer><span class="sign">Principal</span></footer>
+      </section>`;
+    })
+    .join("");
+
+  printHtml(`Date Sheet ${examination.name}`, pages, DATESHEET_CSS);
 }
 
 function ScheduleTab({
@@ -1485,6 +2215,12 @@ function ScheduleTab({
     (p) => classFilter === "all" || paperClassLabel(p, classesById) === classFilter,
   );
   const drafts = papers.filter((p) => p.status === "DRAFT");
+  const [view, setView] = useState<"sheet" | "list">("sheet");
+  const [sheetClass, setSheetClass] = useState("all");
+  const school = useSchoolBranding();
+  const sheetClassOptions = [...new Set(papers.map((p) => paperClassName(p, classesById)))].sort(
+    (a, b) => a.localeCompare(b, undefined, { numeric: true }),
+  );
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey: ["exams"] });
@@ -1554,7 +2290,7 @@ function ScheduleTab({
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <ExaminationSelect examinations={examinations} value={selectedId} onChange={onSelect} />
             <div className="text-xs text-muted-foreground">
-              {examination.exam_type}
+              {examTypeLabel(examination.exam_type)}
               {examination.term ? ` · ${examination.term}` : ""} · {fmtDate(examination.start_date)}{" "}
               – {fmtDate(examination.end_date)}
             </div>
@@ -1614,18 +2350,58 @@ function ScheduleTab({
         title="Exam Schedule"
         subtitle={`${papers.filter((p) => p.status !== "CANCELLED").length} papers`}
         action={
-          classOptions.length > 1 ? (
-            <FilterSelect
-              value={classFilter}
-              onChange={setClassFilter}
-              options={classOptions}
-              placeholder="All classes"
-            />
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg bg-muted p-0.5 text-xs font-semibold">
+              {(
+                [
+                  ["sheet", "Date sheet"],
+                  ["list", "List"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setView(key)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 transition-colors",
+                    view === key ? "bg-card text-primary shadow-sm" : "text-muted-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {view === "list" && classOptions.length > 1 && (
+              <FilterSelect
+                value={classFilter}
+                onChange={setClassFilter}
+                options={classOptions}
+                placeholder="All classes"
+              />
+            )}
+            {view === "sheet" && sheetClassOptions.length > 1 && (
+              <FilterSelect
+                value={sheetClass}
+                onChange={setSheetClass}
+                options={sheetClassOptions}
+                placeholder="All classes"
+              />
+            )}
+            {view === "sheet" && papers.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-9 gap-1.5"
+                onClick={() => printDateSheet(school, examination, papers, classesById, sheetClass)}
+              >
+                <Printer className="h-4 w-4" /> Print
+              </Button>
+            )}
+          </div>
         }
         bodyClassName="p-0"
       >
-        {rows.length === 0 ? (
+        {(view === "sheet" ? papers : rows).length === 0 ? (
           <EmptyState
             title="No papers scheduled"
             description={
@@ -1648,6 +2424,8 @@ function ScheduleTab({
               ) : undefined
             }
           />
+        ) : view === "sheet" ? (
+          <DateSheetChart papers={papers} classesById={classesById} onlyClass={sheetClass} />
         ) : (
           <div className="overflow-x-auto">
             <Table>
@@ -2725,25 +3503,164 @@ function TeacherExamsView() {
   );
 }
 
+/** Prints a student's date sheet for one examination (portrait A4). */
+function printStudentDateSheet(
+  school: SchoolBranding,
+  title: string,
+  classText: string,
+  papers: ApiExam[],
+) {
+  const rows = papers
+    .map((p, i) => {
+      const d = p.date ? new Date(`${p.date}T00:00:00Z`) : null;
+      const weekday = d ? d.toLocaleDateString("en-IN", { weekday: "long", timeZone: "UTC" }) : "";
+      return `<tr><td class="c">${i + 1}</td><td><b>${escapeHtml(fmtDate(p.date))}</b></td><td>${escapeHtml(
+        weekday,
+      )}</td><td><b>${escapeHtml(p.subject_name ?? p.subject ?? "")}</b></td><td>${escapeHtml(
+        timeRange(p),
+      )}</td><td>${escapeHtml(p.room_name ?? "—")}</td></tr>`;
+    })
+    .join("");
+  const css = `
+    @page { size: A4 portrait; margin: 14mm; }
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; color: #0f172a; margin: 0; font-size: 12px; }
+    header { text-align: center; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; margin-bottom: 14px; }
+    header img { height: 48px; margin-bottom: 4px; }
+    h1 { font-size: 20px; margin: 0; color: #1e3a8a; }
+    header p { margin: 2px 0 0; color: #475569; }
+    h2 { text-align: center; font-size: 15px; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 4px; }
+    .sub { text-align: center; color: #475569; margin: 0 0 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; }
+    th { background: #eef2ff; color: #1e3a8a; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+    td.c, th.c { text-align: center; width: 40px; }
+    tr { break-inside: avoid; }
+    .notes { margin-top: 14px; font-size: 11px; color: #475569; line-height: 1.6; }
+    footer { display: flex; justify-content: flex-end; margin-top: 40px; }
+    .sign { border-top: 1px solid #94a3b8; padding-top: 4px; width: 170px; text-align: center; color: #475569; }
+  `;
+  const body = `
+    <header>
+      ${school.logoUrl ? `<img src="${escapeHtml(school.logoUrl)}" alt="" />` : ""}
+      <h1>${escapeHtml(school.name)}</h1>
+      <p>${escapeHtml([school.address, school.phone].filter(Boolean).join(" · "))}</p>
+    </header>
+    <h2>Date Sheet</h2>
+    <p class="sub">${escapeHtml(title)}${classText ? ` · ${escapeHtml(classText)}` : ""}${
+      school.session ? ` · Session ${escapeHtml(school.session)}` : ""
+    }</p>
+    <table>
+      <thead><tr><th class="c">#</th><th>Date</th><th>Day</th><th>Subject</th><th>Time</th><th>Room</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="notes">
+      • Reach the exam room 15 minutes before the exam starts.<br />
+      • Carry your admit card / school ID card.<br />
+      • Electronic devices are not allowed in the exam hall.
+    </div>
+    <footer><span class="sign">Principal</span></footer>`;
+  printHtml(`Date Sheet ${title}`, body, css);
+}
+
 function StudentExamsView() {
   const { data: exams, isLoading } = useExams();
   const { data: examinationsData } = useExaminations();
-  const examinationName = useMemo(
-    () => new Map((examinationsData ?? []).map((x) => [x.id, x.name])),
+  const school = useSchoolBranding();
+  const examinationById = useMemo(
+    () => new Map((examinationsData ?? []).map((x) => [x.id, x])),
     [examinationsData],
   );
   // The backend only returns papers the student may see (published schedules and later).
   const rows = (exams ?? []).filter((e) => e.status !== "CANCELLED").sort(sortPapers);
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = rows.filter((e) => (e.date ?? "") >= today && e.status !== "PUBLISHED");
+  const next = upcoming[0];
+
+  // One date sheet per examination; the one with the nearest upcoming paper first.
+  const sheets = useMemo(() => {
+    const map = new Map<string, ApiExam[]>();
+    for (const e of rows) {
+      const key = e.examination_id ?? e.name ?? e.term ?? "Exams";
+      map.set(key, [...(map.get(key) ?? []), e]);
+    }
+    return [...map]
+      .map(([key, papers]) => {
+        const x = examinationById.get(key);
+        const live = papers.some((p) => (p.date ?? "") >= today);
+        return {
+          key,
+          title: x?.name ?? papers[0]?.name ?? papers[0]?.term ?? "Examination",
+          type: x ? examTypeLabel(x.exam_type) : "",
+          from: papers[0]?.date ?? null,
+          to: papers.at(-1)?.date ?? null,
+          papers,
+          live,
+        };
+      })
+      .sort((a, b) =>
+        a.live !== b.live
+          ? a.live
+            ? -1
+            : 1
+          : a.live
+            ? (a.from ?? "").localeCompare(b.from ?? "")
+            : (b.from ?? "").localeCompare(a.from ?? ""),
+      );
+  }, [rows, examinationById, today]);
+
+  const classText = (p: ApiExam | undefined) =>
+    p?.class_name ? `${p.class_name}${p.section ? `-${p.section}` : ""}` : "";
+
+  const statusOf = (e: ApiExam) =>
+    e.status === "PUBLISHED" ? (
+      <StatusBadge status="Result out" tone="success" />
+    ) : (e.date ?? "") >= today ? (
+      <StatusBadge status="Upcoming" tone="info" />
+    ) : (
+      <StatusBadge status="Done" tone="neutral" />
+    );
 
   return (
     <div>
       <PageHeader
         title="My Exams"
-        description="Exam date-sheet for your class."
+        description="Your exam date sheet — dates, timings and rooms."
         breadcrumb={["Dashboard", "My Exams"]}
       />
+
+      {/* Next exam */}
+      {next && (
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3 sm:p-4">
+          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
+            <span className="text-center leading-none">
+              <span className="block font-display text-xl font-bold">
+                {next.date ? new Date(`${next.date}T00:00:00Z`).getUTCDate() : "—"}
+              </span>
+              <span className="block text-[10px] font-semibold uppercase">
+                {next.date
+                  ? new Date(`${next.date}T00:00:00Z`).toLocaleDateString("en-IN", {
+                      month: "short",
+                      timeZone: "UTC",
+                    })
+                  : ""}
+              </span>
+            </span>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+              Next exam · {countdown(next.date) ?? fmtDate(next.date)}
+            </p>
+            <p className="truncate font-display text-lg font-bold">
+              {next.subject_name ?? next.subject}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {timeRange(next)}
+              {next.room_name ? ` · ${next.room_name}` : ""}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <InfoCard label="Upcoming Exams" value={upcoming.length} icon={CalendarDays} tone="navy" />
@@ -2755,86 +3672,169 @@ function StudentExamsView() {
         />
       </div>
 
-      <div className="panel">
-        {isLoading ? (
-          <p className="p-6 text-center text-sm text-muted-foreground">Loading…</p>
-        ) : rows.length === 0 ? (
+      {isLoading ? (
+        <div className="panel p-6 text-center text-sm text-muted-foreground">Loading…</div>
+      ) : sheets.length === 0 ? (
+        <div className="panel">
           <EmptyState
-            title="No upcoming exams"
-            description="Your exam schedule will appear here."
+            title="No exams yet"
+            description="Your date sheet will appear here once the school publishes it."
             icon={CalendarDays}
           />
-        ) : (
-          <>
-            <div className="space-y-2.5 p-3 md:hidden">
-              {rows.map((e) => (
-                <ExamCard
-                  key={e.id}
-                  exam={e}
-                  examName={
-                    (e.examination_id && examinationName.get(e.examination_id)) || e.name || e.term
-                  }
-                  status={
-                    e.status === "PUBLISHED" ? (
-                      <StatusBadge status="Result Published" tone="success" />
-                    ) : (e.date ?? "") >= today ? (
-                      <StatusBadge status="Upcoming" tone="info" />
-                    ) : (
-                      <StatusBadge status="Completed" tone="neutral" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {sheets.map((sheet) => (
+            <section
+              key={sheet.key}
+              className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+            >
+              <header className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+                <div className="min-w-0">
+                  <h3 className="truncate font-display text-base font-bold">{sheet.title}</h3>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {[
+                      sheet.type,
+                      sheet.from && sheet.to ? `${fmtDate(sheet.from)} – ${fmtDate(sheet.to)}` : "",
+                      `${sheet.papers.length} paper${sheet.papers.length === 1 ? "" : "s"}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 shrink-0 gap-1.5"
+                  onClick={() =>
+                    printStudentDateSheet(
+                      school,
+                      sheet.title,
+                      classText(sheet.papers[0]),
+                      sheet.papers,
                     )
                   }
-                />
-              ))}
-            </div>
-            <div className="hidden overflow-x-auto md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Examination</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Time</TableHead>
-                    <TableHead>Room</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((e) => (
-                    <TableRow key={e.id}>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {(e.examination_id && examinationName.get(e.examination_id)) ||
-                          e.name ||
-                          e.term}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap font-medium">
-                        {e.subject_name ?? e.subject ?? "—"}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {fmtDate(e.date)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {timeRange(e)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {e.room_name ?? "—"}
-                      </TableCell>
-                      <TableCell>
-                        {e.status === "PUBLISHED" ? (
-                          <StatusBadge status="Result Published" tone="success" />
-                        ) : (e.date ?? "") >= today ? (
-                          <StatusBadge status="Upcoming" tone="info" />
-                        ) : (
-                          <StatusBadge status="Completed" tone="neutral" />
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Print</span>
+                </Button>
+              </header>
+
+              {/* Phones: one compact row per exam day. */}
+              <ul className="divide-y divide-border md:hidden">
+                {sheet.papers.map((e) => {
+                  const d = e.date ? new Date(`${e.date}T00:00:00Z`) : null;
+                  const isToday = e.date === today;
+                  const past = (e.date ?? "") < today;
+                  return (
+                    <li
+                      key={e.id}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5",
+                        isToday && "bg-primary/5",
+                        past && "opacity-60",
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "grid h-12 w-12 shrink-0 place-items-center rounded-xl",
+                          isToday ? "bg-primary text-primary-foreground" : "bg-muted",
                         )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        )}
-      </div>
+                      >
+                        <span className="text-center leading-none">
+                          <span className="block font-display text-base font-bold">
+                            {d ? d.getUTCDate() : "—"}
+                          </span>
+                          <span className="block text-[9px] font-semibold uppercase opacity-80">
+                            {d
+                              ? d.toLocaleDateString("en-IN", { weekday: "short", timeZone: "UTC" })
+                              : ""}
+                          </span>
+                        </span>
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">
+                          {e.subject_name ?? e.subject ?? "—"}
+                        </p>
+                        <p className="truncate text-[11px] text-muted-foreground">
+                          {timeRange(e)}
+                          {e.room_name ? ` · ${e.room_name}` : ""}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {isToday ? (
+                          <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                            Today
+                          </span>
+                        ) : (
+                          statusOf(e)
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* Tablets & desktop: the date sheet as a table. */}
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <th className="w-12 px-4 py-2.5 text-center">#</th>
+                      <th className="px-3 py-2.5">Date</th>
+                      <th className="px-3 py-2.5">Day</th>
+                      <th className="px-3 py-2.5">Subject</th>
+                      <th className="px-3 py-2.5">Time</th>
+                      <th className="px-3 py-2.5">Room</th>
+                      <th className="px-4 py-2.5">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sheet.papers.map((e, i) => {
+                      const d = e.date ? new Date(`${e.date}T00:00:00Z`) : null;
+                      const isToday = e.date === today;
+                      return (
+                        <tr
+                          key={e.id}
+                          className={cn(
+                            "border-t border-border",
+                            isToday && "bg-primary/5",
+                            (e.date ?? "") < today && "text-muted-foreground",
+                          )}
+                        >
+                          <td className="px-4 py-3 text-center text-xs tabular-nums text-muted-foreground">
+                            {i + 1}
+                          </td>
+                          <td className="px-3 py-3 font-medium whitespace-nowrap">
+                            {fmtDate(e.date)}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
+                            {d
+                              ? d.toLocaleDateString("en-IN", { weekday: "long", timeZone: "UTC" })
+                              : "—"}
+                          </td>
+                          <td className="px-3 py-3 font-semibold whitespace-nowrap">
+                            {e.subject_name ?? e.subject ?? "—"}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
+                            {timeRange(e)}
+                          </td>
+                          <td className="px-3 py-3 whitespace-nowrap text-muted-foreground">
+                            {e.room_name ?? "—"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            {isToday ? <StatusBadge status="Today" tone="info" /> : statusOf(e)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

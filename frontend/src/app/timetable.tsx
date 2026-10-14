@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import { toast } from "sonner";
 import {
   ChevronLeft,
@@ -38,6 +38,8 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { isPeriodLive, useSchoolTimings } from "@/lib/school-timings";
+import { printTimetables, type TimetablePage } from "@/lib/timetable-print";
+import { useSchoolBranding } from "@/hooks/use-school-branding";
 import { SchoolTimingsEditor } from "@/components/shared/SchoolTimingsEditor";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -644,9 +646,30 @@ function AssignSlotDialog({
   );
 }
 
-function AdminClassTimetable() {
+type PrintRef = MutableRefObject<(() => void) | null>;
+
+/** A class's week as a printable page: subject, teacher and room in each cell. */
+function classPage(
+  label: string,
+  classSlots: ApiTimetableSlot[],
+  teacherName: (id: string | null) => string,
+): TimetablePage {
+  return {
+    title: `Class ${label}`,
+    subtitle: "Class timetable",
+    cell: (day, period) => {
+      const slot = classSlots.find((s) => s.day === day && s.period === period);
+      if (!slot?.subject) return null;
+      return { subject: slot.subject, lines: [teacherName(slot.teacher_id), slot.room ?? ""] };
+    },
+  };
+}
+
+function AdminClassTimetable({ printRef }: { printRef: PrintRef }) {
   const { data: classes } = useClasses();
   const { data: slots, isLoading } = useTimetable();
+  const { data: teachers } = useTeachers();
+  const school = useSchoolBranding();
   const { days: DAYS, periods: PERIODS } = useSchoolTimings();
   const [timingsOpen, setTimingsOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -685,6 +708,41 @@ function AdminClassTimetable() {
     await queryClient.invalidateQueries({ queryKey: ["timetable"] });
   }
 
+  const teacherName = (id: string | null) => (teachers ?? []).find((t) => t.id === id)?.name ?? "";
+  const classLabel = (c: { name: string; section: string }) =>
+    `${c.name.replace(/^class\s*/i, "")}-${c.section}`;
+
+  function printClass() {
+    if (!activeClass) {
+      toast.error("Pick a class to print");
+      return;
+    }
+    printTimetables(
+      school,
+      [classPage(classLabel(activeClass), classSlots, teacherName)],
+      DAYS,
+      PERIODS,
+      `Timetable ${classLabel(activeClass)}`,
+    );
+  }
+
+  function printAllClasses() {
+    const list = [...(classes ?? [])]
+      .filter((c) => c.status !== "ARCHIVED")
+      .sort((a, b) => classLabel(a).localeCompare(classLabel(b), undefined, { numeric: true }));
+    const pages = list
+      .map((c) => ({ c, own: (slots ?? []).filter((s) => s.class_id === c.id) }))
+      .filter(({ own }) => own.length > 0)
+      .map(({ c, own }) => classPage(classLabel(c), own, teacherName));
+    if (!pages.length) {
+      toast.error("No class has any periods assigned yet");
+      return;
+    }
+    printTimetables(school, pages, DAYS, PERIODS, "Class Timetables");
+  }
+
+  printRef.current = printClass;
+
   return (
     <>
       <SectionCard
@@ -722,6 +780,15 @@ function AdminClassTimetable() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={printAllClasses}
+              title="Print every class, one per page"
+            >
+              <Printer className="h-4 w-4" /> Print all
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -851,16 +918,48 @@ function AdminClassTimetable() {
   );
 }
 
-function AdminTeacherTimetable() {
+function AdminTeacherTimetable({ printRef }: { printRef: PrintRef }) {
   const { data: teachers } = useTeachers();
   const { data: slots, isLoading } = useTimetable();
   const { data: classes } = useClasses();
+  const school = useSchoolBranding();
+  const { days: DAYS, periods: PERIODS } = useSchoolTimings();
   const [teacherId, setTeacherId] = useState("");
   const activeTeacherId = teacherId || teachers?.[0]?.id || "";
   const activeTeacher = (teachers ?? []).find((t) => t.id === activeTeacherId);
 
   const classNameById = new Map((classes ?? []).map((c) => [c.id, `${c.name}-${c.section}`]));
   const teacherSlots = (slots ?? []).filter((s) => s.teacher_id === activeTeacherId);
+
+  printRef.current = () => {
+    if (!activeTeacher) {
+      toast.error("Pick a teacher to print");
+      return;
+    }
+    printTimetables(
+      school,
+      [
+        {
+          title: activeTeacher.name,
+          subtitle: "Teacher timetable",
+          cell: (day, period) => {
+            const slot = teacherSlots.find((s) => s.day === day && s.period === period);
+            if (!slot?.subject) return null;
+            return {
+              subject: slot.subject,
+              lines: [
+                slot.class_id ? `Class ${classNameById.get(slot.class_id) ?? ""}` : "",
+                slot.room ?? "",
+              ],
+            };
+          },
+        },
+      ],
+      DAYS,
+      PERIODS,
+      `Timetable ${activeTeacher.name}`,
+    );
+  };
 
   return (
     <SectionCard
@@ -896,19 +995,26 @@ function AdminTeacherTimetable() {
 function AdminTimetableManagement() {
   const [tab, setTab] = useState<"class" | "teacher">("class");
   const { data: slots = [] } = useTimetable();
+  const { data: classes } = useClasses();
+  const { data: teachers } = useTeachers();
+  const classPrint = useRef<(() => void) | null>(null);
+  const teacherPrint = useRef<(() => void) | null>(null);
 
   function downloadTimetable() {
     const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
     const csv = [
-      ["Day", "Period", "Subject", "Teacher ID", "Room", "Class ID"],
-      ...slots.map((slot) => [
-        slot.day,
-        slot.period,
-        slot.subject,
-        slot.teacher_id,
-        slot.room,
-        slot.class_id,
-      ]),
+      ["Class", "Day", "Period", "Subject", "Teacher", "Room"],
+      ...slots.map((slot) => {
+        const c = (classes ?? []).find((x) => x.id === slot.class_id);
+        return [
+          c ? `${c.name}-${c.section}` : "",
+          slot.day,
+          slot.period,
+          slot.subject,
+          (teachers ?? []).find((t) => t.id === slot.teacher_id)?.name ?? "",
+          slot.room,
+        ];
+      }),
     ]
       .map((row) => row.map(escape).join(","))
       .join("\r\n");
@@ -928,7 +1034,12 @@ function AdminTimetableManagement() {
         breadcrumb={["Dashboard", "Timetable"]}
         actions={
           <>
-            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => window.print()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => (tab === "class" ? classPrint : teacherPrint).current?.()}
+            >
               <Printer className="h-4 w-4" /> Print
             </Button>
             <Button size="sm" className="gap-1.5" onClick={downloadTimetable}>
@@ -945,10 +1056,10 @@ function AdminTimetableManagement() {
         </TabsList>
 
         <TabsContent value="class" className="mt-4">
-          <AdminClassTimetable />
+          <AdminClassTimetable printRef={classPrint} />
         </TabsContent>
         <TabsContent value="teacher" className="mt-4">
-          <AdminTeacherTimetable />
+          <AdminTeacherTimetable printRef={teacherPrint} />
         </TabsContent>
       </Tabs>
     </div>

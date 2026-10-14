@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AttendanceHistory } from "@/components/shared/AttendanceHistory";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { LogIn, LogOut, Clock3, CalendarCheck } from "lucide-react";
@@ -9,7 +10,14 @@ import { SectionCard } from "@/components/shared/SectionCard";
 import { InfoCard } from "@/components/shared/InfoCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useTeacherAttendance } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 
@@ -21,7 +29,10 @@ export default function TeacherMyAttendancePage() {
   const today = new Date().toISOString().slice(0, 10);
   const todayRow = useMemo(() => (rows ?? []).find((r) => r.date === today), [rows, today]);
 
-  const history = useMemo(() => [...(rows ?? [])].sort((a, b) => b.date.localeCompare(a.date)), [rows]);
+  const history = useMemo(
+    () => [...(rows ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
+    [rows],
+  );
   const thisMonth = new Date().toISOString().slice(0, 7);
   const monthRows = history.filter((r) => r.date.startsWith(thisMonth));
   const presentThisMonth = monthRows.filter((r) => r.status === "Present").length;
@@ -54,10 +65,19 @@ export default function TeacherMyAttendancePage() {
 
   return (
     <div>
-      <PageHeader title="My Attendance" description="Your own daily check-in and attendance history." breadcrumb={["Dashboard", "My Attendance"]} />
+      <PageHeader
+        title="My Attendance"
+        description="Your own daily check-in and attendance history."
+        breadcrumb={["Dashboard", "My Attendance"]}
+      />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <InfoCard label="This Month" value={`${presentThisMonth}/${monthRows.length}`} icon={CalendarCheck} tone="navy" />
+        <InfoCard
+          label="This Month"
+          value={`${presentThisMonth}/${monthRows.length}`}
+          icon={CalendarCheck}
+          tone="navy"
+        />
         <InfoCard label="Check In" value={todayRow?.check_in ?? "—"} icon={LogIn} tone="success" />
         <InfoCard label="Check Out" value={todayRow?.check_out ?? "—"} icon={LogOut} tone="info" />
       </div>
@@ -70,7 +90,12 @@ export default function TeacherMyAttendancePage() {
             </span>
             <div>
               <p className="text-sm font-semibold">
-                Status: <StatusBadge status={todayRow ? (todayRow.check_out ? "Checked Out" : "Checked In") : "Not Marked"} />
+                Status:{" "}
+                <StatusBadge
+                  status={
+                    todayRow ? (todayRow.check_out ? "Checked Out" : "Checked In") : "Not Marked"
+                  }
+                />
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Check In: {todayRow?.check_in ?? "—"} · Check Out: {todayRow?.check_out ?? "—"}
@@ -99,32 +124,12 @@ export default function TeacherMyAttendancePage() {
         {isLoading ? (
           <TableSkeleton rows={6} cols={4} />
         ) : history.length === 0 ? (
-          <EmptyState title="No attendance history" description="Check in to start building your attendance record." />
+          <EmptyState
+            title="No attendance history"
+            description="Check in to start building your attendance record."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Check In</TableHead>
-                  <TableHead className="text-right">Check Out</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.slice(0, 31).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.date}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={r.status} />
-                    </TableCell>
-                    <TableCell>{r.check_in ?? "—"}</TableCell>
-                    <TableCell className="text-right">{r.check_out ?? "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <AttendanceHistory rows={history.slice(0, 31)} />
         )}
       </div>
     </div>

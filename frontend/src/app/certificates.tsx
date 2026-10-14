@@ -4,16 +4,44 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileText, Printer, Plus } from "lucide-react";
-import { PageHeader, SearchInput, EmptyState, TableSkeleton, Initials } from "@/components/shared/ui-kit";
+import {
+  PageHeader,
+  SearchInput,
+  EmptyState,
+  TableSkeleton,
+  Initials,
+} from "@/components/shared/ui-kit";
 import { InfoCard } from "@/components/shared/InfoCard";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useCertificates, useStudents } from "@/hooks/useApi";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { printCertificate } from "@/lib/certificate-print";
+import { useSchoolBranding } from "@/hooks/use-school-branding";
 
 const TYPES = [
   { value: "BONAFIDE", label: "Bonafide Certificate" },
@@ -30,7 +58,10 @@ function GenerateForm({ onDone }: { onDone: () => void }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!studentId) { toast.error("Select a student"); return; }
+    if (!studentId) {
+      toast.error("Select a student");
+      return;
+    }
     setSubmitting(true);
     try {
       await api.post("/certificates", { studentId, type });
@@ -89,7 +120,15 @@ export default function CertificatesPage() {
   const { data: students } = useStudents();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [preview, setPreview] = useState<{ studentName: string; type: string; issuedOn: string } | null>(null);
+  const school = useSchoolBranding();
+  const [preview, setPreview] = useState<{
+    id: string;
+    studentId: string;
+    studentName: string;
+    typeCode: string;
+    type: string;
+    issuedOn: string;
+  } | null>(null);
 
   const studentName = (id: string) => (students ?? []).find((s) => s.id === id)?.name ?? id;
 
@@ -107,19 +146,19 @@ export default function CertificatesPage() {
         breadcrumb={["Dashboard", "Certificates & Documents"]}
         actions={
           isStudent ? undefined : (
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4" /> Generate Certificate
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Generate Certificate</DialogTitle>
-              </DialogHeader>
-              <GenerateForm onDone={() => setOpen(false)} />
-            </DialogContent>
-          </Dialog>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4" /> Generate Certificate
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Generate Certificate</DialogTitle>
+                </DialogHeader>
+                <GenerateForm onDone={() => setOpen(false)} />
+              </DialogContent>
+            </Dialog>
           )
         }
       />
@@ -136,7 +175,10 @@ export default function CertificatesPage() {
         {isLoading ? (
           <TableSkeleton rows={6} cols={4} />
         ) : filtered.length === 0 ? (
-          <EmptyState title="No certificates issued yet" description="Generate one to see it here." />
+          <EmptyState
+            title="No certificates issued yet"
+            description="Generate one to see it here."
+          />
         ) : (
           <div className="overflow-x-auto">
             <Table>
@@ -157,7 +199,9 @@ export default function CertificatesPage() {
                         <span className="truncate font-medium">{studentName(c.student_id)}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{TYPES.find((t) => t.value === c.type)?.label ?? c.type}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {TYPES.find((t) => t.value === c.type)?.label ?? c.type}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{c.issued_on}</TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -165,6 +209,9 @@ export default function CertificatesPage() {
                         size="sm"
                         onClick={() =>
                           setPreview({
+                            id: c.id,
+                            studentId: c.student_id,
+                            typeCode: c.type,
                             studentName: studentName(c.student_id),
                             type: TYPES.find((t) => t.value === c.type)?.label ?? c.type,
                             issuedOn: c.issued_on,
@@ -190,12 +237,29 @@ export default function CertificatesPage() {
           {preview && (
             <SectionCard>
               <div className="space-y-3 p-2 text-sm">
-                <p>This is to certify that <span className="font-semibold">{preview.studentName}</span> is/was a bona fide student of this school.</p>
+                <p>
+                  This is to certify that{" "}
+                  <span className="font-semibold">{preview.studentName}</span> is/was a bona fide
+                  student of this school.
+                </p>
                 <p className="text-muted-foreground">Certificate Type: {preview.type}</p>
                 <p className="text-muted-foreground">Issued On: {preview.issuedOn}</p>
                 <p className="text-muted-foreground">Issued By: {user?.name}</p>
               </div>
-              <Button className="mt-4 w-full" onClick={() => window.print()}>
+              <Button
+                className="mt-4 w-full"
+                onClick={() => {
+                  const st = (students ?? []).find((x) => x.id === preview.studentId);
+                  printCertificate(school, {
+                    type: preview.typeCode,
+                    typeLabel: preview.type,
+                    student: st ?? { name: preview.studentName },
+                    issuedOn: preview.issuedOn,
+                    issuedBy: user?.name ?? null,
+                    serial: `CERT-${preview.id.slice(0, 8).toUpperCase()}`,
+                  });
+                }}
+              >
                 <Printer className="h-4 w-4" /> Print
               </Button>
             </SectionCard>

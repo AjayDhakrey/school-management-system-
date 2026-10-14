@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ClipboardList, Clock3, CheckCircle2, XCircle, Plus, Check, X, Eye } from "lucide-react";
 import {
   PageHeader,
   SearchInput,
-  FilterSelect,
   EmptyState,
   Pager,
   Initials,
@@ -305,6 +305,23 @@ function splitReason(reason: string | null): { type: string; text: string } {
   return { type: reason.slice(0, idx).trim(), text: reason.slice(idx + 1).trim() };
 }
 
+/** "20 – 22 Oct · 3 days" (or "20 Oct · 1 day"). */
+function leaveRange(from: string | null | undefined, to: string | null | undefined) {
+  if (!from) return "—";
+  const a = new Date(`${from.slice(0, 10)}T00:00:00Z`);
+  const b = new Date(`${(to || from).slice(0, 10)}T00:00:00Z`);
+  const days = Math.max(1, Math.round((b.getTime() - a.getTime()) / 86_400_000) + 1);
+  const opts = { day: "numeric", month: "short", timeZone: "UTC" } as const;
+  const sameMonth = a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear();
+  const range =
+    days === 1
+      ? a.toLocaleDateString("en-IN", opts)
+      : sameMonth
+        ? `${a.getUTCDate()} – ${b.toLocaleDateString("en-IN", opts)}`
+        : `${a.toLocaleDateString("en-IN", opts)} – ${b.toLocaleDateString("en-IN", opts)}`;
+  return `${range} · ${days} day${days === 1 ? "" : "s"}`;
+}
+
 export default function Page({ type: leaveType }: { type: LeaveType }) {
   const { user } = useAuth();
   if (user?.role === "TEACHER" && leaveType === "TEACHER") return <TeacherOwnLeaveView />;
@@ -394,7 +411,42 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
       <SectionCard className="mt-4" title={TITLES[leaveType]} subtitle="All submitted leave applications">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row">
           <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search person…" />
-          <FilterSelect value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={["Pending", "Approved", "Rejected"]} placeholder="Status" />
+        </div>
+        {/* Status tabs */}
+        <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {(
+            [
+              ["all", "All", total],
+              ["Pending", "Pending", pending],
+              ["Approved", "Approved", approved],
+              ["Rejected", "Rejected", rejected],
+            ] as const
+          ).map(([value, label, count]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => {
+                setStatus(value);
+                setPage(1);
+              }}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                status === value
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground",
+              )}
+            >
+              {label}
+              <span
+                className={cn(
+                  "rounded-full px-1.5 text-[10px] tabular-nums",
+                  status === value ? "bg-white/20" : "bg-muted",
+                )}
+              >
+                {count}
+              </span>
+            </button>
+          ))}
         </div>
 
         {isLoading ? (
@@ -402,71 +454,62 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
         ) : paged.length === 0 ? (
           <EmptyState title="No leave requests found" icon={ClipboardList} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-2 py-2">Person</th>
-                  <th className="px-2 py-2">Type</th>
-                  <th className="px-2 py-2">From</th>
-                  <th className="px-2 py-2">To</th>
-                  <th className="px-2 py-2">Reason</th>
-                  <th className="px-2 py-2">Status</th>
-                  <th className="px-2 py-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paged.map((l) => {
-                  const { type, text } = splitReason(l.reason);
-                  const name = nameFor(l.requester_id);
-                  return (
-                    <tr key={l.id} className="border-b border-border/60">
-                      <td className="px-2 py-2">
-                        <div className="flex items-center gap-2">
-                          <Initials name={name} />
-                          <span className="font-medium">{name}</span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-2">{type}</td>
-                      <td className="px-2 py-2 text-muted-foreground">{l.from_date ?? "—"}</td>
-                      <td className="px-2 py-2 text-muted-foreground">{l.to_date ?? "—"}</td>
-                      <td className="max-w-[160px] truncate px-2 py-2 text-muted-foreground">{text}</td>
-                      <td className="px-2 py-2"><StatusBadge status={l.status} /></td>
-                      <td className="px-2 py-2">
-                        <div className="flex items-center gap-1">
-                          <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => setSelected(l)}>
-                            <Eye className="h-3.5 w-3.5" />
+          <ul className="space-y-2.5">
+            {paged.map((l) => {
+              const { type, text } = splitReason(l.reason);
+              const name = nameFor(l.requester_id);
+              return (
+                <li key={l.id} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
+                  <Initials name={name} className="h-10 w-10 text-xs" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold capitalize">{name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {type} · {leaveRange(l.from_date, l.to_date)}
+                        </p>
+                      </div>
+                      <StatusBadge status={l.status} />
+                    </div>
+                    {text && (
+                      <p className="mt-1 line-clamp-1 text-xs text-foreground/70">“{text}”</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 px-2.5 text-xs"
+                        onClick={() => setSelected(l)}
+                      >
+                        <Eye className="h-3.5 w-3.5" /> View
+                      </Button>
+                      {l.status === "Pending" && (
+                        <>
+                          <Button
+                            size="sm"
+                            className="h-8 gap-1 px-2.5 text-xs"
+                            disabled={actingId === l.id}
+                            onClick={() => updateStatus(l.id, "Approved")}
+                          >
+                            <Check className="h-3.5 w-3.5" /> Approve
                           </Button>
-                          {l.status === "Pending" && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 w-7 p-0 text-success"
-                                disabled={actingId === l.id}
-                                onClick={() => updateStatus(l.id, "Approved")}
-                              >
-                                <Check className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-7 w-7 p-0 text-destructive"
-                                disabled={actingId === l.id}
-                                onClick={() => updateStatus(l.id, "Rejected")}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 gap-1 px-2.5 text-xs text-destructive"
+                            disabled={actingId === l.id}
+                            onClick={() => updateStatus(l.id, "Rejected")}
+                          >
+                            <X className="h-3.5 w-3.5" /> Reject
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
         <Pager page={page} pageCount={pageCount} onPage={setPage} total={filtered.length} />
       </SectionCard>
@@ -475,31 +518,30 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
         {history.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">No processed requests yet.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-2 py-2">Person</th>
-                  <th className="px-2 py-2">Type</th>
-                  <th className="px-2 py-2">Dates</th>
-                  <th className="px-2 py-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((l) => {
-                  const { type } = splitReason(l.reason);
-                  return (
-                    <tr key={l.id} className="border-b border-border/60">
-                      <td className="px-2 py-2 font-medium">{nameFor(l.requester_id)}</td>
-                      <td className="px-2 py-2">{type}</td>
-                      <td className="px-2 py-2 text-muted-foreground">{l.from_date} – {l.to_date}</td>
-                      <td className="px-2 py-2"><StatusBadge status={l.status} /></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <ul className="space-y-2.5">
+            {history.map((l) => {
+              const { type } = splitReason(l.reason);
+              const name = nameFor(l.requester_id);
+              return (
+                <li key={l.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(l)}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left shadow-sm active:scale-[0.99]"
+                  >
+                    <Initials name={name} className="h-9 w-9 text-[11px]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold capitalize">{name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {type} · {leaveRange(l.from_date, l.to_date)}
+                      </p>
+                    </div>
+                    <StatusBadge status={l.status} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </SectionCard>
 

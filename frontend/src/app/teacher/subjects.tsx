@@ -1,11 +1,17 @@
 "use client";
 
 import { useMemo } from "react";
-import { BookOpen, GraduationCap, Clock, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
+import { BookOpen, GraduationCap, Clock } from "lucide-react";
 import { PageHeader, EmptyState, CardSkeleton } from "@/components/shared/ui-kit";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { InfoCard } from "@/components/shared/InfoCard";
-import { useMyTeacherTeachingSubjects, useMyTeacherProfile, useClasses, useSubjects } from "@/hooks/useApi";
+import {
+  useMyTeacherTeachingSubjects,
+  useMyTeacherProfile,
+  useClasses,
+  useSubjects,
+} from "@/hooks/useApi";
 
 function typeTone(type: string | null | undefined) {
   if (type === "Core") return "info" as const;
@@ -101,11 +107,21 @@ export default function TeacherSubjectsPage() {
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <InfoCard label="Assigned Subjects" value={totalSubjectsCount} icon={BookOpen} tone="navy" />
-        <InfoCard label="Teaching Classes" value={totalClassesCount} icon={GraduationCap} tone="info" />
         <InfoCard
-          label="Total Weekly Credits"
-          value={`${subjectsBySubjectId.reduce((sum, s) => sum + (s.credits ?? 3) * s.classes.length, 0)} hrs`}
+          label="Assigned Subjects"
+          value={totalSubjectsCount}
+          icon={BookOpen}
+          tone="navy"
+        />
+        <InfoCard
+          label="Teaching Classes"
+          value={totalClassesCount}
+          icon={GraduationCap}
+          tone="info"
+        />
+        <InfoCard
+          label="Periods per Week"
+          value={`${subjectsBySubjectId.reduce((sum, s) => sum + (s.credits ?? 3) * s.classes.length, 0)}`}
           icon={Clock}
           tone="gold"
         />
@@ -120,65 +136,77 @@ export default function TeacherSubjectsPage() {
           icon={BookOpen}
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {subjectsBySubjectId.map((s, idx) => (
-            <div
-              key={idx}
-              className="panel flex flex-col justify-between p-4 border border-border/80 hover:border-primary/40 transition-all shadow-sm"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                      <BookOpen className="h-5 w-5" />
-                    </span>
-                    <div>
-                      <h3 className="font-bold text-base leading-tight">{s.subjectName}</h3>
-                      <span className="font-mono text-xs text-muted-foreground">{s.code ?? "No Code"}</span>
-                    </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {subjectsBySubjectId.map((s, idx) => {
+            const perWeek = s.credits ?? 3;
+            const classes = [...s.classes].sort((a, b) =>
+              a.name.localeCompare(b.name, undefined, { numeric: true }),
+            );
+            return (
+              <div
+                key={idx}
+                className="flex flex-col rounded-2xl border border-border bg-card shadow-sm"
+              >
+                <div className="flex items-center gap-3 p-4 pb-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <BookOpen className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate font-display text-base font-bold">{s.subjectName}</h3>
+                    <p className="truncate text-xs text-muted-foreground">
+                      You teach this in{" "}
+                      <b className="text-foreground">
+                        {classes.length} class{classes.length === 1 ? "" : "es"}
+                      </b>
+                      {s.code ? ` · Code ${s.code}` : ""}
+                    </p>
                   </div>
-                  <StatusBadge status={s.type ?? "Core"} tone={typeTone(s.type)} />
+                  <StatusBadge status={`${s.type ?? "Core"} subject`} tone={typeTone(s.type)} />
                 </div>
 
                 {s.description && (
-                  <p className="mt-3 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                  <p className="-mt-1 line-clamp-2 px-4 pb-3 text-xs leading-relaxed text-muted-foreground">
                     {s.description}
                   </p>
                 )}
 
-                <div className="mt-4 rounded-lg bg-muted/40 p-3 border border-border/60">
-                  <p className="text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-wider">
-                    Assigned Classes ({s.classes.length})
+                <div className="px-4">
+                  <p className="mb-1.5 text-[11px] font-semibold text-muted-foreground">
+                    Your classes — tap to see students
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {s.classes.length > 0 ? (
-                      s.classes.map((c) => (
-                        <span
+                  {classes.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {classes.map((c) => (
+                        <Link
                           key={c.id}
-                          className="inline-flex items-center gap-1 rounded-md bg-surface px-2.5 py-1 text-xs font-semibold border border-border/80 text-foreground"
+                          to={`/teacher/students?classId=${c.id}`}
+                          className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs font-semibold capitalize transition-colors hover:border-primary/40 hover:text-primary"
                         >
                           <GraduationCap className="h-3 w-3 text-primary" />
                           {c.name}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-xs text-muted-foreground italic">No classes allocated</span>
-                    )}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs italic text-muted-foreground">No classes given yet</p>
+                  )}
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 border-t border-border text-center">
+                  <div className="px-3 py-2.5">
+                    <p className="font-display text-base font-bold tabular-nums">{perWeek}</p>
+                    <p className="text-[10px] text-muted-foreground">periods / week per class</p>
+                  </div>
+                  <div className="border-l border-border px-3 py-2.5">
+                    <p className="font-display text-base font-bold tabular-nums text-primary">
+                      {perWeek * classes.length}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">periods / week in total</p>
                   </div>
                 </div>
               </div>
-
-              <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1 font-medium">
-                  <Clock className="h-3.5 w-3.5" />
-                  {s.credits ?? 3} Credit Hours / Week
-                </span>
-                <span className="text-[11px] font-medium text-primary bg-primary/5 px-2 py-0.5 rounded">
-                  Active
-                </span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

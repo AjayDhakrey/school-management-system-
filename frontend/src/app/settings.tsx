@@ -13,7 +13,23 @@ import { Label } from "@/components/ui/label";
 import { useAcademicYears, useSchoolProfile } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 import { PhoneInput } from "@/components/shared/PhoneInput";
-import { SchoolTimingsEditor } from "@/components/shared/SchoolTimingsEditor";
+import { cn } from "@/lib/utils";
+import {
+  BadgeCheck,
+  BookOpen,
+  Building2,
+  CalendarDays,
+  Globe,
+  GraduationCap,
+  Hash,
+  ImageIcon,
+  Mail,
+  MapPin,
+  Phone,
+  School,
+  Tag,
+  UserRound,
+} from "lucide-react";
 
 function SchoolProfileForm() {
   const { data: school, isLoading } = useSchoolProfile();
@@ -76,91 +92,239 @@ function SchoolProfileForm() {
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
+  const changed =
+    !!school &&
+    [
+      [name, school.name],
+      [shortName, school.short_name],
+      [address, school.address],
+      [phone, school.phone],
+      [email, school.email],
+      [logoUrl, school.logo_url],
+      [code, school.code],
+      [website, school.website],
+      [principal, school.principal],
+      [board, school.board],
+      [affiliation, school.affiliation],
+    ].some(([now, was]) => (now ?? "") !== (was ?? ""));
+  const initials =
+    (shortName || name)
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]!.toUpperCase())
+      .join("") || "S";
+
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-name">School Name</Label>
-        <Input id="sch-name" value={name} onChange={(e) => setName(e.target.value)} />
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Identity */}
+      <div className="flex items-center gap-3 rounded-2xl border border-border bg-gradient-to-br from-primary/10 via-card to-card p-4">
+        <span className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-primary text-lg font-bold text-primary-foreground shadow-sm">
+          {/^https?:\/\//i.test(logoUrl) ? (
+            <img src={logoUrl} alt="" className="h-full w-full bg-white object-contain" />
+          ) : (
+            initials
+          )}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-lg font-bold capitalize">
+            {name || "Your school"}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {[shortName, board, session].filter(Boolean).join(" · ") || "Add your school details"}
+          </p>
+        </div>
       </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-short">Short Name</Label>
-        <Input id="sch-short" value={shortName} onChange={(e) => setShortName(e.target.value)} />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-code">School Code</Label>
-        <Input id="sch-code" value={code} onChange={(e) => setCode(e.target.value)} />
-      </div>
-      <div className="grid gap-1.5 sm:col-span-2">
-        <Label htmlFor="sch-address">Address</Label>
-        <Input id="sch-address" value={address} onChange={(e) => setAddress(e.target.value)} />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-phone">Phone</Label>
-        <PhoneInput id="sch-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-email">Email</Label>
-        <Input
-          id="sch-email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-session">Academic Session</Label>
-        <Input
-          id="sch-session"
-          value={session}
-          readOnly
-          disabled
-          title="Managed by the active academic year"
-        />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-logo">Logo URL</Label>
-        <Input
-          id="sch-logo"
-          value={logoUrl}
-          onChange={(e) => setLogoUrl(e.target.value)}
-          placeholder="https://…"
-        />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-website">Website</Label>
-        <Input
-          id="sch-website"
-          type="url"
-          value={website}
-          onChange={(e) => setWebsite(e.target.value)}
-        />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-principal">Principal / Administrator</Label>
-        <Input
+
+      <ProfileGroup icon={Building2} title="School details">
+        <Field id="sch-name" label="School name" icon={School} className="sm:col-span-2">
+          <Input
+            id="sch-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="pl-9"
+          />
+        </Field>
+        <Field id="sch-short" label="Short name" icon={Tag}>
+          <Input
+            id="sch-short"
+            value={shortName}
+            onChange={(e) => setShortName(e.target.value)}
+            className="pl-9"
+          />
+        </Field>
+        <Field id="sch-code" label="School code" icon={Hash}>
+          <Input
+            id="sch-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            placeholder="e.g. MPS-001"
+            className="pl-9"
+          />
+        </Field>
+        <Field
           id="sch-principal"
-          value={principal}
-          onChange={(e) => setPrincipal(e.target.value)}
-        />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-board">Board</Label>
-        <Input id="sch-board" value={board} onChange={(e) => setBoard(e.target.value)} />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="sch-affiliation">Affiliation</Label>
-        <Input
-          id="sch-affiliation"
-          value={affiliation}
-          onChange={(e) => setAffiliation(e.target.value)}
-        />
-      </div>
-      <div className="sm:col-span-2">
-        <Button type="submit" disabled={submitting}>
-          Save Changes
+          label="Principal / Administrator"
+          icon={UserRound}
+          className="sm:col-span-2"
+        >
+          <Input
+            id="sch-principal"
+            value={principal}
+            onChange={(e) => setPrincipal(e.target.value)}
+            className="pl-9"
+          />
+        </Field>
+      </ProfileGroup>
+
+      <ProfileGroup icon={Phone} title="Contact">
+        <Field id="sch-phone" label="Phone" icon={Phone}>
+          <PhoneInput
+            id="sch-phone"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="pl-9"
+          />
+        </Field>
+        <Field id="sch-email" label="Email" icon={Mail}>
+          <Input
+            id="sch-email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="pl-9"
+          />
+        </Field>
+        <Field id="sch-address" label="Address" icon={MapPin} className="sm:col-span-2">
+          <Input
+            id="sch-address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Street, city, state, PIN"
+            className="pl-9"
+          />
+        </Field>
+        <Field id="sch-website" label="Website" icon={Globe} className="sm:col-span-2">
+          <Input
+            id="sch-website"
+            type="url"
+            value={website}
+            onChange={(e) => setWebsite(e.target.value)}
+            placeholder="https://…"
+            className="pl-9"
+          />
+        </Field>
+      </ProfileGroup>
+
+      <ProfileGroup icon={GraduationCap} title="Academic">
+        <Field id="sch-board" label="Board" icon={BookOpen}>
+          <Input
+            id="sch-board"
+            value={board}
+            onChange={(e) => setBoard(e.target.value)}
+            placeholder="e.g. CBSE"
+            className="pl-9"
+          />
+        </Field>
+        <Field id="sch-affiliation" label="Affiliation no." icon={BadgeCheck}>
+          <Input
+            id="sch-affiliation"
+            value={affiliation}
+            onChange={(e) => setAffiliation(e.target.value)}
+            className="pl-9"
+          />
+        </Field>
+        <Field
+          id="sch-session"
+          label="Academic session"
+          icon={CalendarDays}
+          hint="Set by the active academic year below"
+        >
+          <Input id="sch-session" value={session} readOnly disabled className="pl-9" />
+        </Field>
+        <Field
+          id="sch-logo"
+          label="Logo URL"
+          icon={ImageIcon}
+          hint="Shown on receipts and certificates"
+        >
+          <Input
+            id="sch-logo"
+            value={logoUrl}
+            onChange={(e) => setLogoUrl(e.target.value)}
+            placeholder="https://…"
+            className="pl-9"
+          />
+        </Field>
+      </ProfileGroup>
+
+      {/* Save bar — sticks to the bottom on phones while there are changes. */}
+      <div
+        className={cn(
+          "flex items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3",
+          changed &&
+            "sticky bottom-20 z-10 shadow-lg ring-1 ring-primary/20 lg:static lg:shadow-none lg:ring-0",
+        )}
+      >
+        <p className="text-xs text-muted-foreground">
+          {changed ? "You have unsaved changes" : "All changes saved"}
+        </p>
+        <Button type="submit" disabled={submitting || !changed} className="min-w-32">
+          {submitting ? "Saving…" : "Save Changes"}
         </Button>
       </div>
     </form>
+  );
+}
+
+function ProfileGroup({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: typeof School;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-border bg-card">
+      <h3 className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5 text-sm font-semibold">
+        <span className="grid h-7 w-7 place-items-center rounded-lg bg-primary/10 text-primary">
+          <Icon className="h-4 w-4" />
+        </span>
+        {title}
+      </h3>
+      <div className="grid gap-3 p-4 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+function Field({
+  id,
+  label,
+  icon: Icon,
+  hint,
+  className,
+  children,
+}: {
+  id: string;
+  label: string;
+  icon: typeof School;
+  hint?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn("grid gap-1.5", className)}>
+      <Label htmlFor={id} className="text-xs font-medium text-muted-foreground">
+        {label}
+      </Label>
+      <div className="relative">
+        <Icon className="pointer-events-none absolute top-1/2 left-3 z-10 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        {children}
+      </div>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </div>
   );
 }
 
@@ -317,21 +481,12 @@ export default function Page() {
         breadcrumb={["Dashboard", "School Settings"]}
       />
 
-
       <SectionCard
         title="School Profile"
         subtitle="Shown across the app, receipts and certificates"
         className="mt-4 mb-4"
       >
         <SchoolProfileForm />
-      </SectionCard>
-
-      <SectionCard
-        title="School Timings"
-        subtitle="Working days and period times used by every class timetable"
-        className="mb-4"
-      >
-        <SchoolTimingsEditor />
       </SectionCard>
 
       <SectionCard

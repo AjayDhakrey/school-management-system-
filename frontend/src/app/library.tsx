@@ -25,6 +25,7 @@ import {
   Trash2,
   Undo2,
   UserRound,
+  ChevronRight,
 } from "lucide-react";
 import {
   PageHeader,
@@ -180,6 +181,35 @@ function useAvailability(copies: ApiLibraryCopy[]) {
     }
     return map;
   }, [copies]);
+}
+
+/** Days a loan was (or is) kept past its due date. */
+function daysLate(l: { due_date: string | null; returned_on: string | null }) {
+  if (!l.due_date) return 0;
+  const end = l.returned_on ?? new Date().toISOString().slice(0, 10);
+  const diff = Math.round((Date.parse(end) - Date.parse(l.due_date)) / 86_400_000);
+  return diff > 0 ? diff : 0;
+}
+
+/** A plain book icon tile. */
+function BookSpine({ title: _title }: { title: string }) {
+  return (
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+      <BookOpen className="h-4 w-4" />
+    </span>
+  );
+}
+
+/** "2 of 3 available" as plain text. */
+function CopiesMeter({ info }: { info: { total: number; available: number } | undefined }) {
+  if (!info || info.total === 0) {
+    return <span className="text-xs text-muted-foreground">No copies</span>;
+  }
+  return (
+    <span className="text-xs whitespace-nowrap text-foreground/80">
+      {info.available ? `${info.available} of ${info.total} available` : `All ${info.total} issued`}
+    </span>
+  );
 }
 
 function AvailabilityBadge({ info }: { info: { total: number; available: number } | undefined }) {
@@ -704,52 +734,103 @@ function CatalogueTab({
           icon={BookOpen}
         />
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>ISBN</TableHead>
-                <TableHead>Shelf</TableHead>
-                <TableHead>Copies</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((b) => (
-                <TableRow key={b.id}>
-                  <TableCell>
-                    <p className="font-medium">{b.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {[b.author, b.edition && `${b.edition} ed.`, b.publisher]
-                        .filter(Boolean)
-                        .join(" · ") || "Unknown author"}
-                    </p>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{b.category ?? "—"}</TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {b.isbn ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{b.shelf_location ?? "—"}</TableCell>
-                  <TableCell>
-                    <AvailabilityBadge info={availability.get(b.id)} />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8"
-                      onClick={() => setDetailsId(b.id)}
-                    >
-                      Details
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <>
+          {/* Phones: a card per book. */}
+          <ul className="divide-y divide-border md:hidden">
+            {rows.map((b) => {
+              const info = availability.get(b.id);
+              return (
+                <li key={b.id}>
+                  <button
+                    type="button"
+                    onClick={() => setDetailsId(b.id)}
+                    className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-muted/50"
+                  >
+                    <BookSpine title={b.title} />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold capitalize">{b.title}</p>
+                      <p className="truncate text-[11px] text-muted-foreground capitalize">
+                        {b.author || "Unknown author"}
+                        {b.category ? ` · ${b.category}` : ""}
+                      </p>
+                      <div className="mt-1.5">
+                        <CopiesMeter info={info} />
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Tablets & desktop */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-2.5">Book</th>
+                  <th className="px-3 py-2.5">Category</th>
+                  <th className="px-3 py-2.5">ISBN</th>
+                  <th className="px-3 py-2.5">Shelf</th>
+                  <th className="px-3 py-2.5">Copies</th>
+                  <th className="px-4 py-2.5 text-right">
+                    <span className="sr-only">Action</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((b) => (
+                  <tr key={b.id} className="border-b border-border/60 last:border-0">
+                    <td className="px-4 py-2.5">
+                      <div className="flex min-w-[220px] items-center gap-3">
+                        <BookSpine title={b.title} />
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold capitalize">{b.title}</p>
+                          <p className="truncate text-xs text-muted-foreground capitalize">
+                            {[b.author, b.edition && `${b.edition} ed.`, b.publisher]
+                              .filter(Boolean)
+                              .join(" · ") || "Unknown author"}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {b.category ? (
+                        <span className="text-muted-foreground">{b.category}</span>
+                      ) : (
+                        <span className="text-muted-foreground/50">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 font-mono text-xs whitespace-nowrap text-muted-foreground">
+                      {b.isbn ?? <span className="font-sans text-muted-foreground/50">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5 whitespace-nowrap">
+                      {b.shelf_location ? (
+                        <span className="text-muted-foreground">{b.shelf_location}</span>
+                      ) : (
+                        <span className="text-muted-foreground/50">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <CopiesMeter info={availability.get(b.id)} />
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={() => setDetailsId(b.id)}
+                      >
+                        View
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       <Pager
         page={Math.min(page, pageCount)}
@@ -1939,7 +2020,7 @@ function ReportsTab({ loans, isLoading }: { loans: ApiLibraryLoan[]; isLoading: 
       }
       bodyClassName="p-0"
     >
-      <div className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:flex-wrap sm:items-end">
+      <div className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:flex-wrap sm:items-center">
         <SearchInput
           value={search}
           onChange={(v) => {
@@ -1966,31 +2047,29 @@ function ReportsTab({ loans, isLoading }: { loans: ApiLibraryLoan[]; isLoading: 
           options={Object.values(BORROWER_LABEL)}
           placeholder="All borrowers"
         />
-        <div className="flex items-end gap-2">
-          <div>
-            <Label className="mb-1 text-[11px] text-muted-foreground">Issued from</Label>
-            <Input
-              className="h-9 w-[150px]"
-              type="date"
-              value={from}
-              onChange={(e) => {
-                setFrom(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
-          <div>
-            <Label className="mb-1 text-[11px] text-muted-foreground">to</Label>
-            <Input
-              className="h-9 w-[150px]"
-              type="date"
-              value={to}
-              onChange={(e) => {
-                setTo(e.target.value);
-                setPage(1);
-              }}
-            />
-          </div>
+        <div className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 text-xs text-muted-foreground">
+          <span className="font-medium">Issued</span>
+          <input
+            type="date"
+            aria-label="Issued from"
+            value={from}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              setPage(1);
+            }}
+            className="h-7 bg-transparent text-xs text-foreground outline-none"
+          />
+          <span>→</span>
+          <input
+            type="date"
+            aria-label="Issued to"
+            value={to}
+            onChange={(e) => {
+              setTo(e.target.value);
+              setPage(1);
+            }}
+            className="h-7 bg-transparent text-xs text-foreground outline-none"
+          />
         </div>
       </div>
       {isLoading ? (
@@ -2002,60 +2081,109 @@ function ReportsTab({ loans, isLoading }: { loans: ApiLibraryLoan[]; isLoading: 
           icon={Layers}
         />
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Book</TableHead>
-                <TableHead>Borrower</TableHead>
-                <TableHead>Issued</TableHead>
-                <TableHead>Due</TableHead>
-                <TableHead>Returned</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((l) => {
-                const s = loanStatus(l);
-                return (
-                  <TableRow key={l.id}>
-                    <TableCell>
-                      <p className="font-medium">{l.title}</p>
-                      <p className="text-xs text-muted-foreground">Copy {l.accession_no ?? "—"}</p>
-                    </TableCell>
-                    <TableCell>
-                      <p className="whitespace-nowrap">{l.borrower_name ?? "—"}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {BORROWER_LABEL[l.borrower_type]}
-                        {l.borrower_number ? ` · ${l.borrower_number}` : ""}
-                      </p>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {fmtDate(l.issued_on)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {fmtDate(l.due_date)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {fmtDate(l.returned_on)}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={s.label} tone={s.tone} />
-                      {l.remarks && (
-                        <p
-                          className="mt-1 max-w-48 truncate text-[11px] text-muted-foreground"
-                          title={l.remarks}
-                        >
-                          {l.remarks}
+        <>
+          {/* Phones */}
+          <ul className="divide-y divide-border md:hidden">
+            {rows.map((l) => {
+              const st = loanStatus(l);
+              const late = daysLate(l);
+              return (
+                <li key={l.id} className="flex items-start gap-3 px-3 py-3">
+                  <BookSpine title={l.title ?? ""} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="truncate text-sm font-semibold capitalize">{l.title}</p>
+                      <StatusBadge status={st.label} tone={st.tone} />
+                    </div>
+                    <p className="truncate text-[11px] text-muted-foreground capitalize">
+                      {l.borrower_name ?? "—"} · {BORROWER_LABEL[l.borrower_type]}
+                    </p>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {fmtDate(l.issued_on)} → {fmtDate(l.due_date)}
+                      {l.returned_on ? ` · back ${fmtDate(l.returned_on)}` : ""}
+                      {late > 0 && <span className="text-warning"> · {late}d late</span>}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          {/* Tablets & desktop */}
+          <div className="hidden overflow-x-auto md:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-2.5">Book</th>
+                  <th className="px-3 py-2.5">Borrower</th>
+                  <th className="px-3 py-2.5">Issued → Due</th>
+                  <th className="px-3 py-2.5">Returned</th>
+                  <th className="px-4 py-2.5">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((l) => {
+                  const st = loanStatus(l);
+                  const late = daysLate(l);
+                  return (
+                    <tr key={l.id} className="border-b border-border/60 align-top last:border-0">
+                      <td className="px-4 py-2.5">
+                        <div className="flex min-w-[200px] items-center gap-3">
+                          <BookSpine title={l.title ?? ""} />
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold capitalize">{l.title}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Copy {l.accession_no ?? "—"}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="whitespace-nowrap capitalize">{l.borrower_name ?? "—"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {BORROWER_LABEL[l.borrower_type]}
+                          {l.borrower_number ? ` · ${l.borrower_number}` : ""}
                         </p>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        <p>{fmtDate(l.issued_on)}</p>
+                        <p className="text-xs text-muted-foreground">due {fmtDate(l.due_date)}</p>
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap">
+                        {l.returned_on ? (
+                          <>
+                            <p>{fmtDate(l.returned_on)}</p>
+                            <p
+                              className={cn(
+                                "text-xs",
+                                late > 0 ? "text-warning" : "text-muted-foreground",
+                              )}
+                            >
+                              {late > 0 ? `${late} day${late === 1 ? "" : "s"} late` : "On time"}
+                            </p>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Not yet</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <StatusBadge status={st.label} tone={st.tone} />
+                        {l.remarks && (
+                          <p
+                            className="mt-1 max-w-48 truncate text-[11px] text-muted-foreground"
+                            title={l.remarks}
+                          >
+                            {l.remarks}
+                          </p>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       <Pager
         page={Math.min(page, pageCount)}

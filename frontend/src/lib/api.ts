@@ -1650,6 +1650,24 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
     case "school-admins":
       return manageLogin(method, resource, second, third, values());
 
+    // Deleting an examination removes its papers and their marks too (migration 63).
+    case "examinations": {
+      if (method !== "DELETE" || !second) break;
+      const { error } = await supabase.rpc("delete_examination", { p_examination_id: second });
+      if (!error) return { ok: true };
+      if (
+        /delete_examination/i.test(error.message) &&
+        /find|exist|schema cache/i.test(error.message)
+      ) {
+        throw new ApiError(
+          400,
+          "Deleting exams that have papers needs a database update — run migration 63_examination_delete.sql in Supabase",
+        );
+      }
+      fail(error);
+      break;
+    }
+
     case "schools": {
       if (second && parts[parts.length - 1] === "admin" && method === "POST") {
         return invokeFunction("manage-user-login", {

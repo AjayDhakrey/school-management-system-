@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AttendanceHistory } from "@/components/shared/AttendanceHistory";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,6 +16,7 @@ import {
   Clock3,
   AlertTriangle,
   CircleDashed,
+  School,
 } from "lucide-react";
 import { PageHeader, EmptyState, Initials, TableSkeleton } from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
@@ -22,9 +24,22 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { InfoCard, ProgressBar } from "@/components/shared/InfoCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -106,7 +121,15 @@ function StatusToggle({
 }
 
 function SummaryCards({ summary }: { summary: ApiAttendanceSummary | undefined }) {
-  const s = summary ?? { present: 0, absent: 0, late: 0, leave: 0, eligible: 0, percentage: 0, total: 0 };
+  const s = summary ?? {
+    present: 0,
+    absent: 0,
+    late: 0,
+    leave: 0,
+    eligible: 0,
+    percentage: 0,
+    total: 0,
+  };
   return (
     <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
       <InfoCard label="Attendance %" value={`${s.percentage}%`} icon={UserCheck} tone="success" />
@@ -119,7 +142,15 @@ function SummaryCards({ summary }: { summary: ApiAttendanceSummary | undefined }
 }
 
 /** A real month grid coloured from actual attendance records (date → status). */
-function MonthCalendar({ month, records, title }: { month: string; records: { date: string; status: string }[]; title: string }) {
+function MonthCalendar({
+  month,
+  records,
+  title,
+}: {
+  month: string;
+  records: { date: string; status: string }[];
+  title: string;
+}) {
   const y = Number(month.slice(0, 4));
   const m = Number(month.slice(5, 7));
   const daysInMonth = new Date(y, m, 0).getDate();
@@ -165,13 +196,20 @@ function MonthCalendar({ month, records, title }: { month: string; records: { da
   );
 }
 
-function HolidayBanner({ holiday, date }: { holiday: { name: string } | null | undefined; date: string }) {
+function HolidayBanner({
+  holiday,
+  date,
+}: {
+  holiday: { name: string } | null | undefined;
+  date: string;
+}) {
   if (!holiday) return null;
   return (
     <div className="mb-4 flex items-center gap-2 rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
       <AlertTriangle className="h-4 w-4 shrink-0" />
       <span>
-        {date} is a holiday ({holiday.name}). You can still record attendance if the school worked this day.
+        {date} is a holiday ({holiday.name}). You can still record attendance if the school worked
+        this day.
       </span>
     </div>
   );
@@ -248,6 +286,14 @@ function StudentAttendanceMarker({ teacherClassIds }: { teacherClassIds?: string
   const isFuture = date > todayStr();
   const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
 
+  // A class teacher has one class: open it straight away, no class/section choice.
+  const ownClass = teacherClassIds && markableClasses.length === 1 ? markableClasses[0]! : null;
+  useEffect(() => {
+    if (!ownClass) return;
+    setClassName(ownClass.name);
+    setSection(ownClass.section);
+  }, [ownClass]);
+
   // A class with a single section needs no second choice.
   useEffect(() => {
     if (className && !section && sectionRows.length === 1) setSection(sectionRows[0]!.section);
@@ -278,38 +324,53 @@ function StudentAttendanceMarker({ teacherClassIds }: { teacherClassIds?: string
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3">
-        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-          <Select
-            value={className}
-            onValueChange={(v) => {
-              setClassName(v);
-              setSection("");
-            }}
-          >
-            <SelectTrigger className="h-9 w-full bg-surface text-sm capitalize sm:w-[150px]">
-              <SelectValue placeholder="Select class" />
-            </SelectTrigger>
-            <SelectContent>
-              {classNames.map((name) => (
-                <SelectItem key={name} value={name} className="capitalize">
-                  {name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={section} onValueChange={setSection} disabled={!className}>
-            <SelectTrigger className="h-9 w-full bg-surface text-sm sm:w-[140px]">
-              <SelectValue placeholder="Select section" />
-            </SelectTrigger>
-            <SelectContent>
-              {sectionRows.map((c) => (
-                <SelectItem key={c.id} value={c.section}>
-                  Section {c.section}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {ownClass ? (
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+              <School className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold capitalize">
+                {ownClass.name}
+                {ownClass.section ? ` – Section ${ownClass.section}` : ""}
+              </p>
+              <p className="text-[11px] text-muted-foreground">Your class</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
+            <Select
+              value={className}
+              onValueChange={(v) => {
+                setClassName(v);
+                setSection("");
+              }}
+            >
+              <SelectTrigger className="h-9 w-full bg-surface text-sm capitalize sm:w-[150px]">
+                <SelectValue placeholder="Select class" />
+              </SelectTrigger>
+              <SelectContent>
+                {classNames.map((name) => (
+                  <SelectItem key={name} value={name} className="capitalize">
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={section} onValueChange={setSection} disabled={!className}>
+              <SelectTrigger className="h-9 w-full bg-surface text-sm sm:w-[140px]">
+                <SelectValue placeholder="Select section" />
+              </SelectTrigger>
+              <SelectContent>
+                {sectionRows.map((c) => (
+                  <SelectItem key={c.id} value={c.section}>
+                    Section {c.section}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <Input
           type="date"
           max={todayStr()}
@@ -737,12 +798,12 @@ function EmployeeAttendanceMarker({ kind }: { kind: "teacher" | "staff" }) {
   const [saving, setSaving] = useState(false);
 
   const teacherRoster = useTeacherAttendanceRoster(date, undefined, kind === "teacher");
-  const staffRoster = useStaffAttendanceRoster(date, department === "all" ? undefined : department, kind === "staff");
+  const staffRoster = useStaffAttendanceRoster(
+    date,
+    department === "all" ? undefined : department,
+    kind === "staff",
+  );
   const roster = kind === "teacher" ? teacherRoster : staffRoster;
-
-  const teacherHistory = useTeacherAttendance(kind === "teacher", { from: `${monthStr()}-01`, to: todayStr() });
-  const staffHistory = useStaffAttendance(kind === "staff", { from: `${monthStr()}-01`, to: todayStr() });
-  const history = kind === "teacher" ? teacherHistory.data : staffHistory.data;
 
   const basePath = kind === "teacher" ? "/teacher-attendance" : "/staff-attendance";
   const bodyIdKey = kind === "teacher" ? "teacherId" : "staffId";
@@ -763,10 +824,20 @@ function EmployeeAttendanceMarker({ kind }: { kind: "teacher" | "staff" }) {
     if (!roster.data?.people.length) return;
     setSaving(true);
     try {
-      const entries = roster.data.people.map((p) => ({ [bodyIdKey]: p.id, status: draft[p.id] ?? "Present" }));
-      const res = await api.post<{ saved: number; skipped: number }>(`${basePath}/bulk`, { date, entries });
-      await queryClient.invalidateQueries({ queryKey: [kind === "teacher" ? "teacher-attendance" : "staff-attendance"] });
-      await queryClient.invalidateQueries({ queryKey: [`${kind}-attendance-roster-${date}-${kind === "staff" ? department : "all"}`] });
+      const entries = roster.data.people.map((p) => ({
+        [bodyIdKey]: p.id,
+        status: draft[p.id] ?? "Present",
+      }));
+      const res = await api.post<{ saved: number; skipped: number }>(`${basePath}/bulk`, {
+        date,
+        entries,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: [kind === "teacher" ? "teacher-attendance" : "staff-attendance"],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: [`${kind}-attendance-roster-${date}-${kind === "staff" ? department : "all"}`],
+      });
       toast.success(`Saved attendance for ${res.saved} ${kind}${res.saved === 1 ? "" : "s"}`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to save attendance");
@@ -784,6 +855,19 @@ function EmployeeAttendanceMarker({ kind }: { kind: "teacher" | "staff" }) {
 
   return (
     <div>
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <InfoCard
+          label={kind === "teacher" ? "Teachers" : "Staff"}
+          value={people.length}
+          icon={Users}
+          tone="navy"
+        />
+        <InfoCard label="Present" value={counts.Present} icon={UserCheck} tone="success" />
+        <InfoCard label="Absent" value={counts.Absent} icon={UserX} tone="danger" />
+        <InfoCard label="Late" value={counts.Late} icon={Clock} tone="warning" />
+        <InfoCard label="Leave" value={counts.Leave} icon={CalendarClock} tone="info" />
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3">
         <Input
           type="date"
@@ -808,7 +892,13 @@ function EmployeeAttendanceMarker({ kind }: { kind: "teacher" | "staff" }) {
           </Select>
         )}
         <div className="flex-1" />
-        <Button size="sm" variant="outline" onClick={markAllPresent} disabled={!people.length} className="gap-1.5">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={markAllPresent}
+          disabled={!people.length}
+          className="gap-1.5"
+        >
           <UserCheck className="h-4 w-4" /> Mark All Present
         </Button>
         <Button size="sm" onClick={save} disabled={saving || !people.length}>
@@ -816,25 +906,27 @@ function EmployeeAttendanceMarker({ kind }: { kind: "teacher" | "staff" }) {
         </Button>
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <InfoCard label={kind === "teacher" ? "Teachers" : "Staff"} value={people.length} icon={Users} tone="navy" />
-        <InfoCard label="Present" value={counts.Present} icon={UserCheck} tone="success" />
-        <InfoCard label="Absent" value={counts.Absent} icon={UserX} tone="danger" />
-        <InfoCard label="Late" value={counts.Late} icon={Clock} tone="warning" />
-        <InfoCard label="Leave" value={counts.Leave} icon={CalendarClock} tone="info" />
-      </div>
-
       {roster.isLoading ? (
         <TableSkeleton rows={6} cols={3} />
       ) : !people.length ? (
-        <EmptyState title={`No active ${kind}s`} description="Only active employees appear for attendance marking." />
+        <EmptyState
+          title={`No active ${kind}s`}
+          description="Only active employees appear for attendance marking."
+        />
       ) : (
-        <SectionCard title="Daily Register" subtitle={`${people.length} · ${date}`} bodyClassName="p-0" className="mb-4">
+        <SectionCard
+          title="Daily Register"
+          subtitle={`${people.length} · ${date}`}
+          bodyClassName="p-0"
+          className="mb-4"
+        >
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-2.5 font-medium">{kind === "teacher" ? "Teacher" : "Staff"}</th>
+                  <th className="px-4 py-2.5 font-medium">
+                    {kind === "teacher" ? "Teacher" : "Staff"}
+                  </th>
                   <th className="px-4 py-2.5 font-medium">Department</th>
                   <th className="px-4 py-2.5 font-medium">Status</th>
                 </tr>
@@ -847,13 +939,18 @@ function EmployeeAttendanceMarker({ kind }: { kind: "teacher" | "staff" }) {
                         <Initials name={p.name} className="h-8 w-8" />
                         <div className="min-w-0">
                           <p className="truncate font-medium">{p.name}</p>
-                          {p.employment_status === "ON_LEAVE" && <p className="text-[11px] text-info">On leave</p>}
+                          {p.employment_status === "ON_LEAVE" && (
+                            <p className="text-[11px] text-info">On leave</p>
+                          )}
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-muted-foreground">{p.department ?? "—"}</td>
                     <td className="px-4 py-2.5">
-                      <StatusToggle value={draft[p.id] ?? "Present"} onChange={(st) => setDraft((d) => ({ ...d, [p.id]: st }))} />
+                      <StatusToggle
+                        value={draft[p.id] ?? "Present"}
+                        onChange={(st) => setDraft((d) => ({ ...d, [p.id]: st }))}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -862,35 +959,6 @@ function EmployeeAttendanceMarker({ kind }: { kind: "teacher" | "staff" }) {
           </div>
         </SectionCard>
       )}
-
-      <SectionCard title="Recent History" subtitle="This month" bodyClassName="p-0">
-        {!history?.length ? (
-          <EmptyState title="No records this month" description="Saved attendance appears here." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>{kind === "teacher" ? "Teacher" : "Staff"}</TableHead>
-                  <TableHead className="text-right">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.slice(0, 60).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="text-muted-foreground">{r.date}</TableCell>
-                    <TableCell className="font-medium">{r.person_name ?? "—"}</TableCell>
-                    <TableCell className="text-right">
-                      <StatusBadge status={r.status} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </SectionCard>
     </div>
   );
 }
@@ -963,7 +1031,9 @@ function SelfCheckIn({ kind }: { kind: "teacher" | "staff" }) {
   const history = useMemo(() => [...rows].sort((a, b) => b.date.localeCompare(a.date)), [rows]);
   const month = monthStr();
   const monthRows = history.filter((r) => r.date.startsWith(month));
-  const presentThisMonth = monthRows.filter((r) => r.status === "Present" || r.status === "Late").length;
+  const presentThisMonth = monthRows.filter(
+    (r) => r.status === "Present" || r.status === "Late",
+  ).length;
 
   async function act(kind2: "check-in" | "check-out") {
     setBusy(kind2 === "check-in" ? "in" : "out");
@@ -981,7 +1051,12 @@ function SelfCheckIn({ kind }: { kind: "teacher" | "staff" }) {
   return (
     <div>
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <InfoCard label="This Month" value={`${presentThisMonth}/${monthRows.length}`} icon={CalendarCheck} tone="navy" />
+        <InfoCard
+          label="This Month"
+          value={`${presentThisMonth}/${monthRows.length}`}
+          icon={CalendarCheck}
+          tone="navy"
+        />
         <InfoCard label="Check In" value={todayRow?.check_in ?? "—"} icon={LogIn} tone="success" />
         <InfoCard label="Check Out" value={todayRow?.check_out ?? "—"} icon={LogOut} tone="info" />
       </div>
@@ -995,7 +1070,11 @@ function SelfCheckIn({ kind }: { kind: "teacher" | "staff" }) {
             <div>
               <p className="text-sm font-semibold">
                 Status:{" "}
-                <StatusBadge status={todayRow ? (todayRow.check_out ? "Checked Out" : "Checked In") : "Not Marked"} />
+                <StatusBadge
+                  status={
+                    todayRow ? (todayRow.check_out ? "Checked Out" : "Checked In") : "Not Marked"
+                  }
+                />
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Check In: {todayRow?.check_in ?? "—"} · Check Out: {todayRow?.check_out ?? "—"}
@@ -1003,7 +1082,10 @@ function SelfCheckIn({ kind }: { kind: "teacher" | "staff" }) {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => act("check-in")} disabled={busy !== null || Boolean(todayRow?.check_in)}>
+            <Button
+              onClick={() => act("check-in")}
+              disabled={busy !== null || Boolean(todayRow?.check_in)}
+            >
               <LogIn className="mr-1.5 h-4 w-4" /> Check In
             </Button>
             <Button
@@ -1024,32 +1106,12 @@ function SelfCheckIn({ kind }: { kind: "teacher" | "staff" }) {
         {isLoading ? (
           <TableSkeleton rows={6} cols={4} />
         ) : history.length === 0 ? (
-          <EmptyState title="No attendance history" description="Check in to start building your attendance record." />
+          <EmptyState
+            title="No attendance history"
+            description="Check in to start building your attendance record."
+          />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Check In</TableHead>
-                  <TableHead className="text-right">Check Out</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {history.slice(0, 31).map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.date}</TableCell>
-                    <TableCell>
-                      <StatusBadge status={r.status} />
-                    </TableCell>
-                    <TableCell>{r.check_in ?? "—"}</TableCell>
-                    <TableCell className="text-right">{r.check_out ?? "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <AttendanceHistory rows={history.slice(0, 31)} />
         )}
       </div>
     </div>
@@ -1063,12 +1125,19 @@ function SelfCheckIn({ kind }: { kind: "teacher" | "staff" }) {
 function StudentAttendanceView() {
   const { data: rows, isLoading } = useAttendance();
   const { data: summary } = useAttendanceSummary({});
-  const daily = useMemo(() => [...(rows ?? [])].sort((a, b) => b.date.localeCompare(a.date)), [rows]);
+  const daily = useMemo(
+    () => [...(rows ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
+    [rows],
+  );
   const pct = summary?.percentage ?? 0;
 
   return (
     <div>
-      <PageHeader title="My Attendance" description="Your attendance record — read only." breadcrumb={["Dashboard", "Attendance"]} />
+      <PageHeader
+        title="My Attendance"
+        description="Your attendance record — read only."
+        breadcrumb={["Dashboard", "Attendance"]}
+      />
 
       <SummaryCards summary={summary} />
 
@@ -1088,14 +1157,19 @@ function StudentAttendanceView() {
       <div className="grid gap-4 lg:grid-cols-2">
         <MonthCalendar
           month={monthStr()}
-          records={(rows ?? []).filter((r) => r.date.startsWith(monthStr())).map((r) => ({ date: r.date, status: r.status }))}
+          records={(rows ?? [])
+            .filter((r) => r.date.startsWith(monthStr()))
+            .map((r) => ({ date: r.date, status: r.status }))}
           title="This month"
         />
         <SectionCard title="Daily History" subtitle={`${daily.length} records`} bodyClassName="p-0">
           {isLoading ? (
             <p className="p-6 text-center text-sm text-muted-foreground">Loading…</p>
           ) : daily.length === 0 ? (
-            <EmptyState title="No attendance records yet" description="Your attendance history will appear here." />
+            <EmptyState
+              title="No attendance records yet"
+              description="Your attendance history will appear here."
+            />
           ) : (
             <div className="max-h-[420px] overflow-y-auto">
               <table className="w-full text-sm">

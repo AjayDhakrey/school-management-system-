@@ -1,12 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Users, UserCheck, Link2, Phone, Mail } from "lucide-react";
-import { PageHeader, SearchInput, EmptyState, Pager, Initials, usePaged, TableSkeleton } from "@/components/shared/ui-kit";
+import { Users, UserCheck, Link2, Phone, Mail, ChevronRight } from "lucide-react";
+import {
+  PageHeader,
+  SearchInput,
+  EmptyState,
+  Pager,
+  Initials,
+  usePaged,
+  TableSkeleton,
+} from "@/components/shared/ui-kit";
 import { InfoCard, ProgressBar } from "@/components/shared/InfoCard";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useParents, useStudents, type ApiParent, type ApiStudent } from "@/hooks/useApi";
 
@@ -54,7 +69,11 @@ export default function Page() {
 
   return (
     <div>
-      <PageHeader title="Parents" description="Directory of parents and guardians." breadcrumb={["Dashboard", "Parents"]} />
+      <PageHeader
+        title="Parents"
+        description="Directory of parents and guardians."
+        breadcrumb={["Dashboard", "Parents"]}
+      />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <InfoCard label="Total Parents" value={total} icon={Users} tone="navy" />
@@ -70,10 +89,53 @@ export default function Page() {
         {isLoading ? (
           <TableSkeleton rows={5} cols={5} />
         ) : rows.length === 0 ? (
-          <EmptyState title="No parents found" description="Try adjusting your search, or add parents from Users." />
+          <EmptyState
+            title="No parents found"
+            description="Try adjusting your search, or add parents from Users."
+          />
         ) : (
           <>
-            <div className="overflow-x-auto">
+            {/* Phones: one row per parent. */}
+            <ul className="divide-y divide-border md:hidden">
+              {rows.map((p) => {
+                const kids = childrenOf(p);
+                const name = p.name.replace(/\s+Guardian$/i, "");
+                return (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => setActive(p)}
+                      className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-muted/50"
+                    >
+                      <Initials name={name} tone="gold" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold capitalize">
+                          {name.toLowerCase()}
+                        </p>
+                        <p className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+                          <Phone className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{p.phone ?? "No phone"}</span>
+                          {p.email && (
+                            <>
+                              <span className="opacity-50">·</span>
+                              <Mail className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{p.email}</span>
+                            </>
+                          )}
+                        </p>
+                        {kids.length > 0 && (
+                          <p className="mt-0.5 truncate text-[11px] text-foreground/70 capitalize">
+                            Child: {kids.map((c) => c.name.toLowerCase()).join(", ")}
+                          </p>
+                        )}
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -98,7 +160,10 @@ export default function Page() {
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {childrenOf(p).map((c) => (
-                            <span key={c.id} className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">
+                            <span
+                              key={c.id}
+                              className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium"
+                            >
                               {c.name}
                             </span>
                           ))}
@@ -114,7 +179,12 @@ export default function Page() {
                 </TableBody>
               </Table>
             </div>
-            <Pager page={Math.min(page, pageCount)} pageCount={pageCount} onPage={setPage} total={filtered.length} />
+            <Pager
+              page={Math.min(page, pageCount)}
+              pageCount={pageCount}
+              onPage={setPage}
+              total={filtered.length}
+            />
           </>
         )}
       </div>
@@ -131,8 +201,12 @@ export default function Page() {
               </SheetHeader>
               <div className="mt-4 space-y-4">
                 <SectionCard title="Contact Information" bodyClassName="space-y-2 text-sm">
-                  <p><span className="text-muted-foreground">Email:</span> {active.email ?? "—"}</p>
-                  <p><span className="text-muted-foreground">Phone:</span> {active.phone ?? "—"}</p>
+                  <p>
+                    <span className="text-muted-foreground">Email:</span> {active.email ?? "—"}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Phone:</span> {active.phone ?? "—"}
+                  </p>
                 </SectionCard>
                 <SectionCard title="Linked Children">
                   <div className="space-y-3">
@@ -145,7 +219,9 @@ export default function Page() {
                           <Initials name={c.name} />
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium">{c.name}</p>
-                            <p className="text-xs text-muted-foreground">{c.class_name ?? "—"} - {c.section ?? "—"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {c.class_name ?? "—"} - {c.section ?? "—"}
+                            </p>
                           </div>
                         </div>
                         <ProgressBar
@@ -159,8 +235,20 @@ export default function Page() {
                   </div>
                 </SectionCard>
                 <div className="flex gap-2">
-                  {active.email && <Button className="flex-1" asChild><a href={`mailto:${active.email}`}><Mail className="h-4 w-4" /> Email</a></Button>}
-                  {active.phone && <Button variant="outline" className="flex-1" asChild><a href={`tel:${active.phone}`}><Phone className="h-4 w-4" /> Call</a></Button>}
+                  {active.email && (
+                    <Button className="flex-1" asChild>
+                      <a href={`mailto:${active.email}`}>
+                        <Mail className="h-4 w-4" /> Email
+                      </a>
+                    </Button>
+                  )}
+                  {active.phone && (
+                    <Button variant="outline" className="flex-1" asChild>
+                      <a href={`tel:${active.phone}`}>
+                        <Phone className="h-4 w-4" /> Call
+                      </a>
+                    </Button>
+                  )}
                 </div>
               </div>
             </>

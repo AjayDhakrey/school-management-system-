@@ -278,7 +278,7 @@ export default function SubjectsPage() {
       <div className="mt-5">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "allocations" | "catalog")}>
           <div className="mb-4">
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 rounded-2xl p-1 sm:inline-grid sm:w-auto">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1.5 rounded-2xl p-1.5 sm:inline-grid sm:w-auto sm:gap-1 sm:p-1">
               {(
                 [
                   {
@@ -300,12 +300,22 @@ export default function SubjectsPage() {
                 <TabsTrigger
                   key={value}
                   value={value}
-                  className="group h-10 gap-2 rounded-xl px-3 text-sm data-[state=active]:shadow-sm"
+                  className="group h-auto justify-start gap-2.5 rounded-xl px-2.5 py-2 text-sm data-[state=active]:shadow-sm sm:h-10 sm:justify-center sm:gap-2 sm:px-3 sm:py-0"
                 >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate sm:hidden">{short}</span>
+                  {/* Phones: icon tile + label + count underneath. */}
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground transition-colors group-data-[state=active]:bg-primary group-data-[state=active]:text-primary-foreground sm:hidden">
+                    <Icon className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="min-w-0 text-left sm:hidden">
+                    <span className="block truncate text-sm font-semibold">{short}</span>
+                    <span className="block text-[11px] font-normal text-muted-foreground">
+                      {count} {value === "allocations" ? "allocated" : "subjects"}
+                    </span>
+                  </span>
+                  {/* Tablets & desktop */}
+                  <Icon className="hidden h-4 w-4 shrink-0 sm:block" />
                   <span className="hidden sm:inline">{full}</span>
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground group-data-[state=active]:bg-primary group-data-[state=active]:text-primary-foreground">
+                  <span className="hidden rounded-full bg-muted px-1.5 py-0.5 text-[11px] leading-none font-semibold text-muted-foreground group-data-[state=active]:bg-primary group-data-[state=active]:text-primary-foreground sm:inline">
                     {count}
                   </span>
                 </TabsTrigger>

@@ -26,6 +26,8 @@ import {
   Undo2,
   UserRound,
   ChevronRight,
+  FileBarChart,
+  Settings2,
 } from "lucide-react";
 import {
   PageHeader,
@@ -217,6 +219,13 @@ function AvailabilityBadge({ info }: { info: { total: number; available: number 
   if (info.available === 0) return <StatusBadge status="All copies issued" tone="warning" />;
   return <StatusBadge status={`${info.available} of ${info.total} available`} tone="success" />;
 }
+
+const LIBRARY_TABS = [
+  { value: "catalogue", label: "Catalogue", icon: BookOpen },
+  { value: "circulation", label: "Issue & Return", icon: Undo2 },
+  { value: "reports", label: "Reports", icon: FileBarChart },
+  { value: "settings", label: "Settings", icon: Settings2 },
+] as const;
 
 export default function Page() {
   const { user } = useAuth();
@@ -588,12 +597,47 @@ function LibrarianView() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <div className="mb-4 overflow-x-auto">
+        {/* Phones: every section as an icon tile, all visible at once. */}
+        <div className="mb-4 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-card p-1.5 shadow-sm sm:hidden">
+          {LIBRARY_TABS.map(({ value, label, icon: Icon }) => {
+            const active = tab === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTab(value)}
+                aria-pressed={active}
+                className="flex flex-col items-center gap-1 rounded-xl py-1.5 active:scale-95"
+              >
+                <span
+                  className={cn(
+                    "grid h-9 w-9 place-items-center rounded-full transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  <Icon className="h-[18px] w-[18px]" />
+                </span>
+                <span
+                  className={cn(
+                    "w-full truncate px-0.5 text-center text-[10px] leading-none",
+                    active ? "font-semibold text-primary" : "font-medium text-muted-foreground",
+                  )}
+                >
+                  {label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mb-4 hidden overflow-x-auto sm:block">
           <TabsList>
-            <TabsTrigger value="catalogue">Catalogue</TabsTrigger>
-            <TabsTrigger value="circulation">Issue & Return</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+            {LIBRARY_TABS.map(({ value, label, icon: Icon }) => (
+              <TabsTrigger key={value} value={value} className="gap-1.5">
+                <Icon className="h-3.5 w-3.5" /> {label}
+              </TabsTrigger>
+            ))}
           </TabsList>
         </div>
         <TabsContent value="catalogue">

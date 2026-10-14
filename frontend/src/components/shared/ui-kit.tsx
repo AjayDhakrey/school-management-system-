@@ -4,7 +4,13 @@ import { Search, Inbox, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({
@@ -31,9 +37,12 @@ export function PageHeader({
             ))}
           </nav>
         )}
-        <h1 className="truncate font-display text-xl font-bold sm:text-2xl">{title}</h1>
+        <h1 className="truncate font-display text-lg font-bold sm:text-2xl">{title}</h1>
         {description && (
-          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{description}</p>
+          // Taglines are hidden on phones to save space; they show from tablet width up.
+          <div className="mt-1 hidden text-sm text-muted-foreground sm:block">
+            <p className="line-clamp-2">{description}</p>
+          </div>
         )}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -166,15 +175,23 @@ export function Pager({
   pageCount,
   onPage,
   total,
+  divider = true,
 }: {
   page: number;
   pageCount: number;
   onPage: (p: number) => void;
   total: number;
+  /** Line above the pager; off when it follows a list of cards. */
+  divider?: boolean;
 }) {
   if (pageCount <= 0) return null;
   return (
-    <div className="grid gap-2 border-t border-border px-4 py-3 sm:flex sm:items-center sm:justify-between">
+    <div
+      className={cn(
+        "grid gap-2 px-4 py-3 sm:flex sm:items-center sm:justify-between",
+        divider && "border-t border-border",
+      )}
+    >
       <p className="text-xs text-muted-foreground">
         Page {page} of {pageCount} · {total} records
       </p>

@@ -369,7 +369,7 @@ export default function Page() {
       <div className="panel mt-5 overflow-hidden">
         <div className="grid gap-2 border-b border-border p-4 sm:flex sm:items-center sm:justify-between">
           <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search users…" />
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <FilterSelect
               value={roleFilter}
               onChange={(v) => { setRoleFilter(v); setPage(1); }}

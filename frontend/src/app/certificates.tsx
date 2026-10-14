@@ -180,52 +180,97 @@ export default function CertificatesPage() {
             description="Generate one to see it here."
           />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Issued On</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell>
-                      <div className="flex min-w-0 items-center gap-2.5">
-                        <Initials name={studentName(c.student_id)} tone="info" />
-                        <span className="truncate font-medium">{studentName(c.student_id)}</span>
+          <>
+            {/* Phones: one row per certificate. */}
+            <ul className="divide-y divide-border md:hidden">
+              {filtered.map((c) => {
+                const label = TYPES.find((t) => t.value === c.type)?.label ?? c.type;
+                const open = () =>
+                  setPreview({
+                    id: c.id,
+                    studentId: c.student_id,
+                    typeCode: c.type,
+                    studentName: studentName(c.student_id),
+                    type: label,
+                    issuedOn: c.issued_on,
+                  });
+                return (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={open}
+                      className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-muted/50"
+                    >
+                      <Initials name={studentName(c.student_id)} tone="info" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold capitalize">
+                          {studentName(c.student_id).toLowerCase()}
+                        </p>
+                        <p className="truncate text-[11px] text-muted-foreground">
+                          {label} ·{" "}
+                          {new Date(`${c.issued_on}T00:00:00Z`).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            timeZone: "UTC",
+                          })}
+                        </p>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {TYPES.find((t) => t.value === c.type)?.label ?? c.type}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{c.issued_on}</TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setPreview({
-                            id: c.id,
-                            studentId: c.student_id,
-                            typeCode: c.type,
-                            studentName: studentName(c.student_id),
-                            type: TYPES.find((t) => t.value === c.type)?.label ?? c.type,
-                            issuedOn: c.issued_on,
-                          })
-                        }
-                      >
-                        <Printer className="h-3.5 w-3.5" /> Print
-                      </Button>
-                    </TableCell>
+                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground">
+                        <Printer className="h-4 w-4" />
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Issued On</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell>
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <Initials name={studentName(c.student_id)} tone="info" />
+                          <span className="truncate font-medium">{studentName(c.student_id)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {TYPES.find((t) => t.value === c.type)?.label ?? c.type}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{c.issued_on}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setPreview({
+                              id: c.id,
+                              studentId: c.student_id,
+                              typeCode: c.type,
+                              studentName: studentName(c.student_id),
+                              type: TYPES.find((t) => t.value === c.type)?.label ?? c.type,
+                              issuedOn: c.issued_on,
+                            })
+                          }
+                        >
+                          <Printer className="h-3.5 w-3.5" /> Print
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
         )}
       </div>
 

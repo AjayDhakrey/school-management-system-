@@ -647,44 +647,47 @@ function DailyRegister({
         className="mb-4"
       >
         {/* One single-line row per student on every screen; phones get the same row, smaller. */}
-        <div role="table" aria-label="Daily register">
-          <div
-            role="row"
-            className={cn(
-              REGISTER_GRID,
-              "rounded-xl bg-muted/50 px-1 py-2.5 text-[11px] font-medium text-muted-foreground md:px-4 md:py-3 md:text-sm",
-            )}
-          >
-            <span role="columnheader">#</span>
-            <span role="columnheader">Student</span>
-            <span role="columnheader">Status</span>
-            <span role="columnheader">Remarks</span>
-          </div>
-          <div className="divide-y divide-border">
-            {roster.students.map((s, i) => (
-              <div
-                key={s.id}
-                role="row"
-                className={cn(REGISTER_GRID, "px-1 py-2.5 md:px-4 md:py-3")}
-              >
-                <span role="cell" className="text-[11px] text-muted-foreground md:text-sm">
-                  {i + 1}
-                </span>
-                <div role="cell" className="flex min-w-0 items-center gap-1 md:gap-3">
-                  <StudentAvatar name={s.name} />
-                  <StudentName student={s} />
+        {/* Phones: #, student and P/A/L/Lv fill the screen; only Remarks sits off to the right. */}
+        <div className="overflow-x-auto">
+          <div role="table" aria-label="Daily register" className="w-[calc(100%+160px)] md:w-auto">
+            <div
+              role="row"
+              className={cn(
+                REGISTER_GRID,
+                "rounded-xl bg-muted/50 px-2 py-2.5 text-xs font-medium text-muted-foreground md:px-4 md:py-3 md:text-sm",
+              )}
+            >
+              <span role="columnheader">#</span>
+              <span role="columnheader">Student</span>
+              <span role="columnheader">Status</span>
+              <span role="columnheader">Remarks</span>
+            </div>
+            <div className="divide-y divide-border">
+              {roster.students.map((s, i) => (
+                <div
+                  key={s.id}
+                  role="row"
+                  className={cn(REGISTER_GRID, "px-2 py-3 md:px-4 md:py-3")}
+                >
+                  <span role="cell" className="text-xs text-muted-foreground md:text-sm">
+                    {i + 1}
+                  </span>
+                  <div role="cell" className="flex min-w-0 items-center gap-2 md:gap-3">
+                    <StudentAvatar name={s.name} />
+                    <StudentName student={s} />
+                  </div>
+                  <div role="cell">
+                    <StatusCircles {...circleProps(s.id, s.approved_leave)} />
+                  </div>
+                  <div role="cell" className="min-w-0">
+                    <Input
+                      {...remarksProps(s.id)}
+                      className="h-9 w-full min-w-0 rounded-lg bg-surface px-2.5 text-sm md:h-10 md:px-3"
+                    />
+                  </div>
                 </div>
-                <div role="cell">
-                  <StatusCircles {...circleProps(s.id, s.approved_leave)} />
-                </div>
-                <div role="cell" className="min-w-0">
-                  <Input
-                    {...remarksProps(s.id)}
-                    className="h-7 w-full min-w-0 rounded-md bg-surface px-1.5 text-[10px] md:h-10 md:rounded-lg md:px-3 md:text-sm"
-                  />
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </SectionCard>
@@ -695,7 +698,7 @@ function DailyRegister({
 // Fixed column widths so the header and every row line up: # · Student · Status · Remarks.
 // On phones the status column is exactly the four 22px circles; from md up, 36px ones.
 const REGISTER_GRID =
-  "grid grid-cols-[12px_minmax(0,2fr)_97px_minmax(0,1fr)] items-center gap-1 md:grid-cols-[40px_minmax(0,1.3fr)_168px_minmax(0,12rem)] md:gap-4";
+  "grid grid-cols-[18px_minmax(0,1fr)_146px_150px] items-center gap-2.5 md:grid-cols-[40px_minmax(0,1.3fr)_168px_minmax(0,12rem)] md:gap-4";
 
 const AVATAR_TONES = [
   "bg-blue-500/10 text-blue-600",
@@ -718,7 +721,7 @@ function StudentAvatar({ name }: { name: string }) {
   return (
     <span
       className={cn(
-        "grid h-6 w-6 shrink-0 place-items-center rounded-full text-[9px] font-semibold md:h-10 md:w-10 md:text-sm",
+        "grid h-8 w-8 shrink-0 place-items-center rounded-full text-[11px] font-semibold md:h-10 md:w-10 md:text-sm",
         AVATAR_TONES[hash % AVATAR_TONES.length],
       )}
     >
@@ -730,12 +733,8 @@ function StudentAvatar({ name }: { name: string }) {
 function StudentName({ student }: { student: ApiAttendanceRosterStudent }) {
   return (
     <div className="min-w-0">
-      <p className="truncate text-[11px] leading-tight font-medium text-foreground md:text-sm">
-        {student.name}
-      </p>
-      <p className="text-[10px] leading-tight text-muted-foreground md:text-xs">
-        Roll {student.roll ?? "—"}
-      </p>
+      <p className="text-[12.5px] leading-snug font-medium break-words text-foreground md:truncate md:text-sm md:leading-tight">{student.name}</p>
+      <p className="text-xs leading-tight text-muted-foreground">Roll {student.roll ?? "—"}</p>
     </div>
   );
 }
@@ -758,11 +757,7 @@ function StatusCircles({
   isDisabled?: ((s: Status) => boolean) | undefined;
 }) {
   return (
-    <div
-      className="flex items-center gap-[3px] md:gap-2"
-      role="group"
-      aria-label="Attendance status"
-    >
+    <div className="flex items-center gap-1.5 md:gap-2" role="group" aria-label="Attendance status">
       {STATUS_OPTIONS.map((s) => (
         <button
           key={s}
@@ -773,7 +768,7 @@ function StatusCircles({
           disabled={isDisabled?.(s)}
           onClick={() => onChange(s)}
           className={cn(
-            "grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full border text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 md:h-9 md:w-9 md:text-sm",
+            "grid h-8 w-8 shrink-0 place-items-center rounded-full border text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 md:h-9 md:w-9 md:text-sm",
             value === s
               ? CIRCLE_ON[s]
               : "border-border bg-surface text-foreground/70 hover:bg-muted",

@@ -77,6 +77,8 @@ import {
   Printer,
   BookOpen,
   DoorOpen,
+  ClipboardList,
+  PenLine,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -1022,7 +1024,7 @@ function ExaminationsTab({
           }
         />
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 md:grid-cols-2 xl:grid-cols-3">
           {visible.map((x) => {
             const papers = (papersByExamination.get(x.id) ?? []).filter(
               (p) => p.status !== "CANCELLED",
@@ -1032,10 +1034,16 @@ function ExaminationsTab({
             const classNames = x.class_ids.map((id) => classLabel(classesById.get(id)));
             const allPapers = papersByExamination.get(x.id) ?? [];
             return (
-              <div key={x.id} className="flex flex-col rounded-xl border border-border p-4">
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold">{x.name}</p>
+              <div
+                key={x.id}
+                className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-3.5 shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                    <FileSpreadsheet className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-display text-[15px] font-bold">{x.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
                       {examTypeLabel(x.exam_type)}
                       {x.term ? ` · ${x.term}` : ""}
@@ -1082,36 +1090,44 @@ function ExaminationsTab({
                     </DropdownMenu>
                   )}
                 </div>
-                <div className="space-y-1.5 text-xs text-muted-foreground">
-                  <p className="flex items-center gap-1.5">
-                    <CalendarDays className="h-3.5 w-3.5 shrink-0" /> {fmtDate(x.start_date)} –{" "}
-                    {fmtDate(x.end_date)}
-                  </p>
-                  <p className="truncate" title={classNames.join(", ")}>
-                    Classes:{" "}
-                    {classNames.length
-                      ? classNames.slice(0, 4).join(", ") +
-                        (classNames.length > 4 ? ` +${classNames.length - 4} more` : "")
-                      : "All"}
-                  </p>
-                  <p>Passing: {x.passing_percentage}%</p>
+                {/* Dates */}
+                <p className="mt-3 flex items-center gap-1.5 rounded-xl bg-muted/50 px-3 py-2 text-xs font-medium">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0 text-primary" />
+                  {fmtDate(x.start_date)} – {fmtDate(x.end_date)}
+                </p>
+
+                {/* Papers · Classes · Pass mark */}
+                <div className="mt-2 grid grid-cols-3 divide-x divide-border rounded-xl border border-border text-center">
+                  {[
+                    { label: "Papers", value: papers.length },
+                    {
+                      label: "Classes",
+                      value: classNames.length
+                        ? new Set(x.class_ids.map((id) => classesById.get(id)?.name ?? id)).size
+                        : "All",
+                    },
+                    { label: "Pass mark", value: `${x.passing_percentage}%` },
+                  ].map((stat) => (
+                    <div key={stat.label} className="px-2 py-1.5">
+                      <p className="font-display text-sm font-bold tabular-nums">{stat.value}</p>
+                      <p className="text-[10px] text-muted-foreground">{stat.label}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  <StatusBadge
-                    status={`${papers.length} paper${papers.length === 1 ? "" : "s"}`}
-                    tone="neutral"
-                  />
+
+                {/* Status */}
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
                   {x.schedule_published_at ? (
                     <StatusBadge status="Schedule published" tone="info" />
                   ) : (
-                    <StatusBadge status="Schedule not published" tone="neutral" />
+                    <StatusBadge status="Not published" tone="neutral" />
                   )}
                   {submitted > 0 && (
                     <StatusBadge status={`${submitted} to review`} tone="warning" />
                   )}
                   {published > 0 && (
                     <StatusBadge
-                      status={`${published}/${papers.length} results published`}
+                      status={`${published}/${papers.length} results out`}
                       tone="success"
                     />
                   )}
@@ -1119,8 +1135,7 @@ function ExaminationsTab({
                 <div className="mt-auto pt-3">
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="w-full"
+                    className="h-9 w-full rounded-xl"
                     onClick={() => onOpenSchedule(x.id)}
                   >
                     <CalendarDays className="mr-1.5 h-4 w-4" />{" "}
@@ -3233,7 +3248,91 @@ function ReviewTab({
             subtitle={`${list.filter((p) => p.status === "PUBLISHED").length} of ${list.length} published`}
             bodyClassName="p-0"
           >
-            <div className="overflow-x-auto">
+            {/* Phones: one row per paper. */}
+            <ul className="divide-y divide-border md:hidden">
+              {list.map((p) => {
+                const total = classSize(p);
+                const done = resultCount.get(p.id) ?? 0;
+                const pct = total ? Math.round((done / total) * 100) : 0;
+                return (
+                  <li key={p.id} className="px-3 py-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">
+                          {p.subject_name ?? p.subject}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">{fmtDate(p.date)}</p>
+                      </div>
+                      <PaperStatusBadge exam={p} />
+                    </div>
+                    {p.status === "DRAFT" ? (
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        Marks entry not open yet
+                      </p>
+                    ) : (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className={cn(
+                              "h-full rounded-full",
+                              done >= total ? "bg-success" : "bg-warning",
+                            )}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span
+                          className={cn(
+                            "shrink-0 text-[11px] font-semibold tabular-nums",
+                            done < total ? "text-warning" : "text-success",
+                          )}
+                        >
+                          {done}/{total} marks
+                        </span>
+                      </div>
+                    )}
+                    {p.status !== "DRAFT" && (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {p.status !== "DRAFT" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-xs"
+                            onClick={() => onViewMarks(p.id)}
+                          >
+                            View marks
+                          </Button>
+                        )}
+                        {canPublish && p.status === "REVIEW" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs"
+                              disabled={busy}
+                              onClick={() => {
+                                setReturning(p);
+                                setNote("");
+                              }}
+                            >
+                              <Undo2 className="mr-1 h-3.5 w-3.5" /> Return
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-8 text-xs"
+                              disabled={busy}
+                              onClick={() => publish([p])}
+                            >
+                              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Publish
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -3915,7 +4014,58 @@ function AdminExaminationsView() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>
-        <div className="mb-4 overflow-x-auto">
+        {/* Phones: every section as an icon tile, all visible at once. */}
+        <div className="mb-4 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-card p-1.5 shadow-sm sm:hidden">
+          {(
+            [
+              { value: "overview", label: "Exams", icon: ClipboardList },
+              { value: "schedule", label: "Schedule", icon: CalendarDays },
+              { value: "marks", label: "Marks", icon: PenLine },
+              {
+                value: "review",
+                label: "Review",
+                icon: CheckCircle2,
+                badge: counts["REVIEW"] ?? 0,
+              },
+            ] as { value: string; label: string; icon: typeof CalendarDays; badge?: number }[]
+          ).map(({ value, label, icon: Icon, badge }) => {
+            const active = tab === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setTab(value)}
+                aria-pressed={active}
+                className="flex flex-col items-center gap-1 rounded-xl py-1.5 active:scale-95"
+              >
+                <span
+                  className={cn(
+                    "relative grid h-9 w-9 place-items-center rounded-full transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  <Icon className="h-[18px] w-[18px]" />
+                  {badge ? (
+                    <span className="absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-destructive px-1 text-[9px] font-bold text-white">
+                      {badge}
+                    </span>
+                  ) : null}
+                </span>
+                <span
+                  className={cn(
+                    "w-full truncate px-0.5 text-center text-[10px] leading-none",
+                    active ? "font-semibold text-primary" : "font-medium text-muted-foreground",
+                  )}
+                >
+                  {label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mb-4 hidden overflow-x-auto sm:block">
           <TabsList>
             <TabsTrigger value="overview">Examinations</TabsTrigger>
             <TabsTrigger value="schedule">Exam Schedule</TabsTrigger>

@@ -26,19 +26,33 @@ export function InfoCard({
     warning: "bg-warning-soft text-warning",
   };
   return (
-    <div className={cn("panel flex items-start gap-2 p-3 sm:gap-3 sm:p-4", className)}>
+    // Phones: icon on top so the label, number and hint get the card's full width.
+    <div
+      className={cn(
+        "panel flex flex-col items-start gap-2 p-3 sm:flex-row sm:gap-3 sm:p-4",
+        className,
+      )}
+    >
       <span
         className={cn(
           "grid h-8 w-8 shrink-0 place-items-center rounded-xl sm:h-10 sm:w-10",
-          tones[tone]
+          tones[tone],
         )}
       >
         <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
       </span>
-      <div className="min-w-0">
-        <p className="truncate text-[11px] font-medium text-muted-foreground sm:text-xs">{label}</p>
-        <p className="mt-0.5 font-display text-base font-bold tracking-tight sm:text-xl">{value}</p>
-        {hint && <p className="mt-0.5 truncate text-[10px] text-muted-foreground sm:text-[11px]">{hint}</p>}
+      <div className="w-full min-w-0">
+        <p className="text-[11px] leading-tight font-medium text-muted-foreground sm:truncate sm:text-xs">
+          {label}
+        </p>
+        <p className="mt-0.5 font-display text-base font-bold tracking-tight break-words sm:text-xl">
+          {value}
+        </p>
+        {hint && (
+          <p className="mt-0.5 text-[10px] leading-tight text-muted-foreground sm:truncate sm:text-[11px]">
+            {hint}
+          </p>
+        )}
       </div>
     </div>
   );

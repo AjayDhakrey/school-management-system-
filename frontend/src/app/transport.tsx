@@ -522,34 +522,70 @@ function AdminTransportView() {
         {vehicles.length === 0 ? (
           <EmptyState title="No routes yet" icon={RouteIcon} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="px-2 py-2">Route</th>
-                  <th className="px-2 py-2">Vehicle</th>
-                  <th className="px-2 py-2">Driver</th>
-                  <th className="px-2 py-2">Stops</th>
-                  <th className="px-2 py-2">Students</th>
-                  <th className="px-2 py-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vehicles.map((v) => (
-                  <tr key={v.id} className="border-b border-border/60">
-                    <td className="px-2 py-2 font-medium">{v.route ?? "—"}</td>
-                    <td className="px-2 py-2">{v.number ?? "—"}</td>
-                    <td className="px-2 py-2 text-muted-foreground">{v.driver ?? "—"}</td>
-                    <td className="px-2 py-2">{v.stops.length}</td>
-                    <td className="px-2 py-2">{v.occupied}</td>
-                    <td className="px-2 py-2">
-                      <StatusBadge status={v.status} />
-                    </td>
+          <>
+            {/* Phones: one row per route. */}
+            <ul className="-mx-1 divide-y divide-border md:hidden">
+              {vehicles.map((v) => (
+                <li key={v.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelected(v)}
+                    className="flex w-full items-center gap-3 px-1 py-3 text-left active:bg-muted/50"
+                  >
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                      <RouteIcon className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-sm font-semibold capitalize">
+                          {v.route ?? "Unnamed route"}
+                        </p>
+                        <StatusBadge status={v.status} />
+                      </div>
+                      <p className="truncate text-[11px] text-muted-foreground">
+                        {v.number ?? "—"} ·{" "}
+                        <span className="capitalize">
+                          {(v.driver ?? "No driver").toLowerCase()}
+                        </span>
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-foreground/70">
+                        <b>{v.stops.length}</b> stop{v.stops.length === 1 ? "" : "s"} ·{" "}
+                        <b>{v.occupied}</b> student{v.occupied === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                    <th className="px-2 py-2">Route</th>
+                    <th className="px-2 py-2">Vehicle</th>
+                    <th className="px-2 py-2">Driver</th>
+                    <th className="px-2 py-2">Stops</th>
+                    <th className="px-2 py-2">Students</th>
+                    <th className="px-2 py-2">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {vehicles.map((v) => (
+                    <tr key={v.id} className="border-b border-border/60">
+                      <td className="px-2 py-2 font-medium">{v.route ?? "—"}</td>
+                      <td className="px-2 py-2">{v.number ?? "—"}</td>
+                      <td className="px-2 py-2 text-muted-foreground">{v.driver ?? "—"}</td>
+                      <td className="px-2 py-2">{v.stops.length}</td>
+                      <td className="px-2 py-2">{v.occupied}</td>
+                      <td className="px-2 py-2">
+                        <StatusBadge status={v.status} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </SectionCard>
 

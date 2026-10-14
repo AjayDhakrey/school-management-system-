@@ -36,13 +36,33 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
-import { useLeaveRequests, useClassLeave, useStudents, useTeachers, useUsers, type ApiLeaveRequest } from "@/hooks/useApi";
+import {
+  useLeaveRequests,
+  useClassLeave,
+  useStudents,
+  useTeachers,
+  useUsers,
+  type ApiLeaveRequest,
+} from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TableSkeleton } from "@/components/shared/ui-kit";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type LeaveType = "STUDENT" | "TEACHER" | "STAFF";
 const TITLES: Record<LeaveType, string> = {
@@ -56,7 +76,11 @@ function TeacherOwnLeaveView() {
 
   return (
     <div>
-      <PageHeader title="Leave" description="Your own leave requests and leave requests from your class students." breadcrumb={["Dashboard", "Leave"]} />
+      <PageHeader
+        title="Leave"
+        description="Your own leave requests and leave requests from your class students."
+        breadcrumb={["Dashboard", "Leave"]}
+      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="mb-4">
         <TabsList>
@@ -94,7 +118,11 @@ function TeacherMyLeaveTab() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await api.post("/leave", { fromDate, toDate, reason: leaveType ? `${leaveType}: ${reason}` : reason });
+      await api.post("/leave", {
+        fromDate,
+        toDate,
+        reason: leaveType ? `${leaveType}: ${reason}` : reason,
+      });
       await queryClient.invalidateQueries({ queryKey: ["leave-TEACHER"] });
       toast.success("Leave request submitted");
       setApplyOpen(false);
@@ -145,7 +173,9 @@ function TeacherMyLeaveTab() {
                   <tr key={r.id} className="border-b border-border/60">
                     <td className="px-2 py-2 text-muted-foreground">{r.from_date ?? "—"}</td>
                     <td className="px-2 py-2 text-muted-foreground">{r.to_date ?? "—"}</td>
-                    <td className="max-w-[240px] truncate px-2 py-2 text-muted-foreground">{r.reason ?? "—"}</td>
+                    <td className="max-w-[240px] truncate px-2 py-2 text-muted-foreground">
+                      {r.reason ?? "—"}
+                    </td>
                     <td className="px-2 py-2">
                       <StatusBadge status={r.status} />
                     </td>
@@ -167,20 +197,42 @@ function TeacherMyLeaveTab() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label>Leave Type</Label>
-                <Input required placeholder="Sick Leave" value={leaveType} onChange={(e) => setLeaveType(e.target.value)} />
+                <Input
+                  required
+                  placeholder="Sick Leave"
+                  value={leaveType}
+                  onChange={(e) => setLeaveType(e.target.value)}
+                />
               </div>
               <div className="space-y-1">
                 <Label>From</Label>
-                <Input required type="date" min={new Date().toISOString().slice(0, 10)} value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                <Input
+                  required
+                  type="date"
+                  min={new Date().toISOString().slice(0, 10)}
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                />
               </div>
               <div className="space-y-1 sm:col-span-2">
                 <Label>To</Label>
-                <Input required type="date" min={fromDate || new Date().toISOString().slice(0, 10)} value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                <Input
+                  required
+                  type="date"
+                  min={fromDate || new Date().toISOString().slice(0, 10)}
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                />
               </div>
             </div>
             <div className="space-y-1">
               <Label>Reason</Label>
-              <Textarea required placeholder="Reason for leave" value={reason} onChange={(e) => setReason(e.target.value)} />
+              <Textarea
+                required
+                placeholder="Reason for leave"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+              />
             </div>
             <DialogFooter>
               <Button type="submit" disabled={submitting}>
@@ -225,7 +277,8 @@ function TeacherStudentLeaveTab() {
   return (
     <div>
       <p className="mb-4 text-xs text-muted-foreground">
-        Only students in the class(es) where you are the Class Teacher — approving/rejecting is limited to your own class.
+        Only students in the class(es) where you are the Class Teacher — approving/rejecting is
+        limited to your own class.
       </p>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -256,10 +309,14 @@ function TeacherStudentLeaveTab() {
               <TableBody>
                 {rows.map((r) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{studentNameById.get(r.requester_id) ?? "Unknown student"}</TableCell>
+                    <TableCell className="font-medium">
+                      {studentNameById.get(r.requester_id) ?? "Unknown student"}
+                    </TableCell>
                     <TableCell>{r.from_date ?? "—"}</TableCell>
                     <TableCell>{r.to_date ?? "—"}</TableCell>
-                    <TableCell className="max-w-[200px] truncate text-muted-foreground">{r.reason ?? "—"}</TableCell>
+                    <TableCell className="max-w-[200px] truncate text-muted-foreground">
+                      {r.reason ?? "—"}
+                    </TableCell>
                     <TableCell className="text-right">
                       {r.status === "Pending" ? (
                         <div className="inline-flex items-center gap-1.5">
@@ -312,7 +369,8 @@ function leaveRange(from: string | null | undefined, to: string | null | undefin
   const b = new Date(`${(to || from).slice(0, 10)}T00:00:00Z`);
   const days = Math.max(1, Math.round((b.getTime() - a.getTime()) / 86_400_000) + 1);
   const opts = { day: "numeric", month: "short", timeZone: "UTC" } as const;
-  const sameMonth = a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear();
+  const sameMonth =
+    a.getUTCMonth() === b.getUTCMonth() && a.getUTCFullYear() === b.getUTCFullYear();
   const range =
     days === 1
       ? a.toLocaleDateString("en-IN", opts)
@@ -343,8 +401,10 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
   const [actingId, setActingId] = useState<string | null>(null);
 
   const nameFor = (requesterId: string) => {
-    if (leaveType === "STUDENT") return students?.find((s) => s.id === requesterId)?.name ?? "Unknown student";
-    if (leaveType === "TEACHER") return teachers?.find((t) => t.id === requesterId)?.name ?? "Unknown teacher";
+    if (leaveType === "STUDENT")
+      return students?.find((s) => s.id === requesterId)?.name ?? "Unknown student";
+    if (leaveType === "TEACHER")
+      return teachers?.find((t) => t.id === requesterId)?.name ?? "Unknown teacher";
     return users?.find((u) => u.id === requesterId)?.name ?? "Unknown staff member";
   };
 
@@ -353,7 +413,8 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
 
   const filtered = useMemo(() => {
     return rows.filter((l) => {
-      const matchesSearch = !search || nameFor(l.requester_id).toLowerCase().includes(search.toLowerCase());
+      const matchesSearch =
+        !search || nameFor(l.requester_id).toLowerCase().includes(search.toLowerCase());
       const matchesStatus = status === "all" || l.status === status;
       return matchesSearch && matchesStatus;
     });
@@ -408,12 +469,23 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
         <InfoCard label="Rejected" value={rejected} icon={XCircle} tone="danger" />
       </div>
 
-      <SectionCard className="mt-4" title={TITLES[leaveType]} subtitle="All submitted leave applications">
+      <SectionCard
+        className="mt-4"
+        title={TITLES[leaveType]}
+        subtitle="All submitted leave applications"
+      >
         <div className="mb-4 flex flex-col gap-2 sm:flex-row">
-          <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search person…" />
+          <SearchInput
+            value={search}
+            onChange={(v) => {
+              setSearch(v);
+              setPage(1);
+            }}
+            placeholder="Search person…"
+          />
         </div>
         {/* Status tabs */}
-        <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        <div className="mb-3 grid grid-cols-4 gap-1 rounded-xl bg-muted p-1">
           {(
             [
               ["all", "All", total],
@@ -429,22 +501,16 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
                 setStatus(value);
                 setPage(1);
               }}
+              aria-pressed={status === value}
               className={cn(
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-                status === value
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-card text-muted-foreground",
+                "flex min-w-0 flex-col items-center rounded-lg px-1 py-1.5 transition-colors",
+                status === value ? "bg-card text-primary shadow-sm" : "text-muted-foreground",
               )}
             >
-              {label}
-              <span
-                className={cn(
-                  "rounded-full px-1.5 text-[10px] tabular-nums",
-                  status === value ? "bg-white/20" : "bg-muted",
-                )}
-              >
+              <span className="font-display text-base leading-tight font-bold tabular-nums">
                 {count}
               </span>
+              <span className="w-full truncate text-center text-[11px] font-medium">{label}</span>
             </button>
           ))}
         </div>
@@ -459,7 +525,10 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
               const { type, text } = splitReason(l.reason);
               const name = nameFor(l.requester_id);
               return (
-                <li key={l.id} className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
+                <li
+                  key={l.id}
+                  className="flex items-start gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm"
+                >
                   <Initials name={name} className="h-10 w-10 text-xs" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
@@ -511,12 +580,14 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
             })}
           </ul>
         )}
-        <Pager page={page} pageCount={pageCount} onPage={setPage} total={filtered.length} />
+        <Pager page={page} pageCount={pageCount} onPage={setPage} total={filtered.length} divider={false} />
       </SectionCard>
 
       <SectionCard className="mt-4" title="Leave History" subtitle="Processed leave requests">
         {history.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">No processed requests yet.</p>
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            No processed requests yet.
+          </p>
         ) : (
           <ul className="space-y-2.5">
             {history.map((l) => {
@@ -554,30 +625,49 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
                   <Initials name={nameFor(selected.requester_id)} />
                   <div>
                     <SheetTitle>{nameFor(selected.requester_id)}</SheetTitle>
-                    <SheetDescription>{role} · {splitReason(selected.reason).type}</SheetDescription>
+                    <SheetDescription>
+                      {role} · {splitReason(selected.reason).type}
+                    </SheetDescription>
                   </div>
                 </div>
               </SheetHeader>
               <div className="space-y-4 px-4 pb-4">
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-xs text-muted-foreground">From</p><p>{selected.from_date ?? "—"}</p></div>
-                  <div><p className="text-xs text-muted-foreground">To</p><p>{selected.to_date ?? "—"}</p></div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">From</p>
+                    <p>{selected.from_date ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">To</p>
+                    <p>{selected.to_date ?? "—"}</p>
+                  </div>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Reason</p>
                   <p className="mt-1 text-sm">{splitReason(selected.reason).text}</p>
                 </div>
                 <div>
-                  <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase">Status</p>
+                  <p className="mb-2 text-xs font-semibold text-muted-foreground uppercase">
+                    Status
+                  </p>
                   <StatusBadge status={selected.status} />
                 </div>
               </div>
               {selected.status === "Pending" && (
                 <SheetFooter>
-                  <Button variant="outline" className="flex-1" disabled={actingId === selected.id} onClick={() => updateStatus(selected.id, "Rejected")}>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    disabled={actingId === selected.id}
+                    onClick={() => updateStatus(selected.id, "Rejected")}
+                  >
                     Reject
                   </Button>
-                  <Button className="flex-1" disabled={actingId === selected.id} onClick={() => updateStatus(selected.id, "Approved")}>
+                  <Button
+                    className="flex-1"
+                    disabled={actingId === selected.id}
+                    onClick={() => updateStatus(selected.id, "Approved")}
+                  >
                     Approve
                   </Button>
                 </SheetFooter>
@@ -588,13 +678,25 @@ function LeaveManagementView({ type: leaveType }: { type: LeaveType }) {
       </Sheet>
 
       {leaveType === "STUDENT" && (
-        <ApplyForStudentDialog open={applyOpen} onClose={() => setApplyOpen(false)} onDone={invalidate} />
+        <ApplyForStudentDialog
+          open={applyOpen}
+          onClose={() => setApplyOpen(false)}
+          onDone={invalidate}
+        />
       )}
     </div>
   );
 }
 
-function ApplyForStudentDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+function ApplyForStudentDialog({
+  open,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const { data: students } = useStudents(open);
   const [studentId, setStudentId] = useState("");
   const [leaveType, setLeaveType] = useState("");
@@ -650,20 +752,57 @@ function ApplyForStudentDialog({ open, onClose, onDone }: { open: boolean; onClo
               <SelectContent>
                 {(students ?? []).map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.name} {s.class_name ? `— ${s.class_name}${s.section ? `-${s.section}` : ""}` : ""}
+                    {s.name}{" "}
+                    {s.class_name ? `— ${s.class_name}${s.section ? `-${s.section}` : ""}` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1"><Label>Leave Type</Label><Input required placeholder="Sick Leave" value={leaveType} onChange={(e) => setLeaveType(e.target.value)} /></div>
-            <div className="space-y-1"><Label>From</Label><Input required type="date" min={new Date().toISOString().slice(0, 10)} value={fromDate} onChange={(e) => setFromDate(e.target.value)} /></div>
-            <div className="space-y-1 sm:col-span-2"><Label>To</Label><Input required type="date" min={fromDate || new Date().toISOString().slice(0, 10)} value={toDate} onChange={(e) => setToDate(e.target.value)} /></div>
+            <div className="space-y-1">
+              <Label>Leave Type</Label>
+              <Input
+                required
+                placeholder="Sick Leave"
+                value={leaveType}
+                onChange={(e) => setLeaveType(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>From</Label>
+              <Input
+                required
+                type="date"
+                min={new Date().toISOString().slice(0, 10)}
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label>To</Label>
+              <Input
+                required
+                type="date"
+                min={fromDate || new Date().toISOString().slice(0, 10)}
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="space-y-1"><Label>Reason</Label><Textarea required placeholder="Reason for leave" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+          <div className="space-y-1">
+            <Label>Reason</Label>
+            <Textarea
+              required
+              placeholder="Reason for leave"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
           <DialogFooter>
-            <Button type="submit" disabled={submitting}>Submit Request</Button>
+            <Button type="submit" disabled={submitting}>
+              Submit Request
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

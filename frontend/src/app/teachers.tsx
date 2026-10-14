@@ -425,8 +425,9 @@ export default function Page({ mode = "Teaching" }: { mode?: Mode }) {
           title={mode === "Teaching" ? "Teaching Staff" : "Non-Teaching Staff"}
           subtitle={`${filtered.length} staff members`}
           action={
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
               <SearchInput
+                className="col-span-2"
                 value={search}
                 onChange={(v) => {
                   setSearch(v);
@@ -460,6 +461,7 @@ export default function Page({ mode = "Teaching" }: { mode?: Mode }) {
                 }}
                 options={["Active", "On Leave", "Inactive"]}
                 placeholder="Status"
+                className="col-span-2"
               />
             </div>
           }

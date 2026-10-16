@@ -105,32 +105,33 @@ import { cn } from "@/lib/utils";
 import { escapeHtml, printHtml } from "@/lib/print";
 import { useSchoolBranding, type SchoolBranding } from "@/hooks/use-school-branding";
 
-// The exams CBSE and UP Board schools actually hold. Values are the stored exam types allowed
-// by public.exam_type_options() (supabase/migrations/54_exam_scheduling.sql); labels are what
-// the school calls them.
+// Values are the stored exam types allowed by public.exam_type_options();
+// Mid-Term, End-Term, Re-Test, and Improvement have been removed per school requirements.
 const EXAM_TYPES = [
-  "Periodic Test",
+  "Unit Test",
   "Monthly Test",
-  "Mid-Term",
+  "Periodic Test",
   "Half-Yearly",
   "Pre-Final",
   "Final",
   "Practical",
   "Compartment",
+  "Other",
 ];
 const EXAM_TYPE_LABEL: Record<string, string> = {
-  "Periodic Test": "Periodic Test (PT)",
+  "Unit Test": "Unit Test",
   "Monthly Test": "Monthly Test",
-  "Mid-Term": "Quarterly Exam",
-  "Half-Yearly": "Half-Yearly Exam",
-  "Pre-Final": "Pre-Board Exam",
-  Final: "Annual Exam",
-  Practical: "Practical Exam",
-  Compartment: "Compartment Exam",
+  "Periodic Test": "Periodic Test",
+  "Half-Yearly": "Half-Yearly",
+  "Pre-Final": "Pre-Final",
+  Final: "Final",
+  Practical: "Practical",
+  Compartment: "Compartment",
+  Other: "Other",
 };
 const examTypeLabel = (type: string) => EXAM_TYPE_LABEL[type] ?? type;
 // Exams that repeat an earlier one; they get their own papers and marks, the original is kept.
-const REPEAT_TYPES = ["Re-Test", "Improvement", "Compartment"];
+const REPEAT_TYPES = ["Compartment"];
 const TERM_SUGGESTIONS = [
   "Term 1",
   "Term 2",
@@ -313,7 +314,7 @@ function ExamCard({
 
 function suggestedName(type: string, year: ApiAcademicYear | undefined) {
   const suffix = year ? ` ${year.name}` : "";
-  if (["Unit Test", "Monthly Test", "Periodic Test", "Practical", "Re-Test"].includes(type))
+  if (["Unit Test", "Monthly Test", "Periodic Test", "Practical"].includes(type))
     return `${type}${suffix}`;
   if (type === "Other") return "";
   return `${type} Examination${suffix}`;
@@ -670,7 +671,7 @@ function ExaminationFormDialog({
               <Label className="mb-1.5 text-xs">Exam Name *</Label>
               <Input
                 className="h-9"
-                placeholder="e.g. Mid-Term Examination 2026"
+                placeholder="e.g. Half-Yearly Examination 2026"
                 value={name}
                 maxLength={120}
                 disabled={marksStarted}
@@ -971,7 +972,7 @@ function ExaminationsTab({
   return (
     <SectionCard
       title="Examinations"
-      subtitle="Mid-Term, End-Term, Unit Tests and other exams for each academic year"
+      subtitle="Final, Half-Yearly, Unit Tests and other exams for each academic year"
       action={
         canManage ? (
           <Button
@@ -1005,7 +1006,7 @@ function ExaminationsTab({
           title="No examinations yet"
           description={
             canManage
-              ? "Create an examination such as “Mid-Term Examination”, then schedule its subject papers."
+              ? "Create an examination such as “Half-Yearly Examination”, then schedule its subject papers."
               : "Examinations created by the school will appear here."
           }
           icon={FileSpreadsheet}

@@ -15,7 +15,7 @@ export function printHtml(title: string, body: string, css: string) {
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
   frame.style.cssText =
-    "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+    "position:fixed;top:0;left:0;width:100%;height:100%;border:0;opacity:0;pointer-events:none;z-index:-9999;";
   document.body.appendChild(frame);
 
   const doc = frame.contentDocument;

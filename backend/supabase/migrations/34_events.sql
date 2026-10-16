@@ -12,7 +12,7 @@ create table public.events (
   event_time text,
   location text,
   category text not null default 'Academic'
-    check (category in ('Sports','Academic','Meeting','Holiday','Cultural')),
+    check (category in ('Sports','Academic','Meeting','Holiday','Cultural','Art & Craft')),
   created_by uuid,
   created_at timestamptz not null default now()
 );

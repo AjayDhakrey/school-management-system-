@@ -33,7 +33,15 @@ import { useEvents, type ApiSchoolEvent } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 
-const CATEGORIES = ["All", "Sports", "Academic", "Meeting", "Holiday", "Cultural"] as const;
+const CATEGORIES = [
+  "All",
+  "Sports",
+  "Academic",
+  "Meeting",
+  "Holiday",
+  "Cultural",
+  "Art & Craft",
+] as const;
 
 const CATEGORY_TONE: Record<
   string,
@@ -44,6 +52,7 @@ const CATEGORY_TONE: Record<
   Meeting: "warning",
   Holiday: "gold",
   Cultural: "danger",
+  "Art & Craft": "info",
 };
 
 export default function Page() {

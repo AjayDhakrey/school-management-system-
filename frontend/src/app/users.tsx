@@ -64,7 +64,7 @@ import {
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 
-const ROLE_OPTIONS = ["SUPER_ADMIN", "SCHOOL_ADMIN", "TEACHER", "STAFF", "PARENT", "STUDENT"];
+const ROLE_OPTIONS = ["SCHOOL_ADMIN", "TEACHER", "STAFF", "PARENT", "STUDENT"];
 const CREATABLE_ROLES = ["TEACHER", "PARENT", "STUDENT", "STAFF", "SCHOOL_ADMIN"] as const;
 type CreatableRole = (typeof CREATABLE_ROLES)[number];
 const DEPARTMENTS = ["ADMIN", "ACCOUNTS", "LIBRARY", "TRANSPORT"];

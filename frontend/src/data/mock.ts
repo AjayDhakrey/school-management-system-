@@ -492,7 +492,7 @@ export type SchoolEvent = {
   date: string;
   time: string;
   location: string;
-  category: "Sports" | "Academic" | "Meeting" | "Holiday" | "Cultural";
+  category: "Sports" | "Academic" | "Meeting" | "Holiday" | "Cultural" | "Art & Craft";
   description: string;
 };
 

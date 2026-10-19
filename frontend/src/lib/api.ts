@@ -158,6 +158,7 @@ const UNIQUE_MESSAGES: Record<string, string> = {
   uq_subjects_school_name: "Subject name or code already exists",
   uq_subjects_school_code: "Subject name or code already exists",
   uq_rooms_school_name: "Room name or number already exists",
+  uq_classes_one_class_teacher: "This teacher is already Class Teacher of another class",
   uq_rooms_school_number: "Room name or number already exists",
   class_subjects_class_id_subject_id_key: "Subject is already assigned to this class/section",
   uq_fee_structures_equivalent: "An equivalent active fee structure already exists",
@@ -1649,6 +1650,29 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
     case "users":
     case "school-admins":
       return manageLogin(method, resource, second, third, values());
+
+    // A teacher can be Class Teacher of one class section only.
+    case "classes": {
+      const teacherId = body["classTeacherId"];
+      if ((method === "POST" || method === "PATCH") && typeof teacherId === "string" && teacherId) {
+        let query = supabase
+          .from("classes")
+          .select("id,name,section")
+          .eq("class_teacher_id", teacherId)
+          .neq("status", "ARCHIVED");
+        if (method === "PATCH" && second) query = query.neq("id", second);
+        const { data: taken, error } = await query.limit(1);
+        if (error) fail(error);
+        const other = (taken ?? [])[0] as Row | undefined;
+        if (other) {
+          throw new ApiError(
+            400,
+            `This teacher is already Class Teacher of ${str(other["name"])}-${str(other["section"])}. A teacher can be Class Teacher of one class only.`,
+          );
+        }
+      }
+      break;
+    }
 
     // Deleting an examination removes its papers and their marks too (migration 63).
     case "examinations": {

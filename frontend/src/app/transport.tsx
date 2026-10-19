@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
+import { FaBus } from "react-icons/fa";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -243,44 +244,85 @@ function StudentTransportView() {
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="grid content-start gap-4">
             {/* Bus */}
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary to-primary/80 p-4 text-primary-foreground shadow-md">
-              <span className="pointer-events-none absolute -top-10 -right-8 h-32 w-32 rounded-full bg-white/10" />
-              <span className="pointer-events-none absolute -bottom-12 right-20 h-24 w-24 rounded-full bg-white/5" />
-              <div className="relative flex items-start justify-between gap-3">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/15">
-                  <Bus className="h-6 w-6" />
-                </span>
-                <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-semibold">
-                  <span
-                    className={cn(
-                      "h-1.5 w-1.5 rounded-full",
-                      assignment.status === "On Route"
-                        ? "animate-pulse bg-success"
-                        : assignment.status === "Maintenance"
-                          ? "bg-warning"
-                          : "bg-white/70",
-                    )}
-                  />
-                  {assignment.status}
-                </span>
-              </div>
-              <p className="relative mt-4 text-[10px] font-semibold uppercase tracking-wider opacity-75">
-                Your bus
-              </p>
-              <span className="relative mt-1 inline-block rounded-lg border-2 border-white/70 bg-white px-3 py-1 font-mono text-lg font-bold tracking-widest text-foreground shadow-sm">
-                {assignment.number ?? "—"}
-              </span>
-              <div className="relative mt-3 flex flex-wrap items-center gap-2 text-xs">
-                <span className="flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 font-medium">
-                  <RouteIcon className="h-3.5 w-3.5" /> Route {assignment.route ?? "—"}
-                </span>
-                {assignment.vehicle_type && (
-                  <span className="rounded-full bg-white/15 px-2.5 py-1 font-medium">
-                    {assignment.vehicle_type}
-                  </span>
-                )}
-              </div>
-            </div>
+            {(() => {
+              const plate = (assignment.number ?? "")
+                .toUpperCase()
+                .replace(/\s+/g, "")
+                .replace(/^([A-Z]{2})(\d{1,2})([A-Z]{0,3})(\d{1,4})$/, "$1 $2 $3 $4")
+                .replace(/\s+/g, " ")
+                .trim();
+              const live = assignment.status === "On Route";
+              return (
+                <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="relative px-4 pt-4 pb-4">
+                    <div className="relative flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                          <FaBus className="h-[18px] w-[18px]" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Your school bus
+                          </p>
+                          <p className="truncate font-display text-lg font-bold capitalize">
+                            Route {assignment.route ?? "—"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-semibold text-foreground/80">
+                        <span className="relative flex h-2 w-2">
+                          {live && (
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                          )}
+                          <span
+                            className={cn(
+                              "relative inline-flex h-2 w-2 rounded-full",
+                              live
+                                ? "bg-success"
+                                : assignment.status === "Maintenance"
+                                  ? "bg-warning"
+                                  : "bg-muted-foreground/50",
+                            )}
+                          />
+                        </span>
+                        {assignment.status}
+                      </span>
+                    </div>
+
+                    {/* Number plate */}
+                    <div className="relative mt-4 flex w-fit items-stretch overflow-hidden rounded-md border-2 border-neutral-800 bg-[#facc15] shadow-sm">
+                      <span className="flex flex-col items-center justify-center bg-blue-700 px-1.5 text-[8px] leading-tight font-bold text-white">
+                        <span>●</span>
+                        IND
+                      </span>
+                      <span className="px-3 py-1 font-mono text-lg font-bold tracking-[0.15em] text-neutral-900">
+                        {plate || "—"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Facts */}
+                  <div className="grid grid-cols-3 divide-x divide-border border-t border-border text-center">
+                    {[
+                      { label: "Type", value: assignment.vehicle_type || "Bus" },
+                      {
+                        label: "Seats",
+                        value: assignment.capacity ? String(assignment.capacity) : "—",
+                      },
+                      {
+                        label: "Stops",
+                        value: String((assignment.stops ?? []).length || "—"),
+                      },
+                    ].map((f) => (
+                      <div key={f.label} className="px-2 py-2.5">
+                        <p className="truncate text-sm font-bold capitalize">{f.value}</p>
+                        <p className="text-[10px] text-muted-foreground">{f.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Driver */}
             <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3.5 shadow-sm">
@@ -313,56 +355,135 @@ function StudentTransportView() {
           </div>
 
           {/* Journey */}
-          <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <h3 className="text-sm font-semibold">Your journey</h3>
-            <p className="text-xs text-muted-foreground">
-              Where the bus picks you up and drops you off
-            </p>
-            <ol className="mt-4">
-              <JourneyStop
-                tone="success"
-                label="Pickup"
-                place={assignment.pickup_point}
-                time={assignment.pickup_time}
-              />
-              <JourneyStop
-                tone="destructive"
-                label="Drop"
-                place={assignment.drop_point}
-                time={assignment.drop_time}
-                last
-              />
-            </ol>
+          {(() => {
+            const stops = assignment.stops ?? [];
+            const timeAt = (place: string | null | undefined) =>
+              stops.find(
+                (st) => st.name.trim().toLowerCase() === (place ?? "").trim().toLowerCase(),
+              )?.time ?? null;
+            const pickupTime = assignment.pickup_time || timeAt(assignment.pickup_point);
+            const dropTime = assignment.drop_time || timeAt(assignment.drop_point);
+            const same =
+              (assignment.pickup_point ?? "").trim().toLowerCase() ===
+              (assignment.drop_point ?? "").trim().toLowerCase();
+            return (
+              <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                {/* Ticket: pickup → drop */}
+                <div className="p-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Your journey
+                  </p>
+                  <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                    <div className="min-w-0">
+                      <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-success">
+                        <span className="h-1.5 w-1.5 rounded-full bg-success" /> Pickup
+                      </p>
+                      <p className="mt-0.5 truncate font-display text-base font-bold capitalize">
+                        {assignment.pickup_point ?? "Not set"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{pickupTime ?? "Time TBA"}</p>
+                    </div>
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <span className="h-px w-4 bg-border" />
+                      <Bus className="h-4 w-4 text-primary" />
+                      <span className="h-px w-4 bg-border" />
+                    </span>
+                    <div className="min-w-0 text-right">
+                      <p className="flex items-center justify-end gap-1 text-[10px] font-semibold uppercase tracking-wider text-destructive">
+                        Drop <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                      </p>
+                      <p className="mt-0.5 truncate font-display text-base font-bold capitalize">
+                        {assignment.drop_point ?? "Not set"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{dropTime ?? "Time TBA"}</p>
+                    </div>
+                  </div>
+                  {same && assignment.pickup_point && (
+                    <p className="mt-2 rounded-lg bg-muted/60 px-2.5 py-1.5 text-center text-[11px] text-muted-foreground">
+                      Picked up and dropped at the same stop
+                    </p>
+                  )}
+                </div>
 
-            {(assignment.stops ?? []).length > 0 && (
-              <div className="mt-4 border-t border-border pt-4">
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  All stops on this route
-                </p>
-                <ul className="flex flex-wrap gap-1.5">
-                  {(assignment.stops ?? []).map((stop, i) => {
-                    const mine =
-                      stop.name === assignment.pickup_point || stop.name === assignment.drop_point;
-                    return (
-                      <li
-                        key={`${stop.name}-${i}`}
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",
-                          mine
-                            ? "border-primary/40 bg-primary/10 font-semibold text-primary"
-                            : "border-border text-muted-foreground",
-                        )}
-                      >
-                        <MapPin className="h-3 w-3" />
-                        {stop.name}
-                        {stop.time && <span className="opacity-70">· {stop.time}</span>}
-                      </li>
-                    );
-                  })}
-                </ul>
+                {/* Route timeline */}
+                {stops.length > 0 && (
+                  <div className="border-t border-dashed border-border bg-muted/20 p-4">
+                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Route · {stops.length} stop{stops.length === 1 ? "" : "s"}
+                    </p>
+                    <ol className="relative">
+                      {stops.map((stop, i) => {
+                        const key = stop.name.trim().toLowerCase();
+                        const isPickup =
+                          key === (assignment.pickup_point ?? "").trim().toLowerCase();
+                        const isDrop = key === (assignment.drop_point ?? "").trim().toLowerCase();
+                        const mine = isPickup || isDrop;
+                        const last = i === stops.length - 1;
+                        return (
+                          <li
+                            key={`${stop.name}-${i}`}
+                            className="relative grid grid-cols-[56px_20px_minmax(0,1fr)] items-start gap-2 pb-3 last:pb-0"
+                          >
+                            <span
+                              className={cn(
+                                "pt-0.5 text-right text-[11px] tabular-nums",
+                                mine ? "font-semibold text-foreground" : "text-muted-foreground",
+                              )}
+                            >
+                              {stop.time ?? "—"}
+                            </span>
+                            <span className="relative flex justify-center">
+                              {!last && (
+                                <span className="absolute top-4 h-[calc(100%+0.5rem)] w-0.5 rounded bg-border" />
+                              )}
+                              <span
+                                className={cn(
+                                  "relative mt-0.5 h-3.5 w-3.5 rounded-full border-2",
+                                  isPickup
+                                    ? "border-success bg-success"
+                                    : isDrop
+                                      ? "border-destructive bg-destructive"
+                                      : last
+                                        ? "border-primary bg-primary"
+                                        : "border-border bg-card",
+                                )}
+                              />
+                            </span>
+                            <div className="min-w-0">
+                              <p
+                                className={cn(
+                                  "truncate text-sm capitalize",
+                                  mine ? "font-bold" : "text-foreground/80",
+                                )}
+                              >
+                                {stop.name}
+                              </p>
+                              {mine && (
+                                <span
+                                  className={cn(
+                                    "mt-0.5 inline-block rounded-full px-2 py-px text-[10px] font-semibold",
+                                    isPickup
+                                      ? "bg-success-soft text-success"
+                                      : "bg-destructive-soft text-destructive",
+                                  )}
+                                >
+                                  {isPickup && isDrop
+                                    ? "Your stop"
+                                    : isPickup
+                                      ? "Your pickup"
+                                      : "Your drop"}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
         </div>
       )}
     </div>

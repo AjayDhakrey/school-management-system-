@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileText, Printer, Plus } from "lucide-react";
@@ -167,7 +168,9 @@ function GenerateForm({ onDone }: { onDone: () => void }) {
           <div className="flex items-center justify-between">
             <span className="text-slate-500 font-medium">System Roll No.:</span>
             <span className="font-mono font-bold text-indigo-900">
-              {selectedStudent.roll != null && selectedStudent.roll !== 0 ? selectedStudent.roll : "Not set"}
+              {selectedStudent.roll != null && selectedStudent.roll !== 0
+                ? selectedStudent.roll
+                : "Not set"}
             </span>
           </div>
         </div>
@@ -340,7 +343,9 @@ export default function CertificatesPage() {
                         </div>
                         <p className="truncate text-[11px] text-muted-foreground">
                           {label} ·{" "}
-                          {st?.class_name ? `Class ${st.class_name}${st.section ? `-${st.section}` : ""} · ` : ""}
+                          {st?.class_name
+                            ? `Class ${st.class_name}${st.section ? `-${st.section}` : ""} · `
+                            : ""}
                           {new Date(`${c.issued_on}T00:00:00Z`).toLocaleDateString("en-IN", {
                             day: "numeric",
                             month: "short",
@@ -360,62 +365,96 @@ export default function CertificatesPage() {
 
             {/* Desktop Table with Student, Roll No., Class, Type, Issued On, Actions */}
             <div className="hidden overflow-x-auto md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Roll No.</TableHead>
-                    <TableHead>Class & Section</TableHead>
-                    <TableHead>Certificate Type</TableHead>
-                    <TableHead>Issued On</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-2.5">Student</th>
+                    <th className="px-3 py-2.5">Roll No.</th>
+                    <th className="px-3 py-2.5">Class</th>
+                    <th className="px-3 py-2.5">Certificate</th>
+                    <th className="px-3 py-2.5">Issued On</th>
+                    <th className="px-4 py-2.5 text-right">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
                   {filtered.map((c) => {
                     const st = studentMap.get(c.student_id);
                     const label = TYPES.find((t) => t.value === c.type)?.label ?? c.type;
+                    const name = st?.name ?? studentName(c.student_id);
+                    const cls = st?.class_name
+                      ? `${st.class_name.replace(/^class\s*/i, "")}${st.section ? `-${st.section}` : ""}`
+                      : null;
                     return (
-                      <TableRow key={c.id}>
-                        <TableCell>
-                          <div className="flex min-w-0 items-center gap-2.5">
-                            <Initials name={st?.name ?? studentName(c.student_id)} tone="info" />
+                      <tr
+                        key={c.id}
+                        className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40"
+                      >
+                        <td className="px-4 py-2.5">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Initials name={name} tone="info" />
                             <div className="min-w-0">
-                              <span className="truncate font-semibold block">
-                                {st?.name ?? studentName(c.student_id)}
-                              </span>
+                              <p className="truncate font-semibold capitalize">
+                                {name.toLowerCase()}
+                              </p>
                               {st?.admission_no && (
-                                <span className="text-[11px] text-muted-foreground block font-mono">
-                                  Adm: {st.admission_no}
-                                </span>
+                                <p className="truncate text-[11px] text-muted-foreground">
+                                  {st.admission_no}
+                                </p>
                               )}
                             </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-block rounded bg-primary/10 px-2 py-0.5 font-mono text-xs font-bold text-primary">
-                            {st?.roll != null && st.roll !== 0 ? st.roll : "—"}
+                        </td>
+                        <td className="px-3 py-2.5 tabular-nums">
+                          {st?.roll != null && st.roll !== 0 ? (
+                            st.roll
+                          ) : (
+                            <span className="text-muted-foreground/50">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          {cls ? (
+                            <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium">
+                              Class {cls}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/50">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1.5 font-medium">
+                            <span
+                              className={cn(
+                                "h-2 w-2 rounded-full",
+                                c.type === "TRANSFER"
+                                  ? "bg-warning"
+                                  : c.type === "CHARACTER"
+                                    ? "bg-success"
+                                    : "bg-primary",
+                              )}
+                            />
+                            {label}
                           </span>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {st?.class_name
-                            ? `${st.class_name}${st.section ? ` – ${st.section}` : ""}`
-                            : "—"}
-                        </TableCell>
-                        <TableCell className="text-slate-800 font-medium">
-                          {label}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{c.issued_on}</TableCell>
-                        <TableCell className="text-right">
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground">
+                          {new Date(`${c.issued_on}T00:00:00Z`).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                            timeZone: "UTC",
+                          })}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="gap-1.5"
+                            className="h-8 gap-1.5"
                             onClick={() =>
                               setPreview({
                                 id: c.id,
                                 studentId: c.student_id,
-                                studentName: st?.name ?? studentName(c.student_id),
+                                studentName: name,
                                 studentRoll: st?.roll,
                                 typeCode: c.type,
                                 type: label,
@@ -425,12 +464,12 @@ export default function CertificatesPage() {
                           >
                             <Printer className="h-3.5 w-3.5" /> Print
                           </Button>
-                        </TableCell>
-                      </TableRow>
+                        </td>
+                      </tr>
                     );
                   })}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           </>
         )}

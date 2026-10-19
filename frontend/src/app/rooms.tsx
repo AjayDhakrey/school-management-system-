@@ -254,107 +254,118 @@ export default function Page() {
           icon={DoorOpen}
         />
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {shown.map((room) => {
-            const used = classesByRoom.get(room.id) ?? [];
-            const active = room.status === "ACTIVE";
-            const busy = busyId === room.id;
-            return (
-              <li
-                key={room.id}
-                className={cn(
-                  "group overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_1px_3px_rgba(15,23,42,0.06)] transition-all hover:-translate-y-0.5 hover:shadow-md",
-                  !active && "opacity-60",
-                )}
-              >
-                <div className="flex items-start gap-3 p-3">
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-                    <DoorOpen className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className={cn(
-                          "h-2 w-2 shrink-0 rounded-full",
-                          active ? "bg-success" : "bg-muted-foreground/40",
-                        )}
-                        title={active ? "Active" : "Inactive"}
-                      />
-                      <p className="truncate text-sm font-bold">{room.name}</p>
-                    </div>
-                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                      {room.number ? `#${room.number}` : "No room number"}
-                    </p>
-                  </div>
-                  <div className="-mt-1 -mr-1 flex shrink-0 items-center">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-muted-foreground hover:text-primary"
-                      title="Edit room"
-                      aria-label={`Edit ${room.name}`}
-                      onClick={() => setEditing(room)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      title="Delete room"
-                      aria-label={`Delete ${room.name}`}
-                      disabled={busy}
-                      onClick={() => setDeleting(room)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="mx-3 flex items-center justify-between gap-2 border-t border-border/70 py-2.5">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
-                    {used.length ? (
-                      used.map((c) => (
-                        <span
-                          key={c}
-                          className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold capitalize text-foreground ring-1 ring-primary/15"
-                        >
-                          <GraduationCap className="h-3 w-3 text-primary" />
-                          {c}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-muted-foreground italic">Free · no class</span>
-                    )}
-                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                      <Users2 className="h-3 w-3" />
-                      {room.capacity ?? "—"}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => toggle(room)}
-                    role="switch"
-                    aria-checked={active}
-                    title={active ? "Deactivate room" : "Activate room"}
-                    className={cn(
-                      "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50",
-                      active ? "bg-success" : "bg-muted-foreground/30",
-                    )}
-                  >
-                    <span
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[600px] text-sm">
+              <thead>
+                <tr className="border-b-2 border-border bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 py-2.5">Room</th>
+                  <th className="px-3 py-2.5">Room No.</th>
+                  <th className="px-3 py-2.5">Used by</th>
+                  <th className="px-3 py-2.5 text-right">Seats</th>
+                  <th className="px-3 py-2.5 text-center">Active</th>
+                  <th className="px-4 py-2.5 text-right">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((room) => {
+                  const used = classesByRoom.get(room.id) ?? [];
+                  const active = room.status === "ACTIVE";
+                  const busy = busyId === room.id;
+                  return (
+                    <tr
+                      key={room.id}
                       className={cn(
-                        "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all",
-                        active ? "left-[18px]" : "left-0.5",
+                        "border-b border-border/60 last:border-0 hover:bg-muted/30",
+                        !active && "opacity-60",
                       )}
-                    />
-                  </button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                    >
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-3">
+                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+                            <DoorOpen className="h-4 w-4" />
+                          </span>
+                          <p className="truncate font-semibold">{room.name}</p>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5 whitespace-nowrap text-muted-foreground tabular-nums">
+                        {room.number ?? <span className="text-muted-foreground/50">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {used.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {used.map((c) => (
+                              <span
+                                key={c}
+                                className="inline-flex items-center gap-1 rounded-md bg-info-soft px-2 py-0.5 text-[11px] font-semibold text-info capitalize"
+                              >
+                                <GraduationCap className="h-3 w-3" />
+                                {c}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/70">Free</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right tabular-nums">
+                        {room.capacity ?? <span className="text-muted-foreground/50">—</span>}
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => toggle(room)}
+                          role="switch"
+                          aria-checked={active}
+                          title={active ? "Deactivate room" : "Activate room"}
+                          className={cn(
+                            "relative inline-block h-5 w-9 rounded-full align-middle transition-colors disabled:opacity-50",
+                            active ? "bg-success" : "bg-muted-foreground/30",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all",
+                              active ? "left-[18px]" : "left-0.5",
+                            )}
+                          />
+                        </button>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-primary hover:bg-primary/10 hover:text-primary"
+                            title="Edit room"
+                            aria-label={`Edit ${room.name}`}
+                            onClick={() => setEditing(room)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            title="Delete room"
+                            aria-label={`Delete ${room.name}`}
+                            disabled={busy}
+                            onClick={() => setDeleting(room)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       <Dialog

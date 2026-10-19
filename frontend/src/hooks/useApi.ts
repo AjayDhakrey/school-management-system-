@@ -961,6 +961,8 @@ export interface ApiPlan {
   price: number;
   billing_cycle: string;
   status: string;
+  /** Most students a school on this plan may have; null = no limit (migration 64). */
+  max_students?: number | null;
 }
 
 export interface ApiLead {

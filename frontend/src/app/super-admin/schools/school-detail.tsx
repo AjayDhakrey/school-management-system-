@@ -19,9 +19,32 @@ import {
   DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useSchool, usePlans } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+
+/** "17 Oct 2026" from an ISO date/time. */
+function niceDate(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** One billing period after `from` (a month, or a year for yearly plans). */
+function periodEnd(from: Date, cycle: string | null | undefined) {
+  const end = new Date(from);
+  if (cycle === "YEARLY") end.setFullYear(end.getFullYear() + 1);
+  else end.setMonth(end.getMonth() + 1);
+  return end.toISOString();
+}
 
 function ResetAdminDialog({ schoolId, hasAdmin }: { schoolId: string; hasAdmin: boolean }) {
   const queryClient = useQueryClient();
@@ -55,16 +78,29 @@ function ResetAdminDialog({ schoolId, hasAdmin }: { schoolId: string; hasAdmin: 
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{hasAdmin ? "Reset School Admin Access" : "Create School Admin"}</DialogTitle>
+          <DialogTitle>
+            {hasAdmin ? "Reset School Admin Access" : "Create School Admin"}
+          </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid gap-1.5">
             <Label htmlFor="admin-name">Name</Label>
-            <Input id="admin-name" required value={name} onChange={(e) => setName(e.target.value)} />
+            <Input
+              id="admin-name"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="admin-email">Email</Label>
-            <Input id="admin-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              id="admin-email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="admin-password">{hasAdmin ? "New Password" : "Password"}</Label>
@@ -102,6 +138,17 @@ export default function SchoolDetailPage() {
     if (!id) return;
     try {
       await api.patch(`/schools/${id}/status`, { status });
+      // An active school is a paid-up school: settle the payment and make sure the current
+      // period has an end date.
+      if (status === "ACTIVE" && school) {
+        const start = school.subscription_started_at ?? new Date().toISOString();
+        await api.patch(`/schools/${id}`, {
+          payment_status: "PAID",
+          subscription_started_at: start,
+          subscription_expires_at:
+            school.subscription_expires_at ?? periodEnd(new Date(start), school.billing_cycle),
+        });
+      }
       await queryClient.invalidateQueries({ queryKey: [`school-${id}`] });
       await queryClient.invalidateQueries({ queryKey: ["schools"] });
       toast.success(`School marked ${status.toLowerCase()}`);
@@ -110,10 +157,31 @@ export default function SchoolDetailPage() {
     }
   }
 
+  async function changePayment(payment: string) {
+    if (!id) return;
+    try {
+      await api.patch(`/schools/${id}`, { payment_status: payment });
+      await queryClient.invalidateQueries({ queryKey: [`school-${id}`] });
+      await queryClient.invalidateQueries({ queryKey: ["schools"] });
+      toast.success(`Payment marked ${payment.toLowerCase()}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to update payment");
+    }
+  }
+
   async function changePlan(plan: string) {
     if (!id) return;
     try {
-      await api.patch(`/schools/${id}`, { plan });
+      const chosen = (plans ?? []).find((p) => p.name === plan);
+      const cycle = chosen?.billing_cycle ?? school?.billing_cycle ?? "MONTHLY";
+      const now = new Date();
+      await api.patch(`/schools/${id}`, {
+        plan,
+        billing_cycle: cycle,
+        subscription_started_at: now.toISOString(),
+        subscription_expires_at: periodEnd(now, cycle),
+        ...(school?.status === "ACTIVE" ? { payment_status: "PAID" } : {}),
+      });
       await queryClient.invalidateQueries({ queryKey: [`school-${id}`] });
       await queryClient.invalidateQueries({ queryKey: ["schools"] });
       toast.success(`Plan changed to ${plan}`);
@@ -172,7 +240,10 @@ export default function SchoolDetailPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="School Admin" action={<ResetAdminDialog schoolId={school.id} hasAdmin={Boolean(school.admin)} />}>
+        <SectionCard
+          title="School Admin"
+          action={<ResetAdminDialog schoolId={school.id} hasAdmin={Boolean(school.admin)} />}
+        >
           {school.admin ? (
             <div className="flex items-center gap-3">
               <Initials name={school.admin.name} tone="gold" />
@@ -183,7 +254,9 @@ export default function SchoolDetailPage() {
               <StatusBadge status="Active" className="ml-auto" />
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No School Admin account yet — create one to let this school sign in.</p>
+            <p className="text-sm text-muted-foreground">
+              No School Admin account yet — create one to let this school sign in.
+            </p>
           )}
         </SectionCard>
 
@@ -208,20 +281,48 @@ export default function SchoolDetailPage() {
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Billing Cycle</dt>
-              <dd className="mt-1 text-sm font-medium">{school.billing_cycle ?? "—"}</dd>
+              <dd className="mt-1 text-sm font-medium">
+                {school.billing_cycle === "YEARLY" ? "Yearly" : "Monthly"}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Start Date</dt>
-              <dd className="mt-1 text-sm font-medium">{school.subscription_started_at ?? "—"}</dd>
+              <dd className="mt-1 text-sm font-medium">
+                {niceDate(school.subscription_started_at)}
+              </dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Expiry Date</dt>
-              <dd className="mt-1 text-sm font-medium">{school.subscription_expires_at ?? "—"}</dd>
+              <dd className="mt-1 text-sm font-medium">
+                {school.subscription_expires_at
+                  ? niceDate(school.subscription_expires_at)
+                  : "Renews automatically"}
+              </dd>
             </div>
             <div className="col-span-2">
               <dt className="text-xs text-muted-foreground">Payment Status</dt>
-              <dd className="mt-1">
-                <StatusBadge status={school.payment_status ?? "PENDING"} />
+              <dd className="mt-1 flex flex-wrap items-center gap-2">
+                {/* An active school counts as paid unless it's been marked otherwise. */}
+                <Select
+                  value={
+                    school.status === "ACTIVE" && (school.payment_status ?? "PENDING") === "PENDING"
+                      ? "PAID"
+                      : (school.payment_status ?? "PENDING")
+                  }
+                  onValueChange={changePayment}
+                >
+                  <SelectTrigger className="h-8 w-[150px] bg-surface text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PAID">Paid</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
+                    <SelectItem value="OVERDUE">Overdue</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-[11px] text-muted-foreground">
+                  Activating the school marks it paid automatically.
+                </span>
               </dd>
             </div>
           </dl>
@@ -231,7 +332,7 @@ export default function SchoolDetailPage() {
           <dl className="grid grid-cols-2 gap-4">
             <div>
               <dt className="text-xs text-muted-foreground">Created</dt>
-              <dd className="mt-1 text-sm font-medium">{school.created_at}</dd>
+              <dd className="mt-1 text-sm font-medium">{niceDate(school.created_at)}</dd>
             </div>
             <div>
               <dt className="text-xs text-muted-foreground">Status</dt>
@@ -241,10 +342,20 @@ export default function SchoolDetailPage() {
             </div>
           </dl>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => changeStatus("ACTIVE")} disabled={school.status === "ACTIVE"}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => changeStatus("ACTIVE")}
+              disabled={school.status === "ACTIVE"}
+            >
               <CheckCircle2 className="h-4 w-4" /> Activate
             </Button>
-            <Button variant="outline" size="sm" onClick={() => changeStatus("SUSPENDED")} disabled={school.status === "SUSPENDED"}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => changeStatus("SUSPENDED")}
+              disabled={school.status === "SUSPENDED"}
+            >
               <PauseCircle className="h-4 w-4" /> Suspend
             </Button>
             <Button

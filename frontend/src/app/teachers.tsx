@@ -15,6 +15,8 @@ import {
   Calendar,
   Eye,
   EyeOff,
+  BookOpen,
+  AlertTriangle,
 } from "lucide-react";
 import {
   PageHeader,
@@ -60,6 +62,7 @@ import {
   useStaff,
   useSubjects,
   useClasses,
+  useSubjectMappings,
   type ApiTeacher,
   type ApiStaff,
 } from "@/hooks/useApi";
@@ -264,6 +267,23 @@ const STAFF_STATUS: Record<string, { label: string; tone: "success" | "warning" 
   INACTIVE: { label: "Inactive", tone: "neutral" },
 };
 
+// A steady colour per class, so each class teacher's tag is easy to tell apart.
+const CLASS_TONES = [
+  "border-sky-500/30 bg-sky-500/10 text-sky-700",
+  "border-violet-500/30 bg-violet-500/10 text-violet-700",
+  "border-emerald-500/30 bg-emerald-500/10 text-emerald-700",
+  "border-amber-500/30 bg-amber-500/10 text-amber-700",
+  "border-rose-500/30 bg-rose-500/10 text-rose-700",
+  "border-cyan-500/30 bg-cyan-500/10 text-cyan-700",
+  "border-orange-500/30 bg-orange-500/10 text-orange-700",
+  "border-teal-500/30 bg-teal-500/10 text-teal-700",
+];
+function classTone(label: string) {
+  let hash = 0;
+  for (const ch of label) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return CLASS_TONES[hash % CLASS_TONES.length]!;
+}
+
 /** "2025-09-07" → "7 Sep 2025". */
 function formatJoined(value: string | null | undefined) {
   if (!value) return "—";
@@ -296,6 +316,12 @@ export default function Page({ mode = "Teaching" }: { mode?: Mode }) {
     const c = classes?.find((c) => c.id === id);
     return c ? `${c.name}-${c.section}` : id;
   };
+  // Which section each teacher is Class Teacher of (one at most).
+  const classTeacherOf = new Map(
+    (classes ?? [])
+      .filter((c) => c.class_teacher_id && c.status !== "ARCHIVED")
+      .map((c) => [c.class_teacher_id!, `${c.name}-${c.section}`]),
+  );
 
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<StaffRow | null>(null);
@@ -478,11 +504,11 @@ export default function Page({ mode = "Teaching" }: { mode?: Mode }) {
             <>
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-3">Staff member</th>
-                      {isTeaching && <th className="px-4 py-3">Subjects</th>}
-                      {isTeaching && <th className="px-4 py-3">Classes</th>}
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <th className="px-5 py-3">Staff member</th>
+                      {isTeaching && <th className="px-4 py-3">Class teacher</th>}
+                      {isTeaching && <th className="px-4 py-3">Teaches</th>}
                       <th className="px-4 py-3">Phone</th>
                       {isTeaching && <th className="px-4 py-3">Joined</th>}
                       <th className="px-4 py-3">Status</th>
@@ -499,86 +525,129 @@ export default function Page({ mode = "Teaching" }: { mode?: Mode }) {
                         label: t.status,
                         tone: "neutral" as const,
                       };
+                      const niceName = t.name.replace(/\b\w/g, (ch) => ch.toUpperCase());
+                      const dot =
+                        st.tone === "success"
+                          ? "bg-success"
+                          : st.tone === "warning"
+                            ? "bg-warning"
+                            : "bg-muted-foreground/50";
                       return (
                         <tr
                           key={t.id}
-                          className="cursor-pointer border-b border-border align-middle transition-colors last:border-0 hover:bg-muted/30"
+                          className="group cursor-pointer border-b border-border/60 align-middle transition-colors last:border-0 hover:bg-primary/[0.03]"
                           onClick={() => setSelected(t)}
                         >
-                          <td className="px-4 py-3">
-                            <div className="flex min-w-[200px] items-center gap-3">
-                              <Initials name={t.name} tone="navy" className="h-9 w-9" />
+                          <td className="px-5 py-3.5">
+                            <div className="flex min-w-[220px] items-center gap-3">
+                              <Initials name={niceName} tone="navy" className="h-10 w-10" />
                               <div className="min-w-0">
-                                <p className="truncate font-semibold">{t.name}</p>
-                                <p className="truncate text-xs text-muted-foreground">
-                                  {[t.designation, t.department].filter(Boolean).join(" · ") || "—"}
+                                <p className="truncate font-semibold text-foreground group-hover:text-primary">
+                                  {niceName}
                                 </p>
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                                  {t.designation && (
+                                    <span className="rounded-md bg-primary/10 px-1.5 py-px text-[10px] font-bold tracking-wide text-primary uppercase">
+                                      {t.designation}
+                                    </span>
+                                  )}
+                                  <span className="truncate text-xs text-muted-foreground">
+                                    {t.department ?? "—"}
+                                  </span>
+                                </div>
                               </div>
                             </div>
                           </td>
+
                           {isTeaching && (
-                            <td className="px-4 py-3">
-                              {t.subjects.length > 0 ? (
-                                <div className="flex max-w-[220px] flex-wrap gap-1">
-                                  {t.subjects.map((sid) => (
-                                    <span
-                                      key={sid}
-                                      className="whitespace-nowrap rounded-full bg-info-soft px-2.5 py-0.5 text-xs font-medium capitalize text-info"
-                                    >
-                                      {subjectName(sid)}
-                                    </span>
-                                  ))}
-                                </div>
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              {classTeacherOf.get(t.id) ? (
+                                <span
+                                  className={cn(
+                                    "inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-semibold capitalize",
+                                    classTone(classTeacherOf.get(t.id)!),
+                                  )}
+                                >
+                                  <GraduationCap className="h-3.5 w-3.5" />
+                                  {classTeacherOf.get(t.id)}
+                                </span>
                               ) : (
-                                <span className="text-xs text-muted-foreground">Not assigned</span>
+                                <span className="text-xs text-muted-foreground/60">—</span>
                               )}
                             </td>
                           )}
                           {isTeaching && (
-                            <td className="px-4 py-3">
-                              {t.classes.length > 0 ? (
-                                <div className="flex flex-nowrap items-center gap-1">
-                                  {shownClasses.map((c) => (
-                                    <span
-                                      key={c}
-                                      className="whitespace-nowrap rounded-md bg-muted px-2 py-0.5 text-xs font-medium capitalize"
-                                    >
-                                      {classLabel(c)}
-                                    </span>
-                                  ))}
-                                  {hiddenClasses.length > 0 && (
-                                    <span
-                                      title={hiddenClasses.map(classLabel).join(", ")}
-                                      className="whitespace-nowrap rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
-                                    >
-                                      +{hiddenClasses.length} more
-                                    </span>
+                            <td className="px-4 py-3.5">
+                              {t.subjects.length || t.classes.length ? (
+                                <div className="max-w-[300px] space-y-1.5">
+                                  {t.subjects.length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                      {t.subjects.map((sid) => (
+                                        <span
+                                          key={sid}
+                                          className="inline-flex items-center gap-1 rounded-full border border-info/20 bg-info-soft px-2 py-0.5 text-[11px] font-semibold capitalize text-info"
+                                        >
+                                          <BookOpen className="h-3 w-3" />
+                                          {subjectName(sid)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {t.classes.length > 0 && (
+                                    <div className="flex flex-wrap items-center gap-1">
+                                      {shownClasses.map((c) => (
+                                        <span
+                                          key={c}
+                                          className="whitespace-nowrap rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-medium capitalize text-foreground/80"
+                                        >
+                                          {classLabel(c)}
+                                        </span>
+                                      ))}
+                                      {hiddenClasses.length > 0 && (
+                                        <span
+                                          title={hiddenClasses.map(classLabel).join(", ")}
+                                          className="whitespace-nowrap rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold text-primary"
+                                        >
+                                          +{hiddenClasses.length}
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-xs text-muted-foreground">Not assigned</span>
+                                <span className="text-xs text-muted-foreground/70">
+                                  Not assigned
+                                </span>
                               )}
                             </td>
                           )}
-                          <td className="whitespace-nowrap px-4 py-3">
-                            {t.phone ? (
-                              <span className="flex items-center gap-1.5 text-foreground/80">
-                                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                                {t.phone}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
-                            )}
+
+                          <td className="px-4 py-3.5">
+                            <p className="flex items-center gap-1.5 whitespace-nowrap text-foreground/85">
+                              <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                              {t.phone ? (
+                                <span className="tabular-nums">
+                                  {t.phone.replace(/^(\d{5})(\d{5})$/, "$1 $2")}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground/60">No phone</span>
+                              )}
+                            </p>
                           </td>
+
                           {isTeaching && (
-                            <td className="whitespace-nowrap px-4 py-3 text-foreground/80">
-                              {formatJoined(t.joinedOn)}
+                            <td className="whitespace-nowrap px-4 py-3.5">
+                              <p className="text-foreground/85">{formatJoined(t.joinedOn)}</p>
                             </td>
                           )}
-                          <td className="whitespace-nowrap px-4 py-3">
-                            <StatusBadge status={st.label} tone={st.tone} />
+
+                          <td className="whitespace-nowrap px-4 py-3.5">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium">
+                              <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
+                              {st.label}
+                            </span>
                           </td>
-                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                          <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                             <RowActions
                               t={t}
                               onEdit={() => setEditing(t)}
@@ -615,6 +684,17 @@ export default function Page({ mode = "Teaching" }: { mode?: Mode }) {
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         {t.phone ?? "—"}
                       </p>
+                      {isTeaching && classTeacherOf.get(t.id) && (
+                        <span
+                          className={cn(
+                            "mt-1.5 inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-semibold capitalize",
+                            classTone(classTeacherOf.get(t.id)!),
+                          )}
+                        >
+                          <GraduationCap className="h-3 w-3" />
+                          Class teacher · {classTeacherOf.get(t.id)}
+                        </span>
+                      )}
                     </div>
                   </button>
                 ))}
@@ -645,6 +725,9 @@ export default function Page({ mode = "Teaching" }: { mode?: Mode }) {
               onDelete={() => handleDelete(selected)}
               subjectName={subjectName}
               classLabel={classLabel}
+              classTeacherOf={(classes ?? [])
+                .filter((c) => c.class_teacher_id === selected.id && c.status !== "ARCHIVED")
+                .map((c) => `${c.name}-${c.section}`)}
             />
           )}
         </SheetContent>
@@ -707,6 +790,7 @@ function StaffProfile({
   onDelete,
   subjectName,
   classLabel,
+  classTeacherOf = [],
 }: {
   t: StaffRow;
   isTeaching: boolean;
@@ -715,6 +799,8 @@ function StaffProfile({
   onDelete: () => void;
   subjectName: (id: string) => string;
   classLabel: (id: string) => string;
+  /** Classes this teacher is the Class Teacher of. */
+  classTeacherOf?: string[];
 }) {
   const isActive = t.status.toLowerCase() === "active";
   return (
@@ -760,6 +846,22 @@ function StaffProfile({
           </div>
         )}
       </div>
+
+      {isTeaching && (
+        <div className="mt-5 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+            <GraduationCap className="h-5 w-5" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Class Teacher of</p>
+            {classTeacherOf.length ? (
+              <p className="truncate font-semibold capitalize">{classTeacherOf.join(", ")}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Not a class teacher</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {isTeaching && t.subjects.length > 0 && (
         <div className="mt-5">
@@ -817,13 +919,38 @@ function StaffFormDialog({
   const [submitting, setSubmitting] = useState(false);
   const [selectedClasses, setSelectedClasses] = useState<string[]>(initial?.classes ?? []);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(initial?.subjects ?? []);
-  const [classTeacherOf, setClassTeacherOf] = useState<string>("");
+  const { data: classes } = useClasses(isTeaching);
+  // Blank by default; when editing, starts on the class this teacher already heads (if any).
+  const currentClassTeacherOf =
+    (initial &&
+      (classes ?? []).find((c) => c.class_teacher_id === initial.id && c.status !== "ARCHIVED")
+        ?.id) ||
+    "";
+  const [classTeacherOf, setClassTeacherOf] = useState<string>(currentClassTeacherOf);
+  const [classTeacherTouched, setClassTeacherTouched] = useState(false);
+  useEffect(() => {
+    if (!classTeacherTouched) setClassTeacherOf(currentClassTeacherOf);
+  }, [currentClassTeacherOf, classTeacherTouched]);
+  // Subjects in the picked classes that another teacher already teaches.
+  const { data: mappingsData } = useSubjectMappings(undefined, isTeaching);
+  const [replaceOthers, setReplaceOthers] = useState(false);
+  const conflicts = (mappingsData ?? []).filter(
+    (m) =>
+      m.teacher_id &&
+      m.teacher_id !== initial?.id &&
+      selectedClasses.includes(m.class_id) &&
+      selectedSubjects.includes(m.subject_id),
+  );
+
+  // Unticking that class under Assigned Classes also clears it here.
+  useEffect(() => {
+    if (classTeacherOf && !selectedClasses.includes(classTeacherOf)) setClassTeacherOf("");
+  }, [selectedClasses, classTeacherOf]);
   const [designation, setDesignation] = useState(initial?.designation ?? "");
   const [department, setDepartment] = useState(initial?.department ?? "");
   const [createLogin, setCreateLogin] = useState(false);
   const [portalPassword, setPortalPassword] = useState("");
   const [showPortalPassword, setShowPortalPassword] = useState(false);
-  const { data: classes } = useClasses(isTeaching);
   const { data: subjects } = useSubjects(isTeaching);
   const queryClient = useQueryClient();
 
@@ -888,6 +1015,12 @@ function StaffFormDialog({
       toast.error("Portal password must be at least 6 characters");
       return;
     }
+    if (isTeaching && conflicts.length && !replaceOthers) {
+      toast.error(
+        "Some subjects are already taught by another teacher — tick “Replace them” or untick those classes/subjects",
+      );
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -911,10 +1044,19 @@ function StaffFormDialog({
         } else {
           teacherId = (await api.post<{ id: string }>("/teachers", body)).id;
         }
-        if (classTeacherOf) {
-          await api.patch(`/classes/${classTeacherOf}`, { classTeacherId: teacherId });
+        // One class per Class Teacher: clear the old class first, then set the new one.
+        if (classTeacherOf !== currentClassTeacherOf) {
+          if (currentClassTeacherOf) {
+            await api.patch(`/classes/${currentClassTeacherOf}`, { classTeacherId: null });
+          }
+          if (classTeacherOf) {
+            await api.patch(`/classes/${classTeacherOf}`, { classTeacherId: teacherId });
+          }
           await queryClient.invalidateQueries({ queryKey: ["classes"] });
         }
+        await queryClient.invalidateQueries({
+          predicate: (q) => String(q.queryKey[0]).startsWith("subject-mappings"),
+        });
       } else {
         const body = {
           name,
@@ -1094,21 +1236,70 @@ function StaffFormDialog({
               </div>
             </div>
 
+            {conflicts.length > 0 && (
+              <div className="rounded-xl border border-warning/40 bg-warning-soft/40 p-3 sm:col-span-2">
+                <p className="flex items-center gap-1.5 text-sm font-semibold text-warning">
+                  <AlertTriangle className="h-4 w-4" /> Already assigned to another teacher
+                </p>
+                <ul className="mt-2 space-y-1 text-xs">
+                  {conflicts.map((m) => (
+                    <li key={m.id} className="flex flex-wrap items-center gap-1">
+                      <span className="font-semibold">{m.subject_name}</span>
+                      <span className="text-muted-foreground">in</span>
+                      <span className="font-semibold capitalize">
+                        {m.class_name}-{m.section}
+                      </span>
+                      <span className="text-muted-foreground">is taught by</span>
+                      <span className="font-semibold">{m.teacher_name ?? "another teacher"}</span>
+                    </li>
+                  ))}
+                </ul>
+                <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 accent-[var(--color-primary)]"
+                    checked={replaceOthers}
+                    onChange={(e) => setReplaceOthers(e.target.checked)}
+                  />
+                  <span>
+                    <b>Replace them</b> — remove the old teacher
+                    {conflicts.length === 1 ? "" : "s"} from{" "}
+                    {conflicts.length === 1 ? "this subject" : "these subjects"} and assign this
+                    teacher instead. Otherwise untick those classes or subjects.
+                  </span>
+                </label>
+              </div>
+            )}
+
             {selectedClasses.length > 0 && (
               <div className="grid gap-1.5 sm:col-span-2">
                 <Label>Make Class Teacher Of (optional)</Label>
-                <Select value={classTeacherOf} onValueChange={setClassTeacherOf}>
+                <Select
+                  value={classTeacherOf || "none"}
+                  onValueChange={(v) => {
+                    setClassTeacherTouched(true);
+                    setClassTeacherOf(v === "none" ? "" : v);
+                  }}
+                >
                   <SelectTrigger className="bg-surface">
                     <SelectValue placeholder="Not a class teacher" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Not a class teacher</SelectItem>
                     {selectedClasses.map((cid) => {
                       const c = classes?.find((x) => x.id === cid);
-                      return c ? (
-                        <SelectItem key={cid} value={cid}>
+                      if (!c) return null;
+                      // A class that already has a different Class Teacher can't be picked.
+                      const other =
+                        c.class_teacher_id && c.class_teacher_id !== initial?.id
+                          ? c.class_teacher_id
+                          : null;
+                      return (
+                        <SelectItem key={cid} value={cid} disabled={Boolean(other)}>
                           {c.name}-{c.section}
+                          {other ? " · already has a class teacher" : ""}
                         </SelectItem>
-                      ) : null;
+                      );
                     })}
                   </SelectContent>
                 </Select>

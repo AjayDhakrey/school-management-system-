@@ -19,6 +19,7 @@ import {
   AlertCircle,
   MoreHorizontal,
   FolderSync,
+  AlertTriangle,
 } from "lucide-react";
 import {
   PageHeader,
@@ -127,7 +128,10 @@ export default function SubjectsPage() {
   // Invalidate queries helper
   async function invalidateAll() {
     await queryClient.invalidateQueries({ queryKey: ["subjects"] });
-    await queryClient.invalidateQueries({ queryKey: ["subject-mappings"] });
+    // Mapping queries are keyed "subject-mappings-<filters>", so match on the prefix.
+    await queryClient.invalidateQueries({
+      predicate: (q) => String(q.queryKey[0]).startsWith("subject-mappings"),
+    });
     await queryClient.invalidateQueries({ queryKey: ["my-teaching-subjects"] });
     await queryClient.invalidateQueries({ queryKey: ["my-class-subjects"] });
   }
@@ -907,6 +911,7 @@ export default function SubjectsPage() {
       >
         <MappingFormDialog
           initial={editingMapping}
+          mappings={mappings ?? []}
           classes={classes ?? []}
           subjects={subjects ?? []}
           teachers={teachers ?? []}
@@ -1056,6 +1061,7 @@ function SubjectFormDialog({
 /** Class-Subject-Teacher Mapping Dialog Component */
 function MappingFormDialog({
   initial,
+  mappings = [],
   classes,
   subjects,
   teachers,
@@ -1063,6 +1069,8 @@ function MappingFormDialog({
   onClose,
 }: {
   initial: ApiClassSubjectMapping | null;
+  /** Every current class-subject allocation, to spot one that already has a teacher. */
+  mappings?: ApiClassSubjectMapping[];
   classes: { id: string; name: string; section: string }[];
   subjects: ApiSubject[];
   teachers: { id: string; name: string; department?: string | null }[];
@@ -1074,11 +1082,25 @@ function MappingFormDialog({
   const [subjectId, setSubjectId] = useState(initial?.subject_id ?? (subjects[0]?.id || ""));
   const [teacherId, setTeacherId] = useState(initial?.teacher_id ?? UNASSIGNED);
   const [submitting, setSubmitting] = useState(false);
+  const [replaceOld, setReplaceOld] = useState(false);
+
+  // This subject in this class already has a teacher — only one teacher per subject per class.
+  const existing = mappings.find((m) => m.class_id === classId && m.subject_id === subjectId);
+  const oldTeacher =
+    existing?.teacher_id && existing.teacher_id !== (teacherId === UNASSIGNED ? null : teacherId)
+      ? { id: existing.teacher_id, name: existing.teacher_name ?? "another teacher" }
+      : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!classId || !subjectId) {
       toast.error("Class and Subject are required");
+      return;
+    }
+    if (oldTeacher && !replaceOld) {
+      toast.error(
+        `${oldTeacher.name} already teaches this subject in this class — tick “Remove ${oldTeacher.name}” to replace them`,
+      );
       return;
     }
     setSubmitting(true);
@@ -1165,6 +1187,31 @@ function MappingFormDialog({
               ))}
             </SelectContent>
           </Select>
+          {oldTeacher && (
+            <div className="mt-1 rounded-xl border border-warning/40 bg-warning-soft/40 p-3">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-warning">
+                <AlertTriangle className="h-4 w-4" /> Already assigned
+              </p>
+              <p className="mt-1 text-xs">
+                This subject in this class is taught by <b>{oldTeacher.name}</b>. A subject can have
+                only one teacher per class.
+              </p>
+              <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 accent-[var(--color-primary)]"
+                  checked={replaceOld}
+                  onChange={(e) => setReplaceOld(e.target.checked)}
+                />
+                <span>
+                  <b>Remove {oldTeacher.name}</b>
+                  {teacherId === UNASSIGNED
+                    ? " and leave it unassigned"
+                    : " and assign the new teacher"}
+                </span>
+              </label>
+            </div>
+          )}
           <p className="text-[11px] text-muted-foreground">
             This teacher will automatically see this class and subject in their Teacher Portal and
             Grading sheets.

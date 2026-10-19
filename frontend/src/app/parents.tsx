@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { Users, UserCheck, Link2, Phone, Mail, ChevronRight } from "lucide-react";
 import {
   PageHeader,
@@ -107,7 +108,10 @@ export default function Page() {
                       onClick={() => setActive(p)}
                       className="flex w-full items-center gap-3 px-3 py-3 text-left active:bg-muted/50"
                     >
-                      <Initials name={name} tone="gold" />
+                      <Initials
+                        name={name.replace(/\b\w/g, (ch) => ch.toUpperCase())}
+                        tone="gold"
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold capitalize">
                           {name.toLowerCase()}
@@ -136,48 +140,96 @@ export default function Page() {
               })}
             </ul>
             <div className="hidden overflow-x-auto md:block">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Parent</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Children</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        <div className="flex min-w-0 items-center gap-2.5">
-                          <Initials name={p.name} tone="gold" />
-                          <span className="truncate font-medium">{p.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="truncate">{p.email ?? "—"}</TableCell>
-                      <TableCell className="whitespace-nowrap">{p.phone ?? "—"}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {childrenOf(p).map((c) => (
-                            <span
-                              key={c.id}
-                              className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium"
-                            >
-                              {c.name}
-                            </span>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="outline" onClick={() => setActive(p)}>
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border bg-muted/40 text-left text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <th className="px-4 py-2.5">Parent</th>
+                    <th className="px-3 py-2.5">Contact</th>
+                    <th className="px-3 py-2.5">Children</th>
+                    <th className="px-4 py-2.5 text-right">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((p) => {
+                    const name = p.name.replace(/\s+Guardian$/i, "");
+                    const guardian = /\s+Guardian$/i.test(p.name);
+                    const kids = childrenOf(p);
+                    return (
+                      <tr
+                        key={p.id}
+                        className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40"
+                      >
+                        <td className="px-4 py-2.5">
+                          <div className="flex min-w-0 items-center gap-3">
+                            <Initials
+                              name={name.replace(/\b\w/g, (ch) => ch.toUpperCase())}
+                              tone="gold"
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold capitalize">
+                                {name.toLowerCase()}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {guardian ? "Guardian" : "Parent"}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <p className="flex items-center gap-1.5 whitespace-nowrap">
+                            <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                            {p.phone ? (
+                              <span className="tabular-nums">
+                                {p.phone.replace(/^(\d{5})(\d{5})$/, "$1 $2")}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/60">No phone</span>
+                            )}
+                          </p>
+                          <p className="mt-0.5 flex max-w-[260px] items-center gap-1.5 text-xs text-muted-foreground">
+                            <Mail className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{p.email ?? "No email"}</span>
+                          </p>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {kids.length ? (
+                            <div className="flex flex-wrap gap-1">
+                              {kids.map((c) => (
+                                <span
+                                  key={c.id}
+                                  className="inline-flex items-center gap-1 rounded-full bg-primary/[0.07] px-2.5 py-1 text-[11px] font-medium text-foreground capitalize"
+                                >
+                                  {c.name.toLowerCase()}
+                                  {c.class_name && (
+                                    <span className="text-muted-foreground">
+                                      · {c.class_name.replace(/^class\s*/i, "")}
+                                      {c.section ? `-${c.section}` : ""}
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/60">Not linked</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 gap-1 text-primary hover:bg-primary/10 hover:text-primary"
+                            onClick={() => setActive(p)}
+                          >
+                            View <ChevronRight className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
             <Pager
               page={Math.min(page, pageCount)}
@@ -191,68 +243,168 @@ export default function Page() {
 
       <Sheet open={!!active} onOpenChange={(o) => !o && setActive(null)}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-md">
-          {active && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center gap-3">
-                  <Initials name={active.name} tone="gold" />
-                  <span>{active.name}</span>
-                </SheetTitle>
-              </SheetHeader>
-              <div className="mt-4 space-y-4">
-                <SectionCard title="Contact Information" bodyClassName="space-y-2 text-sm">
-                  <p>
-                    <span className="text-muted-foreground">Email:</span> {active.email ?? "—"}
-                  </p>
-                  <p>
-                    <span className="text-muted-foreground">Phone:</span> {active.phone ?? "—"}
-                  </p>
-                </SectionCard>
-                <SectionCard title="Linked Children">
-                  <div className="space-y-3">
-                    {childrenOf(active).length === 0 && (
-                      <p className="text-xs text-muted-foreground">No children linked.</p>
-                    )}
-                    {childrenOf(active).map((c) => (
-                      <div key={c.id} className="panel p-3">
-                        <div className="flex items-center gap-2.5">
-                          <Initials name={c.name} />
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">{c.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {c.class_name ?? "—"} - {c.section ?? "—"}
-                            </p>
-                          </div>
-                        </div>
-                        <ProgressBar
-                          className="mt-2"
-                          value={c.attendance ?? 0}
-                          tone="success"
-                          label={<span>Attendance · {c.attendance ?? 0}%</span>}
-                        />
-                      </div>
-                    ))}
+          {active &&
+            (() => {
+              const name = active.name.replace(/\s+Guardian$/i, "");
+              const nice = name.replace(/\b\w/g, (ch) => ch.toUpperCase());
+              const guardian = /\s+Guardian$/i.test(active.name);
+              const kids = childrenOf(active);
+              const phone = active.phone?.replace(/^(\d{5})(\d{5})$/, "$1 $2");
+              return (
+                <>
+                  <SheetHeader className="sr-only">
+                    <SheetTitle>{nice}</SheetTitle>
+                  </SheetHeader>
+
+                  {/* Profile */}
+                  <div className="flex flex-col items-center px-4 pt-6 text-center">
+                    <span className="grid h-20 w-20 place-items-center rounded-full bg-gold-soft font-display text-2xl font-bold text-gold-foreground ring-4 ring-gold-soft/40">
+                      {nice
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((w) => w[0])
+                        .join("")}
+                    </span>
+                    <h2 className="mt-3 font-display text-xl font-bold capitalize">
+                      {name.toLowerCase()}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      {guardian ? "Guardian" : "Parent"} · {kids.length} child
+                      {kids.length === 1 ? "" : "ren"}
+                    </p>
+
+                    {/* Quick actions */}
+                    <div className="mt-4 flex gap-6">
+                      {[
+                        {
+                          label: "Call",
+                          icon: Phone,
+                          href: active.phone ? `tel:${active.phone}` : null,
+                        },
+                        {
+                          label: "Email",
+                          icon: Mail,
+                          href: active.email ? `mailto:${active.email}` : null,
+                        },
+                      ].map(({ label, icon: Icon, href }) => (
+                        <a
+                          key={label}
+                          href={href ?? undefined}
+                          aria-disabled={!href}
+                          className={cn(
+                            "flex flex-col items-center gap-1 text-[11px] font-medium",
+                            href ? "text-primary" : "pointer-events-none text-muted-foreground/50",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "grid h-11 w-11 place-items-center rounded-full",
+                              href ? "bg-primary/10" : "bg-muted",
+                            )}
+                          >
+                            <Icon className="h-5 w-5" />
+                          </span>
+                          {label}
+                        </a>
+                      ))}
+                    </div>
                   </div>
-                </SectionCard>
-                <div className="flex gap-2">
-                  {active.email && (
-                    <Button className="flex-1" asChild>
-                      <a href={`mailto:${active.email}`}>
-                        <Mail className="h-4 w-4" /> Email
-                      </a>
-                    </Button>
-                  )}
-                  {active.phone && (
-                    <Button variant="outline" className="flex-1" asChild>
-                      <a href={`tel:${active.phone}`}>
-                        <Phone className="h-4 w-4" /> Call
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
+
+                  <div className="space-y-4 p-4">
+                    {/* Contact */}
+                    <section>
+                      <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Contact
+                      </p>
+                      <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+                        {[
+                          { icon: Phone, label: "Mobile", value: phone },
+                          { icon: Mail, label: "Email", value: active.email },
+                        ].map(({ icon: Icon, label, value }) => (
+                          <li key={label} className="flex items-center gap-3 px-3 py-2.5">
+                            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-[11px] text-muted-foreground">{label}</p>
+                              <p
+                                className={cn(
+                                  "truncate text-sm font-medium",
+                                  !value && "text-muted-foreground/60",
+                                )}
+                              >
+                                {value ?? "Not added"}
+                              </p>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+
+                    {/* Children */}
+                    <section>
+                      <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Children
+                      </p>
+                      {kids.length === 0 ? (
+                        <p className="rounded-2xl border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                          No children linked yet.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {kids.map((c) => {
+                            const att = Number(c.attendance ?? 0);
+                            const tone =
+                              att >= 90
+                                ? { bar: "bg-success", text: "text-success" }
+                                : att >= 75
+                                  ? { bar: "bg-warning", text: "text-warning" }
+                                  : { bar: "bg-destructive", text: "text-destructive" };
+                            return (
+                              <li
+                                key={c.id}
+                                className="rounded-2xl border border-border bg-card p-3"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <Initials
+                                    name={c.name.replace(/\b\w/g, (ch) => ch.toUpperCase())}
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold capitalize">
+                                      {c.name.toLowerCase()}
+                                    </p>
+                                    <p className="text-[11px] text-muted-foreground capitalize">
+                                      {c.class_name
+                                        ? `${c.class_name}${c.section ? ` – ${c.section}` : ""}`
+                                        : "No class"}
+                                      {c.roll ? ` · Roll ${c.roll}` : ""}
+                                    </p>
+                                  </div>
+                                  <span className={cn("text-sm font-bold tabular-nums", tone.text)}>
+                                    {att}%
+                                  </span>
+                                </div>
+                                <div className="mt-2.5 flex items-center gap-2">
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Attendance
+                                  </span>
+                                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                    <div
+                                      className={cn("h-full rounded-full", tone.bar)}
+                                      style={{ width: `${Math.min(100, Math.max(att, 0))}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </section>
+                  </div>
+                </>
+              );
+            })()}
         </SheetContent>
       </Sheet>
     </div>

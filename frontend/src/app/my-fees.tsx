@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Wallet, CheckCircle2, Clock3, Printer, CreditCard } from "lucide-react";
+import { Wallet, CheckCircle2, Clock3, Printer, CreditCard, Building2 } from "lucide-react";
 import { PageHeader, EmptyState, TableSkeleton } from "@/components/shared/ui-kit";
 import { InfoCard, ProgressBar } from "@/components/shared/InfoCard";
 import { SectionCard } from "@/components/shared/SectionCard";
@@ -323,10 +323,9 @@ export default function MyFeesPage() {
                         <Printer className="h-4 w-4" /> View Receipt
                       </Button>
                     ) : (
-                      <Button className="gap-1.5" onClick={() => setPayingFor(f)}>
-                        <CreditCard className="h-4 w-4" />
-                        {f.status === "Partial" ? "Pay Remaining" : "Pay Now"}
-                      </Button>
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft px-3 py-1.5 text-xs font-semibold text-warning">
+                        <Building2 className="h-3.5 w-3.5" /> Pay at school office
+                      </span>
                     )
                   }
                 />
@@ -381,10 +380,9 @@ export default function MyFeesPage() {
                                 <Printer className="h-3.5 w-3.5" /> Receipt
                               </Button>
                             ) : (
-                              <Button size="sm" className="gap-1" onClick={() => setPayingFor(f)}>
-                                <CreditCard className="h-3.5 w-3.5" />
-                                {f.status === "Partial" ? "Pay Remaining" : "Pay Now"}
-                              </Button>
+                              <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning">
+                                <Building2 className="h-3 w-3" /> Pay at office
+                              </span>
                             )}
                           </div>
                         </TableCell>
@@ -408,18 +406,6 @@ export default function MyFeesPage() {
           <ProgressBar value={(paid / total) * 100} tone="success" />
         </div>
       )}
-
-      <Dialog open={Boolean(payingFor)} onOpenChange={(o) => !o && setPayingFor(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Pay Fee — {payingFor ? feeTitle(payingFor) : ""}</DialogTitle>
-            <DialogDescription>
-              Choose to pay the full remaining amount or make a partial payment.
-            </DialogDescription>
-          </DialogHeader>
-          {payingFor && <PayNowDialog fee={payingFor} onDone={handlePaymentDone} />}
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={Boolean(receipt)} onOpenChange={(o) => !o && setReceipt(null)}>
         <DialogContent className="receipt-print-dialog max-w-lg print:max-w-none">

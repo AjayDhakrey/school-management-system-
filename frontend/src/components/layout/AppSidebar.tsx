@@ -166,7 +166,7 @@ export function AppSidebar() {
               <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem asChild>
                   <Link to={profilePath}>
-                    <User className="mr-2 h-4 w-4" /> My Profile
+                    <User className="mr-2 h-4 w-4" />Profile
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={handleSignOut}>

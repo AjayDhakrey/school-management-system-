@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom";
+import { useAuth } from "@/lib/auth-context";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -298,22 +299,38 @@ function ParentsGuardiansSection({ studentId }: { studentId: string }) {
       )}
 
       {unlinked.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-          <select
-            className="h-9 flex-1 rounded-lg border border-border bg-surface px-3 text-sm"
-            value={existingToLink}
-            onChange={(e) => setExistingToLink(e.target.value)}
-          >
-            <option value="">Link an existing guardian…</option>
-            {unlinked.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.email ?? "no email"})
-              </option>
-            ))}
-          </select>
-          <Button size="sm" variant="outline" onClick={linkExisting} disabled={!existingToLink}>
-            Link
-          </Button>
+        <div className="mt-4 rounded-2xl border border-dashed border-border bg-muted/30 p-4">
+          <p className="mb-2.5 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            Link Existing Guardian
+          </p>
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <select
+                className="h-10 w-full appearance-none rounded-xl border border-border bg-card px-3.5 pr-9 text-sm font-medium shadow-sm transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                value={existingToLink}
+                onChange={(e) => setExistingToLink(e.target.value)}
+              >
+                <option value="">Select a guardian to link…</option>
+                {unlinked.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.email ?? "no email"})
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </span>
+            </div>
+            <Button
+              size="sm"
+              onClick={linkExisting}
+              disabled={!existingToLink}
+              className="h-10 shrink-0 gap-1.5 rounded-xl px-5 text-sm font-semibold"
+            >
+              <Plus className="h-4 w-4" /> Link Guardian
+            </Button>
+          </div>
         </div>
       )}
     </SectionCard>
@@ -329,8 +346,15 @@ const attendanceMarkStyle: Record<string, string> = {
 export default function StudentProfile() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isTeacher = user?.role === "TEACHER";
   const [editOpen, setEditOpen] = useState(false);
   const [tab, setTab] = useState<string>("overview");
+
+  // Teachers cannot see Fees or Documents tabs
+  const visibleTabs = isTeacher
+    ? PROFILE_TABS.filter((t) => t.value !== "fees" && t.value !== "documents")
+    : PROFILE_TABS;
 
   const { data: student, isLoading, isError } = useStudent(id);
   const { data: allStudents } = useStudents();
@@ -475,7 +499,7 @@ export default function StudentProfile() {
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <StatusBadge status={student.status ?? "Active"} />
-                <StatusBadge status={feeStatus} />
+                {!isTeacher && <StatusBadge status={feeStatus} />}
               </div>
               <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
                 {student.phone && (
@@ -500,43 +524,44 @@ export default function StudentProfile() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Dialog open={editOpen} onOpenChange={setEditOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Pencil className="h-4 w-4" /> Edit
-                </Button>
-              </DialogTrigger>
-              <StudentFormDialog
-                initial={student}
-                onDone={async () => {
-                  await invalidateStudent();
-                  setEditOpen(false);
-                }}
-                onClose={() => setEditOpen(false)}
-              />
-            </Dialog>
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
-              <Printer className="h-4 w-4" /> Print
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem disabled={billing} onClick={billFromStructure}>
-                  {billing ? "Billing fees…" : "Bill fees from fee structure"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={generateTC}>Generate TC</DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={toggleActive}
-                >
-                  {student.status === "Inactive" ? "Reactivate" : "Deactivate"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {!isTeacher && (
+              <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Pencil className="h-4 w-4" /> Edit
+                  </Button>
+                </DialogTrigger>
+                <StudentFormDialog
+                  initial={student}
+                  onDone={async () => {
+                    await invalidateStudent();
+                    setEditOpen(false);
+                  }}
+                  onClose={() => setEditOpen(false)}
+                />
+              </Dialog>
+            )}
+            {!isTeacher && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-9 w-9">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem disabled={billing} onClick={billFromStructure}>
+                    {billing ? "Billing fees…" : "Bill fees from fee structure"}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={generateTC}>Generate TC</DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={toggleActive}
+                  >
+                    {student.status === "Inactive" ? "Reactivate" : "Deactivate"}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </div>
@@ -544,7 +569,7 @@ export default function StudentProfile() {
       <Tabs value={tab} onValueChange={setTab}>
         {/* Phones: every section visible at once as an icon grid. */}
         <div className="grid grid-cols-4 gap-y-1 rounded-2xl border border-border bg-card p-1.5 shadow-sm sm:hidden">
-          {PROFILE_TABS.map(({ value, short, icon: Icon }) => {
+          {visibleTabs.map(({ value, short, icon: Icon }) => {
             const active = tab === value;
             return (
               <button
@@ -578,7 +603,7 @@ export default function StudentProfile() {
         </div>
         <div className="hidden overflow-x-auto sm:block">
           <TabsList className="w-max">
-            {PROFILE_TABS.map(({ value, label }) => (
+            {visibleTabs.map(({ value, label }) => (
               <TabsTrigger key={value} value={value}>
                 {label}
               </TabsTrigger>
@@ -603,26 +628,28 @@ export default function StudentProfile() {
                 />
               </div>
             </StatTile>
-            <StatTile icon={FileText} tone="gold" label="Fee Status" value={feeStatus}>
-              <p
-                className={cn(
-                  "mt-1 text-[11px] font-medium",
-                  feeStatus === "Paid" || feeStatus === "No fees"
-                    ? "text-success"
-                    : feeStatus === "Overdue"
-                      ? "text-destructive"
-                      : "text-warning",
-                )}
-              >
-                {feeStatus === "Paid"
-                  ? "All dues cleared"
-                  : feeStatus === "No fees"
-                    ? "Nothing billed yet"
-                    : feeStatus === "Overdue"
-                      ? "Payment overdue"
-                      : "Dues outstanding"}
-              </p>
-            </StatTile>
+            {!isTeacher && (
+              <StatTile icon={FileText} tone="gold" label="Fee Status" value={feeStatus}>
+                <p
+                  className={cn(
+                    "mt-1 text-[11px] font-medium",
+                    feeStatus === "Paid" || feeStatus === "No fees"
+                      ? "text-success"
+                      : feeStatus === "Overdue"
+                        ? "text-destructive"
+                        : "text-warning",
+                  )}
+                >
+                  {feeStatus === "Paid"
+                    ? "All dues cleared"
+                    : feeStatus === "No fees"
+                      ? "Nothing billed yet"
+                      : feeStatus === "Overdue"
+                        ? "Payment overdue"
+                        : "Dues outstanding"}
+                </p>
+              </StatTile>
+            )}
             <StatTile
               icon={CalendarDays}
               tone="navy"

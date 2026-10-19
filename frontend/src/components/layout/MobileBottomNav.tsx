@@ -292,7 +292,7 @@ export function MobileBottomNav() {
           : role === "Parent"
             ? {
                 label: "Fees",
-                to: "/parent/fees/pay",
+                to: "/parent/fees/details",
                 icon: IoWalletOutline,
                 activeIcon: IoWallet,
                 match: ["/parent/fees/pay", "/parent/fees/details", "/parent/fees/history"],

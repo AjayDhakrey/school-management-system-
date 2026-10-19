@@ -33,7 +33,7 @@ const PARENT_SHORTCUTS: ParentShortcut[] = [
   { label: "Attendance", image: attendanceIcon, to: "/parent/children/attendance" },
   { label: "Timetable", image: timeIcon, to: "/parent/children/timetable" },
   { label: "Homework", image: homeworkIcon, to: "/parent/children/homework" },
-  { label: "Pay Fees", image: feesIcon, to: "/parent/fees/pay" },
+  { label: "Fees", image: feesIcon, to: "/parent/fees/details" },
   { label: "Transport", image: transportIcon, to: "/parent/transport" },
   { label: "Leave", image: leaveIcon, to: "/parent/leave" },
 ];
@@ -67,7 +67,7 @@ export default function ParentDashboardPage() {
 
   const parentShortcutBadges: Record<string, number | undefined> = {
     Homework: dueHomework.length,
-    "Pay Fees": pendingFeesCount,
+    Fees: pendingFeesCount,
   };
 
   return (

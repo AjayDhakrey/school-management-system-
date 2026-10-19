@@ -733,7 +733,9 @@ function StudentAvatar({ name }: { name: string }) {
 function StudentName({ student }: { student: ApiAttendanceRosterStudent }) {
   return (
     <div className="min-w-0">
-      <p className="text-[12.5px] leading-snug font-medium break-words text-foreground md:truncate md:text-sm md:leading-tight">{student.name}</p>
+      <p className="text-[12.5px] leading-snug font-medium break-words text-foreground md:truncate md:text-sm md:leading-tight">
+        {student.name}
+      </p>
       <p className="text-xs leading-tight text-muted-foreground">Roll {student.roll ?? "—"}</p>
     </div>
   );
@@ -863,13 +865,17 @@ function EmployeeAttendanceMarker({ kind }: { kind: "teacher" | "staff" }) {
         <InfoCard label="Leave" value={counts.Leave} icon={CalendarClock} tone="info" />
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface p-3">
+      {/* Phones: two columns — date | department, then the two buttons side by side. */}
+      <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border border-border bg-surface p-3 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
         <Input
           type="date"
           max={todayStr()}
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="h-9 w-full bg-surface text-sm sm:w-44"
+          className={cn(
+            "h-9 w-full min-w-0 bg-surface text-sm sm:w-44",
+            kind !== "staff" && "col-span-2",
+          )}
         />
         {kind === "staff" && (
           <Select value={department} onValueChange={setDepartment}>
@@ -886,17 +892,22 @@ function EmployeeAttendanceMarker({ kind }: { kind: "teacher" | "staff" }) {
             </SelectContent>
           </Select>
         )}
-        <div className="flex-1" />
+        <div className="hidden flex-1 sm:block" />
         <Button
           size="sm"
           variant="outline"
           onClick={markAllPresent}
           disabled={!people.length}
-          className="gap-1.5"
+          className="h-9 w-full gap-1.5 sm:w-auto"
         >
-          <UserCheck className="h-4 w-4" /> Mark All Present
+          <UserCheck className="h-4 w-4" /> All Present
         </Button>
-        <Button size="sm" onClick={save} disabled={saving || !people.length}>
+        <Button
+          size="sm"
+          className="h-9 w-full sm:w-auto"
+          onClick={save}
+          disabled={saving || !people.length}
+        >
           {saving ? "Saving…" : "Save Attendance"}
         </Button>
       </div>

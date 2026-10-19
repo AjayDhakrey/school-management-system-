@@ -42,23 +42,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useSchoolTimings } from "@/lib/school-timings";
-import classes from "@/icons/add-class-icon.png"
-import students from "@/icons/add-student-icon.png"
+import classes from "@/icons/add-class-icon.png";
+import students from "@/icons/add-student-icon.png";
 import subjectsIcon from "@/icons/subjects-icon.png";
-import timeIcon from "@/icons/time-table-icon.png"
-import homeworkIcon from "@/icons/homework-icon.png"
-import attendanceIcon from "@/icons/mark-attendance-icon.png"
-import examIcon from "@/icons/exam-icon.png"
-import resultIcon from "@/icons/result-icon.png"
-import feesIcon from "@/icons/pay-fees-icon.png"
-import leaveIcon from "@/icons/staff-leave-icon.png"
-import transportIcon from "@/icons/transport-icon.png"
-import holidaysIcon from "@/icons/holidays-icon.png"
-import feeStructureIcon from "@/icons/Add-fees-icon.png"
-import payrollIcon from "@/icons/Add-staff-icon.png"
-import addNoticeIcon from "@/icons/add-notice-icon.png"
-import driversIcon from "@/icons/drivers.png"
-import maintenanceIcon from "@/icons/maintenance.png"
+import timeIcon from "@/icons/time-table-icon.png";
+import homeworkIcon from "@/icons/homework-icon.png";
+import attendanceIcon from "@/icons/mark-attendance-icon.png";
+import examIcon from "@/icons/exam-icon.png";
+import resultIcon from "@/icons/result-icon.png";
+import feesIcon from "@/icons/pay-fees-icon.png";
+import leaveIcon from "@/icons/staff-leave-icon.png";
+import transportIcon from "@/icons/transport-icon.png";
+import holidaysIcon from "@/icons/holidays-icon.png";
+import feeStructureIcon from "@/icons/Add-fees-icon.png";
+import payrollIcon from "@/icons/Add-staff-icon.png";
+import addNoticeIcon from "@/icons/add-notice-icon.png";
+import driversIcon from "@/icons/drivers.png";
+import maintenanceIcon from "@/icons/maintenance.png";
 import { cn } from "@/lib/utils";
 import { QUICK_ACTION_ASSETS } from "@/lib/siteData";
 import { useAuth, toDisplayRole } from "@/lib/auth-context";
@@ -113,7 +113,7 @@ const STUDENT_SHORTCUTS: StudentShortcut[] = [
   { label: "Attendance", image: attendanceIcon, to: "/attendance" },
   { label: "Exams", image: examIcon, to: "/examinations" },
   { label: "Results", image: resultIcon, to: "/results" },
-  { label: "Pay Fees", image:  feesIcon, to: "/my-fees" },
+  { label: "Fees", image: feesIcon, to: "/my-fees" },
   { label: "Transport", image: transportIcon, to: "/transport" },
   { label: "Holidays", image: holidaysIcon, to: "/holidays" },
 ];
@@ -132,24 +132,38 @@ function StudentDashboard() {
   const { data: notifications } = useNotifications();
 
   const todayDay = new Date().toLocaleDateString("en-US", { weekday: "long" });
-  const today = (todaySlots ?? []).filter((s) => s.day === todayDay).sort((a, b) => a.period - b.period);
+  const today = (todaySlots ?? [])
+    .filter((s) => s.day === todayDay)
+    .sort((a, b) => a.period - b.period);
 
   const presentCount = (attendance ?? []).filter((a) => a.status === "Present").length;
-  const attendancePct = attendance && attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : profile?.attendance ?? 0;
+  const attendancePct =
+    attendance && attendance.length > 0
+      ? Math.round((presentCount / attendance.length) * 100)
+      : (profile?.attendance ?? 0);
 
-  const pendingHomework = (homework ?? []).filter((h) => !h.submission_status || h.submission_status === "Pending");
+  const pendingHomework = (homework ?? []).filter(
+    (h) => !h.submission_status || h.submission_status === "Pending",
+  );
   const upcomingExamsAll = (exams ?? []).filter(isUpcomingExam);
   const upcomingExams = upcomingExamsAll.slice(0, 3);
   const latestResults = [...(results ?? [])].slice(-3).reverse();
   const pendingFees = (fees ?? []).filter((f) => f.status !== "Paid");
-  const pendingFeeTotal = pendingFees.reduce((sum, f) => sum + Math.max(0, f.amount - f.discount + f.fine), 0);
+  const pendingFeeTotal = pendingFees.reduce(
+    (sum, f) => sum + Math.max(0, f.amount - f.discount + f.fine),
+    0,
+  );
   const unreadCount = (notifications ?? []).filter((n) => !n.read).length;
 
   return (
     <div>
       <PageHeader
         title={`Welcome, ${user?.name ?? "Student"}`}
-        {...(profile ? { description: `${profile.class_name ?? ""} ${profile.section ?? ""} · Roll #${profile.roll ?? "—"}` } : {})}
+        {...(profile
+          ? {
+              description: `${profile.class_name ?? ""} ${profile.section ?? ""} · Roll #${profile.roll ?? "—"}`,
+            }
+          : {})}
       />
 
       <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-3 lg:grid-cols-9 md:grid-cols-6">
@@ -158,7 +172,6 @@ function StudentDashboard() {
             key={a.label}
             to={a.to}
             className="panel bg-card group flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-2 py-3 text-center shadow-md shadow-gray-300 transition-all hover:-translate-y-0.5"
-           
           >
             {a.image ? (
               <span className="relative grid h-12 w-12 shrink-0 place-items-center sm:h-11 sm:w-11">
@@ -191,7 +204,9 @@ function StudentDashboard() {
             <ClipboardCheck className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{attendancePct}%</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {attendancePct}%
+            </span>
             <span className="block truncate text-[11px] text-muted-foreground">Attendance</span>
           </span>
         </div>
@@ -200,8 +215,12 @@ function StudentDashboard() {
             <NotebookPen className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{pendingHomework.length}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Pending Homework</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {pendingHomework.length}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Pending Homework
+            </span>
           </span>
         </div>
         <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
@@ -209,7 +228,9 @@ function StudentDashboard() {
             <Wallet className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">₹{pendingFeeTotal.toLocaleString()}</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              ₹{pendingFeeTotal.toLocaleString()}
+            </span>
             <span className="block truncate text-[11px] text-muted-foreground">Pending Fees</span>
           </span>
         </div>
@@ -218,8 +239,12 @@ function StudentDashboard() {
             <Bell className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{unreadCount}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Unread Notifications</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {unreadCount}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Unread Notifications
+            </span>
           </span>
         </div>
       </div>
@@ -227,10 +252,15 @@ function StudentDashboard() {
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <SectionCard title="Today's Timetable" subtitle={todayDay} bodyClassName="space-y-2">
           {today.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">No classes scheduled today.</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              No classes scheduled today.
+            </p>
           ) : (
             today.slice(0, 6).map((slot) => (
-              <div key={slot.id} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+              <div
+                key={slot.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+              >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{slot.subject}</p>
                   <p className="truncate text-[11px] text-muted-foreground">Period {slot.period}</p>
@@ -275,12 +305,19 @@ function StudentDashboard() {
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <SectionCard title="Upcoming Exams" subtitle="Scheduled for your class" bodyClassName="space-y-2">
+        <SectionCard
+          title="Upcoming Exams"
+          subtitle="Scheduled for your class"
+          bodyClassName="space-y-2"
+        >
           {upcomingExams.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">No scheduled exams.</p>
           ) : (
             upcomingExams.map((e) => (
-              <div key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+              <div
+                key={e.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+              >
                 <p className="truncate text-sm font-medium">{e.subject}</p>
                 <span className="shrink-0 text-[11px] text-muted-foreground">{e.date}</span>
               </div>
@@ -290,10 +327,15 @@ function StudentDashboard() {
 
         <SectionCard title="Latest Results" subtitle="Most recent scores" bodyClassName="space-y-2">
           {latestResults.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">No results published yet.</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              No results published yet.
+            </p>
           ) : (
             latestResults.map((r) => (
-              <div key={r.id} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+              <div
+                key={r.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+              >
                 <span className="text-sm">Marks: {r.marks ?? "—"}</span>
                 <StatusBadge status={r.grade ?? "—"} />
               </div>
@@ -332,7 +374,9 @@ function TeacherDashboard() {
   const [openNotice, setOpenNotice] = useState<ApiNotice | null>(null);
   const { data: notifications } = useNotifications();
 
-  const assignedClassCount = profile ? (JSON.parse(profile.assigned_classes) as string[]).length : 0;
+  const assignedClassCount = profile
+    ? (JSON.parse(profile.assigned_classes) as string[]).length
+    : 0;
   const todayDay = new Date().toLocaleDateString("en-US", { weekday: "long" });
   const today = (todaySlots ?? [])
     .filter((s) => s.day === todayDay && s.teacher_id === profile?.id)
@@ -341,8 +385,12 @@ function TeacherDashboard() {
   const myHomework = (homework ?? []).filter((h) => h.teacher_id === profile?.id);
   const upcomingExamsAll = (exams ?? []).filter(isUpcomingExam);
   const upcomingExams = upcomingExamsAll.slice(0, 4);
-  const todayAttendance = (myAttendance ?? []).find((a) => a.date === new Date().toISOString().slice(0, 10));
-  const latestLeave = [...(leaveRequests ?? [])].sort((a, b) => (a.from_date ?? "").localeCompare(b.from_date ?? "")).at(-1);
+  const todayAttendance = (myAttendance ?? []).find(
+    (a) => a.date === new Date().toISOString().slice(0, 10),
+  );
+  const latestLeave = [...(leaveRequests ?? [])]
+    .sort((a, b) => (a.from_date ?? "").localeCompare(b.from_date ?? ""))
+    .at(-1);
   const unreadCount = (notifications ?? []).filter((n) => !n.read).length;
 
   return (
@@ -394,8 +442,12 @@ function TeacherDashboard() {
             <Layers className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{assignedClassCount}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Assigned Classes</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {assignedClassCount}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Assigned Classes
+            </span>
           </span>
         </div>
         <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
@@ -403,7 +455,9 @@ function TeacherDashboard() {
             <Users className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{(students ?? []).length}</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {(students ?? []).length}
+            </span>
             <span className="block truncate text-[11px] text-muted-foreground">Total Students</span>
           </span>
         </div>
@@ -412,8 +466,12 @@ function TeacherDashboard() {
             <NotebookPen className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{myHomework.length}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Homework Assigned</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {myHomework.length}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Homework Assigned
+            </span>
           </span>
         </div>
         <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
@@ -421,8 +479,12 @@ function TeacherDashboard() {
             <Bell className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{unreadCount}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Unread Notifications</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {unreadCount}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Unread Notifications
+            </span>
           </span>
         </div>
       </div>
@@ -430,10 +492,15 @@ function TeacherDashboard() {
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         <SectionCard title="Today's Timetable" subtitle={todayDay} bodyClassName="space-y-2">
           {today.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">No classes scheduled today.</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              No classes scheduled today.
+            </p>
           ) : (
             today.slice(0, 6).map((slot) => (
-              <div key={slot.id} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+              <div
+                key={slot.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+              >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{slot.subject}</p>
                   <p className="truncate text-[11px] text-muted-foreground">Period {slot.period}</p>
@@ -450,7 +517,15 @@ function TeacherDashboard() {
         >
           <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
             <span className="text-sm">Today's Status</span>
-            <StatusBadge status={todayAttendance ? (todayAttendance.check_out ? "Checked Out" : "Checked In") : "Not Marked"} />
+            <StatusBadge
+              status={
+                todayAttendance
+                  ? todayAttendance.check_out
+                    ? "Checked Out"
+                    : "Checked In"
+                  : "Not Marked"
+              }
+            />
           </div>
           <div className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
             <span className="text-sm">Latest Leave Request</span>
@@ -460,12 +535,19 @@ function TeacherDashboard() {
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
-        <SectionCard title="Upcoming Exams" subtitle="In your assigned classes" bodyClassName="space-y-2">
+        <SectionCard
+          title="Upcoming Exams"
+          subtitle="In your assigned classes"
+          bodyClassName="space-y-2"
+        >
           {upcomingExams.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">No scheduled exams.</p>
           ) : (
             upcomingExams.map((e) => (
-              <div key={e.id} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+              <div
+                key={e.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+              >
                 <p className="truncate text-sm font-medium">{e.subject}</p>
                 <span className="shrink-0 text-[11px] text-muted-foreground">{e.date}</span>
               </div>
@@ -576,7 +658,9 @@ function AccountantDashboard() {
             <span className="block font-display text-lg leading-tight font-bold">
               ₹{pendingFeeTotal.toLocaleString()}
             </span>
-            <span className="block truncate text-[11px] text-muted-foreground">Pending Fee Amount</span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Pending Fee Amount
+            </span>
           </span>
         </div>
         <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
@@ -584,8 +668,12 @@ function AccountantDashboard() {
             <Hourglass className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{pendingLeaveCount}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Pending Staff Leave</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {pendingLeaveCount}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Pending Staff Leave
+            </span>
           </span>
         </div>
         <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
@@ -593,8 +681,12 @@ function AccountantDashboard() {
             <Bell className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{unreadCount}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Unread Notifications</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {unreadCount}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Unread Notifications
+            </span>
           </span>
         </div>
       </div>
@@ -696,7 +788,9 @@ function TransportManagerDashboard() {
           </span>
           <span className="min-w-0">
             <span className="block font-display text-lg leading-tight font-bold">{onRoute}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Vehicles On Route</span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Vehicles On Route
+            </span>
           </span>
         </div>
         <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
@@ -704,8 +798,12 @@ function TransportManagerDashboard() {
             <Users className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{studentsOnTransport}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Students on Transport</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {studentsOnTransport}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Students on Transport
+            </span>
           </span>
         </div>
         <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
@@ -713,8 +811,12 @@ function TransportManagerDashboard() {
             <ShieldCheck className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">{openComplaints}</span>
-            <span className="block truncate text-[11px] text-muted-foreground">Open Complaints</span>
+            <span className="block font-display text-lg leading-tight font-bold">
+              {openComplaints}
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Open Complaints
+            </span>
           </span>
         </div>
       </div>
@@ -764,7 +866,9 @@ function SuperAdminDashboard() {
   const inactive = rows.filter((s) => s.status === "INACTIVE" || s.status === "SUSPENDED").length;
   const trial = rows.filter((s) => s.status === "TRIAL").length;
   const expired = rows.filter((s) => s.status === "EXPIRED").length;
-  const activeSubscriptions = rows.filter((s) => s.payment_status === "PAID" && s.status === "ACTIVE").length;
+  const activeSubscriptions = rows.filter(
+    (s) => s.payment_status === "PAID" && s.status === "ACTIVE",
+  ).length;
   const expiringSoon = rows.filter((s) => {
     if (!s.subscription_expires_at) return false;
     const days = (new Date(s.subscription_expires_at).getTime() - Date.now()) / 86_400_000;
@@ -802,7 +906,10 @@ function SuperAdminDashboard() {
 
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
         {platformTotals.map((t) => (
-          <div key={t.label} className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
+          <div
+            key={t.label}
+            className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300"
+          >
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#3882F6]/80 text-white">
               <t.icon className="h-5 w-5" />
             </span>
@@ -816,7 +923,10 @@ function SuperAdminDashboard() {
 
       <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
         {platformSaas.map((t) => (
-          <div key={t.label} className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
+          <div
+            key={t.label}
+            className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300"
+          >
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/80 text-white">
               <t.icon className="h-5 w-5" />
             </span>
@@ -828,7 +938,12 @@ function SuperAdminDashboard() {
         ))}
       </div>
 
-      <SectionCard title="Schools" subtitle={`${totalSchools} schools on the platform`} className="mt-4" bodyClassName="p-0">
+      <SectionCard
+        title="Schools"
+        subtitle={`${totalSchools} schools on the platform`}
+        className="mt-4"
+        bodyClassName="p-0"
+      >
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -850,7 +965,11 @@ function SuperAdminDashboard() {
                 </TableRow>
               )}
               {rows.map((s) => (
-                <TableRow key={s.id} className="cursor-pointer" onClick={() => (window.location.href = `/super-admin/schools/${s.id}`)}>
+                <TableRow
+                  key={s.id}
+                  className="cursor-pointer"
+                  onClick={() => (window.location.href = `/super-admin/schools/${s.id}`)}
+                >
                   <TableCell>
                     <div className="flex min-w-0 items-center gap-2">
                       <Initials name={s.short_name} className="h-8 w-8 text-[10px]" tone="info" />
@@ -860,12 +979,16 @@ function SuperAdminDashboard() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{s.admin?.email ?? "Not assigned"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {s.admin?.email ?? "Not assigned"}
+                  </TableCell>
                   <TableCell className="text-sm">{s.plan}</TableCell>
                   <TableCell className="text-sm">
                     <StatusBadge status={s.payment_status ?? "PENDING"} />
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{s.subscription_expires_at ?? "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {s.subscription_expires_at ?? "—"}
+                  </TableCell>
                   <TableCell className="text-right">
                     <StatusBadge status={s.status} />
                   </TableCell>
@@ -882,7 +1005,9 @@ function SuperAdminDashboard() {
 function SchoolDashboard() {
   const { user } = useAuth();
   const displayRole = toDisplayRole(user);
-  const quickActions = actions.filter((a) => !a.to || (ROUTE_ROLES[a.to] ?? []).includes(displayRole));
+  const quickActions = actions.filter(
+    (a) => !a.to || (ROUTE_ROLES[a.to] ?? []).includes(displayRole),
+  );
 
   const canAdmissions = canView(user, "admissions");
   const canHomework = canView(user, "homework");
@@ -902,7 +1027,9 @@ function SchoolDashboard() {
   const { periods: schoolPeriods } = useSchoolTimings();
 
   const todayDay = new Date().toLocaleDateString("en-US", { weekday: "long" });
-  const today = (todaySlots ?? []).filter((s) => s.day === todayDay).sort((a, b) => a.period - b.period);
+  const today = (todaySlots ?? [])
+    .filter((s) => s.day === todayDay)
+    .sort((a, b) => a.period - b.period);
 
   const upcomingHolidays = (holidays ?? [])
     .filter((h) => new Date(h.date) >= new Date(new Date().toISOString().slice(0, 10)))
@@ -912,10 +1039,20 @@ function SchoolDashboard() {
   const recentActivity: RecentItem[] = [
     ...(canAdmissions ? (admissions ?? []) : [])
       .filter((a) => a.applied_on)
-      .map((a) => ({ id: `adm-${a.id}`, text: `${a.applicant} applied for admission (${a.status})`, type: "Admission", date: a.applied_on! })),
+      .map((a) => ({
+        id: `adm-${a.id}`,
+        text: `${a.applicant} applied for admission (${a.status})`,
+        type: "Admission",
+        date: a.applied_on!,
+      })),
     ...(canFees ? (fees ?? []) : [])
       .filter((f) => f.status === "Paid" && f.paid_on)
-      .map((f) => ({ id: `fee-${f.id}`, text: `Fee payment received — ₹${f.amount.toLocaleString()}`, type: "Fees", date: f.paid_on! })),
+      .map((f) => ({
+        id: `fee-${f.id}`,
+        text: `Fee payment received — ₹${f.amount.toLocaleString()}`,
+        type: "Fees",
+        date: f.paid_on!,
+      })),
     ...(canNotices ? (notices ?? []) : [])
       .filter((n) => n.date)
       .map((n) => ({ id: `notice-${n.id}`, text: n.title, type: "Notice", date: n.date! })),
@@ -1005,35 +1142,44 @@ function SchoolDashboard() {
             subtitle="Latest applications received"
             bodyClassName="p-0"
           >
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Applicant</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead className="hidden sm:table-cell">Applied</TableHead>
-                    <TableHead className="text-right">Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(admissions ?? []).slice(0, 5).map((a) => (
-                    <TableRow key={a.id}>
-                      <TableCell>
-                        <div className="flex min-w-0 items-center gap-2">
-                          <Initials name={a.applicant} className="h-8 w-8 text-[10px]" tone="info" />
-                          <p className="truncate text-sm font-medium">{a.applicant}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{a.class_applied}</TableCell>
-                      <TableCell className="hidden text-sm sm:table-cell">{a.applied_on}</TableCell>
-                      <TableCell className="text-right">
-                        <StatusBadge status={a.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            {(admissions ?? []).length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No applications yet.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {(admissions ?? []).slice(0, 5).map((a) => (
+                  <li key={a.id}>
+                    <Link
+                      to="/admissions"
+                      className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
+                    >
+                      <Initials
+                        name={a.applicant.replace(/\b\w/g, (ch) => ch.toUpperCase())}
+                        className="h-9 w-9 text-[11px]"
+                        tone="info"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold capitalize">{a.applicant}</p>
+                        <p className="truncate text-[11px] text-muted-foreground">
+                          <span className="capitalize">{a.class_applied ?? "—"}</span>
+                          {a.applied_on
+                            ? ` · ${new Date(`${a.applied_on.slice(0, 10)}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
+                            : ""}
+                        </p>
+                      </div>
+                      <StatusBadge status={a.status} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {(admissions ?? []).length > 0 && (
+              <Link
+                to="/admissions"
+                className="block border-t border-border px-4 py-2.5 text-center text-xs font-semibold text-primary hover:bg-primary/5"
+              >
+                View all applications →
+              </Link>
+            )}
           </SectionCard>
         ) : canHomework ? (
           <SectionCard
@@ -1059,7 +1205,10 @@ function SchoolDashboard() {
             bodyClassName="space-y-2"
           >
             {(fees ?? []).slice(0, 5).map((f) => (
-              <div key={f.id} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+              <div
+                key={f.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+              >
                 <span className="text-sm">₹{f.amount.toLocaleString()}</span>
                 <StatusBadge status={f.status} />
               </div>
@@ -1076,7 +1225,11 @@ function SchoolDashboard() {
           </SectionCard>
         )}
 
-        <SectionCard className="order-3 lg:order-none lg:col-start-1 lg:row-start-1" title="Academic Calendar" subtitle="August 2026">
+        <SectionCard
+          className="order-3 lg:order-none lg:col-start-1 lg:row-start-1"
+          title="Academic Calendar"
+          subtitle="August 2026"
+        >
           <SchoolCalendar />
         </SectionCard>
 
@@ -1109,21 +1262,32 @@ function SchoolDashboard() {
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         <SectionCard title="Today's Classes" subtitle={todayDay} bodyClassName="space-y-2">
           {today.length === 0 ? (
-            <p className="py-4 text-center text-sm text-muted-foreground">No classes scheduled today.</p>
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              No classes scheduled today.
+            </p>
           ) : (
             today.slice(0, 5).map((slot) => (
-              <div key={slot.id} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2">
+              <div
+                key={slot.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+              >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{slot.subject}</p>
                   <p className="truncate text-[11px] text-muted-foreground">Period {slot.period}</p>
                 </div>
-                <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">{schoolPeriods[slot.period - 1]?.time}</span>
+                <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
+                  {schoolPeriods[slot.period - 1]?.time}
+                </span>
               </div>
             ))
           )}
         </SectionCard>
 
-        <SectionCard title="Upcoming Holidays" subtitle="Next on the school calendar" bodyClassName="space-y-2">
+        <SectionCard
+          title="Upcoming Holidays"
+          subtitle="Next on the school calendar"
+          bodyClassName="space-y-2"
+        >
           {upcomingHolidays.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">No upcoming holidays.</p>
           ) : (
@@ -1141,7 +1305,11 @@ function SchoolDashboard() {
           )}
         </SectionCard>
 
-        <SectionCard title="Upcoming Exams" subtitle="Scheduled assessments" bodyClassName="space-y-2.5">
+        <SectionCard
+          title="Upcoming Exams"
+          subtitle="Scheduled assessments"
+          bodyClassName="space-y-2.5"
+        >
           {(exams ?? [])
             .filter(isUpcomingExam)
             .slice(0, 4)

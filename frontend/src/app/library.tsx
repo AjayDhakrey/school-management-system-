@@ -2064,14 +2064,16 @@ function ReportsTab({ loans, isLoading }: { loans: ApiLibraryLoan[]; isLoading: 
       }
       bodyClassName="p-0"
     >
-      <div className="flex flex-col gap-2 border-b border-border p-4 sm:flex-row sm:flex-wrap sm:items-center">
+      {/* Phones: search full width, then two columns for the filters and dates. */}
+      <div className="grid grid-cols-2 gap-2 border-b border-border p-4 sm:flex sm:flex-wrap sm:items-center">
         <SearchInput
+          className="col-span-2"
           value={search}
           onChange={(v) => {
             setSearch(v);
             setPage(1);
           }}
-          placeholder="Book, accession, borrower name or number…"
+          placeholder="Book, accession or borrower…"
         />
         <FilterSelect
           value={status}
@@ -2091,30 +2093,29 @@ function ReportsTab({ loans, isLoading }: { loans: ApiLibraryLoan[]; isLoading: 
           options={Object.values(BORROWER_LABEL)}
           placeholder="All borrowers"
         />
-        <div className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 text-xs text-muted-foreground">
-          <span className="font-medium">Issued</span>
-          <input
-            type="date"
-            aria-label="Issued from"
-            value={from}
-            onChange={(e) => {
-              setFrom(e.target.value);
-              setPage(1);
-            }}
-            className="h-7 bg-transparent text-xs text-foreground outline-none"
-          />
-          <span>→</span>
-          <input
-            type="date"
-            aria-label="Issued to"
-            value={to}
-            onChange={(e) => {
-              setTo(e.target.value);
-              setPage(1);
-            }}
-            className="h-7 bg-transparent text-xs text-foreground outline-none"
-          />
-        </div>
+        {(
+          [
+            ["Issued from", from, setFrom],
+            ["Issued to", to, setTo],
+          ] as const
+        ).map(([label, value, set]) => (
+          <label
+            key={label}
+            className="flex h-9 min-w-0 items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 text-xs text-muted-foreground"
+          >
+            <span className="shrink-0 font-medium">{label.replace("Issued ", "")}</span>
+            <input
+              type="date"
+              aria-label={label}
+              value={value}
+              onChange={(e) => {
+                set(e.target.value);
+                setPage(1);
+              }}
+              className="h-7 w-full min-w-0 bg-transparent text-xs text-foreground outline-none"
+            />
+          </label>
+        ))}
       </div>
       {isLoading ? (
         <TableSkeleton rows={6} cols={6} />

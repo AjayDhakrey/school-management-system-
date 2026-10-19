@@ -744,7 +744,7 @@ export default function StudentsPage() {
 
       <div className="panel">
         <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
             <Select value={classFilter} onValueChange={handleClassChange}>
               <SelectTrigger className="h-9 w-full bg-surface text-sm sm:w-[160px]">
                 <SelectValue placeholder="Select Class" />

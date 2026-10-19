@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { FaBus } from "react-icons/fa";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,7 +49,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth-context";
+import { useSchoolTimings } from "@/lib/school-timings";
 import {
+  useHolidays,
   useMyTransport,
   useTransport,
   useStudents,
@@ -205,6 +207,186 @@ function JourneyStop({
         </span>
       </div>
     </li>
+  );
+}
+
+/** "7:05 am", "07:05", "13:30" → minutes after midnight (null when unreadable). */
+function stopMinutes(time: string | null | undefined) {
+  const m = /^\s*(\d{1,2})[:.](\d{2})\s*(am|pm)?\s*$/i.exec(time ?? "");
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = Number(m[2]);
+  const ap = m[3]?.toLowerCase();
+  if (ap === "pm" && h < 12) h += 12;
+  if (ap === "am" && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+/**
+ * The route as a timeline that follows the clock: stops the bus has already passed turn
+ * green, the bus sits at the stop it reached last, and a status line says what's next.
+ */
+function LiveRoute({
+  stops,
+  pickup,
+  drop,
+}: {
+  stops: { name: string; time?: string | null }[];
+  pickup: string | null | undefined;
+  drop: string | null | undefined;
+}) {
+  // Re-render every 30 seconds so the bus moves on its own.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  // No bus on Sundays / non-working days or on a school holiday.
+  const { days: workingDays } = useSchoolTimings();
+  const { data: holidays } = useHolidays();
+  const weekday = now.toLocaleDateString("en-US", { weekday: "long" });
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const holiday = (holidays ?? []).find((h) => (h.date ?? "").slice(0, 10) === todayIso);
+  const offReason = holiday
+    ? holiday.name
+    : weekday === "Sunday" || !workingDays.includes(weekday)
+      ? weekday
+      : null;
+
+  const minutesNow = now.getHours() * 60 + now.getMinutes();
+  const times = stops.map((st) => stopMinutes(st.time));
+  // Last stop whose time has come (none on a day off).
+  let at = -1;
+  if (!offReason) {
+    times.forEach((t, i) => {
+      if (t !== null && t <= minutesNow) at = i;
+    });
+  }
+  const started = at >= 0;
+  const finished = !offReason && at === stops.length - 1;
+  const next = finished ? null : stops[at + 1];
+  const nextIn = next ? (times[at + 1] ?? minutesNow) - minutesNow : 0;
+  const key = (name: string | null | undefined) => (name ?? "").trim().toLowerCase();
+
+  const status = offReason
+    ? { text: `No bus today · ${offReason}`, tone: "bg-warning-soft text-warning" }
+    : !started
+      ? { text: `Bus starts at ${stops[0]?.time ?? "—"}`, tone: "bg-muted text-muted-foreground" }
+      : finished
+        ? {
+            text: `Reached ${stops.at(-1)?.name ?? "school"}`,
+            tone: "bg-success-soft text-success",
+          }
+        : {
+            text: `Next: ${next?.name} ${nextIn > 0 ? `in ${nextIn} min` : "now"}`,
+            tone: "bg-primary/10 text-primary",
+          };
+
+  return (
+    <div className="border-t border-dashed border-border bg-muted/20 p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Route · {stops.length} stop{stops.length === 1 ? "" : "s"}
+        </p>
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize",
+            status.tone,
+          )}
+        >
+          {started && !finished && (
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+            </span>
+          )}
+          {status.text}
+        </span>
+      </div>
+      <ol>
+        {stops.map((stop, i) => {
+          const k = key(stop.name);
+          const isPickup = k === key(pickup);
+          const isDrop = k === key(drop);
+          const mine = isPickup || isDrop;
+          const passed = i <= at;
+          const here = i === at && !finished;
+          const last = i === stops.length - 1;
+          return (
+            <li
+              key={`${stop.name}-${i}`}
+              className="grid grid-cols-[56px_24px_minmax(0,1fr)] items-start gap-2 pb-3 last:pb-0"
+            >
+              <span
+                className={cn(
+                  "pt-0.5 text-right text-[11px] tabular-nums",
+                  passed || mine ? "font-semibold text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {stop.time ?? "—"}
+              </span>
+              <span className="relative flex justify-center">
+                {!last && (
+                  <span
+                    className={cn(
+                      "absolute top-4 h-[calc(100%+0.5rem)] w-0.5 rounded",
+                      i < at ? "bg-success" : "bg-border",
+                    )}
+                  />
+                )}
+                {here ? (
+                  <span className="relative grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground shadow-md ring-4 ring-primary/20">
+                    <FaBus className="h-3 w-3" />
+                  </span>
+                ) : (
+                  <span
+                    className={cn(
+                      "relative mt-0.5 h-3.5 w-3.5 rounded-full border-2",
+                      passed
+                        ? "border-success bg-success"
+                        : mine
+                          ? "border-success bg-card"
+                          : last
+                            ? "border-primary bg-card"
+                            : "border-border bg-card",
+                    )}
+                  />
+                )}
+              </span>
+              <div className="min-w-0">
+                <p
+                  className={cn(
+                    "truncate text-sm capitalize",
+                    here || mine ? "font-bold" : passed ? "text-foreground" : "text-foreground/70",
+                  )}
+                >
+                  {stop.name}
+                </p>
+                <div className="mt-0.5 flex flex-wrap gap-1">
+                  {here && (
+                    <span className="rounded-full bg-primary px-2 py-px text-[10px] font-semibold text-primary-foreground">
+                      Bus is here
+                    </span>
+                  )}
+                  {mine && (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-px text-[10px] font-semibold",
+                        isPickup
+                          ? "bg-success-soft text-success"
+                          : "bg-destructive-soft text-destructive",
+                      )}
+                    >
+                      {isPickup && isDrop ? "Your stop" : isPickup ? "Your pickup" : "Your drop"}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -405,81 +587,13 @@ function StudentTransportView() {
                   )}
                 </div>
 
-                {/* Route timeline */}
+                {/* Route timeline — follows the clock */}
                 {stops.length > 0 && (
-                  <div className="border-t border-dashed border-border bg-muted/20 p-4">
-                    <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Route · {stops.length} stop{stops.length === 1 ? "" : "s"}
-                    </p>
-                    <ol className="relative">
-                      {stops.map((stop, i) => {
-                        const key = stop.name.trim().toLowerCase();
-                        const isPickup =
-                          key === (assignment.pickup_point ?? "").trim().toLowerCase();
-                        const isDrop = key === (assignment.drop_point ?? "").trim().toLowerCase();
-                        const mine = isPickup || isDrop;
-                        const last = i === stops.length - 1;
-                        return (
-                          <li
-                            key={`${stop.name}-${i}`}
-                            className="relative grid grid-cols-[56px_20px_minmax(0,1fr)] items-start gap-2 pb-3 last:pb-0"
-                          >
-                            <span
-                              className={cn(
-                                "pt-0.5 text-right text-[11px] tabular-nums",
-                                mine ? "font-semibold text-foreground" : "text-muted-foreground",
-                              )}
-                            >
-                              {stop.time ?? "—"}
-                            </span>
-                            <span className="relative flex justify-center">
-                              {!last && (
-                                <span className="absolute top-4 h-[calc(100%+0.5rem)] w-0.5 rounded bg-border" />
-                              )}
-                              <span
-                                className={cn(
-                                  "relative mt-0.5 h-3.5 w-3.5 rounded-full border-2",
-                                  isPickup
-                                    ? "border-success bg-success"
-                                    : isDrop
-                                      ? "border-destructive bg-destructive"
-                                      : last
-                                        ? "border-primary bg-primary"
-                                        : "border-border bg-card",
-                                )}
-                              />
-                            </span>
-                            <div className="min-w-0">
-                              <p
-                                className={cn(
-                                  "truncate text-sm capitalize",
-                                  mine ? "font-bold" : "text-foreground/80",
-                                )}
-                              >
-                                {stop.name}
-                              </p>
-                              {mine && (
-                                <span
-                                  className={cn(
-                                    "mt-0.5 inline-block rounded-full px-2 py-px text-[10px] font-semibold",
-                                    isPickup
-                                      ? "bg-success-soft text-success"
-                                      : "bg-destructive-soft text-destructive",
-                                  )}
-                                >
-                                  {isPickup && isDrop
-                                    ? "Your stop"
-                                    : isPickup
-                                      ? "Your pickup"
-                                      : "Your drop"}
-                                </span>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ol>
-                  </div>
+                  <LiveRoute
+                    stops={stops}
+                    pickup={assignment.pickup_point}
+                    drop={assignment.drop_point}
+                  />
                 )}
               </div>
             );

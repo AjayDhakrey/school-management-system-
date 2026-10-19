@@ -108,6 +108,7 @@ export default function SubjectsPage() {
   // Allocations filters
   const [allocSearch, setAllocSearch] = useState("");
   const [allocClass, setAllocClass] = useState("all");
+  const [allocSection, setAllocSection] = useState("all");
   const [allocTeacher, setAllocTeacher] = useState("all");
   const [allocType, setAllocType] = useState("all");
   const [allocView, setAllocView] = useState<"table" | "card">("table");
@@ -148,7 +149,8 @@ export default function SubjectsPage() {
       ) {
         return false;
       }
-      if (allocClass !== "all" && `${m.class_name}-${m.section}` !== allocClass) return false;
+      if (allocClass !== "all" && m.class_name !== allocClass) return false;
+      if (allocSection !== "all" && m.section !== allocSection) return false;
       if (allocTeacher !== "all") {
         if (allocTeacher === UNASSIGNED && m.teacher_id) return false;
         if (allocTeacher !== UNASSIGNED && m.teacher_id !== allocTeacher) return false;
@@ -156,7 +158,7 @@ export default function SubjectsPage() {
       if (allocType !== "all" && (m.subject_type ?? "Core") !== allocType) return false;
       return true;
     });
-  }, [mappings, allocSearch, allocClass, allocTeacher, allocType]);
+  }, [mappings, allocSearch, allocClass, allocSection, allocTeacher, allocType]);
 
   const { rows: allocRows, pageCount: allocPageCount } = usePaged(filteredMappings, allocPage, 10);
 
@@ -190,9 +192,23 @@ export default function SubjectsPage() {
   const unassignedAllocations = (mappings ?? []).filter((m) => !m.teacher_id).length;
 
   // Options for filters
-  const classOptions = useMemo(
-    () => (classes ?? []).map((c) => ({ value: c.id, label: `${c.name}-${c.section}` })),
+
+  // Class first, then that class's sections.
+  const allocClassNames = useMemo(
+    () =>
+      Array.from(new Set((classes ?? []).map((c) => c.name))).sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true }),
+      ),
     [classes],
+  );
+  const allocSectionNames = useMemo(
+    () =>
+      allocClass === "all"
+        ? []
+        : Array.from(
+            new Set((classes ?? []).filter((c) => c.name === allocClass).map((c) => c.section)),
+          ).sort(),
+    [classes, allocClass],
   );
 
   const teacherOptions = useMemo(
@@ -347,10 +363,20 @@ export default function SubjectsPage() {
                     value={allocClass}
                     onChange={(v) => {
                       setAllocClass(v);
+                      setAllocSection("all");
                       setAllocPage(1);
                     }}
-                    options={classOptions.map((c) => c.label)}
+                    options={allocClassNames}
                     placeholder="Class"
+                  />
+                  <FilterSelect
+                    value={allocSection}
+                    onChange={(v) => {
+                      setAllocSection(v);
+                      setAllocPage(1);
+                    }}
+                    options={allocSectionNames}
+                    placeholder={allocClass === "all" ? "Section" : "All sections"}
                   />
                   <FilterSelect
                     value={allocType}

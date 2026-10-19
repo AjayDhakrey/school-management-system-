@@ -78,7 +78,6 @@ const ParentHomework = lazy(() => import("@/app/parent/children/homework"));
 const ParentExams = lazy(() => import("@/app/parent/children/exams"));
 const ParentResults = lazy(() => import("@/app/parent/children/results"));
 const ParentFeeDetails = lazy(() => import("@/app/parent/fees/fee-details"));
-const ParentPayFees = lazy(() => import("@/app/parent/fees/pay-fees"));
 const ParentPaymentHistory = lazy(() => import("@/app/parent/fees/payment-history"));
 const ParentLeave = lazy(() => import("@/app/parent/leave"));
 const ParentTransport = lazy(() => import("@/app/parent/transport"));
@@ -116,356 +115,384 @@ export default function App() {
       <AuthProvider>
         <AppProvider>
           <ErrorBoundary>
-            <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">Loading page…</div>}><Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/" element={<RootRedirect />} />
+            <Suspense
+              fallback={
+                <div className="flex min-h-[50vh] items-center justify-center text-sm text-muted-foreground">
+                  Loading page…
+                </div>
+              }
+            >
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={<RootRedirect />} />
 
-              <Route element={<AppShell />}>
-                {/* Role-prefixed dashboard entry points, per login redirection spec */}
-                <Route
-                  path="/super-admin/dashboard"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <Dashboard />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/school-admin/dashboard"
-                  element={
-                    <RequireRole roles={["School Admin"]}>
-                      <Dashboard />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/teacher/dashboard"
-                  element={
-                    <RequireRole roles={["Teacher"]}>
-                      <Dashboard />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/staff/dashboard"
-                  element={
-                    <RequireRole roles={["Staff", "Accountant", "Librarian", "Transport Manager"]}>
-                      <Dashboard />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/student/dashboard"
-                  element={
-                    <RequireRole roles={["Student"]}>
-                      <Dashboard />
-                    </RequireRole>
-                  }
-                />
+                <Route element={<AppShell />}>
+                  {/* Role-prefixed dashboard entry points, per login redirection spec */}
+                  <Route
+                    path="/super-admin/dashboard"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <Dashboard />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/school-admin/dashboard"
+                    element={
+                      <RequireRole roles={["School Admin"]}>
+                        <Dashboard />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/teacher/dashboard"
+                    element={
+                      <RequireRole roles={["Teacher"]}>
+                        <Dashboard />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/staff/dashboard"
+                    element={
+                      <RequireRole
+                        roles={["Staff", "Accountant", "Librarian", "Transport Manager"]}
+                      >
+                        <Dashboard />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/student/dashboard"
+                    element={
+                      <RequireRole roles={["Student"]}>
+                        <Dashboard />
+                      </RequireRole>
+                    }
+                  />
 
-                {/* Parent Portal — child-switcher state is scoped to just this route subtree */}
-                <Route
-                  element={
-                    <RequireRole roles={["Parent"]}>
-                      <ParentChildProvider>
-                        <Outlet />
-                      </ParentChildProvider>
-                    </RequireRole>
-                  }
-                >
-                  <Route path="/parent/dashboard" element={<ParentDashboard />} />
-                  <Route path="/parent/children/profile" element={<ParentChildProfile />} />
-                  <Route path="/parent/children/attendance" element={<ParentAttendance />} />
-                  <Route path="/parent/children/timetable" element={<ParentTimetable />} />
-                  <Route path="/parent/children/homework" element={<ParentHomework />} />
-                  <Route path="/parent/children/exams" element={<ParentExams />} />
-                  <Route path="/parent/children/results" element={<ParentResults />} />
-                  <Route path="/parent/fees/details" element={<ParentFeeDetails />} />
-                  <Route path="/parent/fees/pay" element={<ParentPayFees />} />
-                  <Route path="/parent/fees/history" element={<ParentPaymentHistory />} />
-                  <Route path="/parent/leave" element={<ParentLeave />} />
-                  <Route path="/parent/transport" element={<ParentTransport />} />
+                  {/* Parent Portal — child-switcher state is scoped to just this route subtree */}
+                  <Route
+                    element={
+                      <RequireRole roles={["Parent"]}>
+                        <ParentChildProvider>
+                          <Outlet />
+                        </ParentChildProvider>
+                      </RequireRole>
+                    }
+                  >
+                    <Route path="/parent/dashboard" element={<ParentDashboard />} />
+                    <Route path="/parent/children/profile" element={<ParentChildProfile />} />
+                    <Route path="/parent/children/attendance" element={<ParentAttendance />} />
+                    <Route path="/parent/children/timetable" element={<ParentTimetable />} />
+                    <Route path="/parent/children/homework" element={<ParentHomework />} />
+                    <Route path="/parent/children/exams" element={<ParentExams />} />
+                    <Route path="/parent/children/results" element={<ParentResults />} />
+                    <Route path="/parent/fees/details" element={<ParentFeeDetails />} />
+                    <Route
+                      path="/parent/fees/pay"
+                      element={<Navigate to="/parent/fees/details" replace />}
+                    />
+                    <Route path="/parent/fees/history" element={<ParentPaymentHistory />} />
+                    <Route path="/parent/leave" element={<ParentLeave />} />
+                    <Route path="/parent/transport" element={<ParentTransport />} />
+                  </Route>
+
+                  <Route path="/students" element={guarded("/students", <StudentsPage />)} />
+                  <Route path="/students/:id" element={guarded("/students", <StudentProfile />)} />
+                  <Route path="/subjects" element={guarded("/subjects", <SubjectsPage />)} />
+                  <Route path="/admissions" element={guarded("/admissions", <Admissions />)} />
+                  <Route path="/attendance" element={guarded("/attendance", <Attendance />)} />
+                  <Route path="/classes" element={guarded("/classes", <Classes />)} />
+                  <Route path="/rooms" element={guarded("/rooms", <Rooms />)} />
+                  <Route path="/events" element={guarded("/events", <Events />)} />
+                  <Route
+                    path="/examinations"
+                    element={guarded("/examinations", <Examinations />)}
+                  />
+                  <Route
+                    path="/fees/structure"
+                    element={guarded("/fees/structure", <Fees tab="structure" />)}
+                  />
+                  <Route
+                    path="/fees/collection"
+                    element={guarded("/fees/collection", <Fees tab="collection" />)}
+                  />
+                  <Route
+                    path="/fees/pending"
+                    element={guarded("/fees/pending", <Fees tab="pending" />)}
+                  />
+                  <Route
+                    path="/fees/reports"
+                    element={guarded("/fees/reports", <Fees tab="reports" />)}
+                  />
+                  <Route
+                    path="/fees/discounts"
+                    element={guarded("/fees/discounts", <Fees tab="discounts" />)}
+                  />
+                  <Route
+                    path="/payments/transactions"
+                    element={guarded("/payments/transactions", <Payments mode="transactions" />)}
+                  />
+                  <Route
+                    path="/payments/refunds"
+                    element={guarded("/payments/refunds", <Payments mode="refunds" />)}
+                  />
+                  <Route
+                    path="/expenses"
+                    element={guarded("/expenses", <Expenses tab="expenses" />)}
+                  />
+                  <Route
+                    path="/expenses/categories"
+                    element={guarded("/expenses/categories", <Expenses tab="categories" />)}
+                  />
+                  <Route
+                    path="/expenses/vendors"
+                    element={guarded("/expenses/vendors", <Expenses tab="vendors" />)}
+                  />
+                  <Route path="/invoices" element={guarded("/invoices", <Invoices />)} />
+                  <Route
+                    path="/financial-reports"
+                    element={guarded("/financial-reports", <FinancialReports />)}
+                  />
+                  <Route
+                    path="/financial-settings"
+                    element={guarded("/financial-settings", <FinancialSettings />)}
+                  />
+                  <Route path="/homework" element={guarded("/homework", <Homework />)} />
+                  <Route
+                    path="/leave/students"
+                    element={guarded("/leave/students", <Leave type="STUDENT" />)}
+                  />
+                  <Route
+                    path="/leave/teachers"
+                    element={guarded("/leave/teachers", <Leave type="TEACHER" />)}
+                  />
+                  <Route
+                    path="/leave/staff"
+                    element={guarded("/leave/staff", <Leave type="STAFF" />)}
+                  />
+                  <Route path="/library" element={guarded("/library", <Library />)} />
+                  <Route path="/notices" element={guarded("/notices", <Notices />)} />
+                  <Route
+                    path="/announcements"
+                    element={guarded("/announcements", <Announcements />)}
+                  />
+                  <Route
+                    path="/certificates"
+                    element={guarded("/certificates", <Certificates />)}
+                  />
+                  <Route
+                    path="/notifications"
+                    element={guarded("/notifications", <Notifications />)}
+                  />
+                  <Route path="/parents" element={guarded("/parents", <Parents />)} />
+                  <Route path="/reports" element={guarded("/reports", <Reports />)} />
+                  <Route path="/results" element={guarded("/results", <Results />)} />
+                  <Route path="/roles" element={guarded("/roles", <RolesPage />)} />
+                  <Route path="/settings" element={guarded("/settings", <SettingsPage />)} />
+                  <Route
+                    path="/teaching-staff"
+                    element={guarded(
+                      "/teaching-staff",
+                      <Teachers key="teaching" mode="Teaching" />,
+                    )}
+                  />
+                  <Route
+                    path="/non-teaching-staff"
+                    element={guarded(
+                      "/non-teaching-staff",
+                      <Teachers key="non-teaching" mode="Non-Teaching" />,
+                    )}
+                  />
+                  <Route path="/timetable" element={guarded("/timetable", <Timetable />)} />
+                  <Route path="/transport" element={guarded("/transport", <Transport />)} />
+                  <Route
+                    path="/transport/drivers"
+                    element={guarded("/transport/drivers", <TransportDrivers tab="drivers" />)}
+                  />
+                  <Route
+                    path="/transport/attendants"
+                    element={guarded("/transport/drivers", <TransportDrivers tab="attendants" />)}
+                  />
+                  <Route
+                    path="/transport/students"
+                    element={guarded("/transport/students", <TransportStudents />)}
+                  />
+                  <Route
+                    path="/transport/attendance"
+                    element={guarded("/transport/attendance", <TransportAttendance />)}
+                  />
+                  <Route
+                    path="/transport/maintenance"
+                    element={guarded("/transport/maintenance", <TransportMaintenance />)}
+                  />
+                  <Route
+                    path="/transport/complaints"
+                    element={guarded("/transport/complaints", <TransportComplaints />)}
+                  />
+                  <Route
+                    path="/transport/fees"
+                    element={guarded("/transport/fees", <TransportFees />)}
+                  />
+                  <Route
+                    path="/transport/reports"
+                    element={guarded("/transport/reports", <TransportReports />)}
+                  />
+                  <Route path="/users" element={guarded("/users", <Users />)} />
+                  <Route path="/profile" element={guarded("/profile", <Profile />)} />
+                  <Route path="/my-subjects" element={guarded("/my-subjects", <MySubjects />)} />
+                  <Route path="/my-leave" element={guarded("/my-leave", <MyLeave />)} />
+                  <Route path="/holidays" element={guarded("/holidays", <Holidays />)} />
+                  <Route path="/my-fees" element={guarded("/my-fees", <MyFees />)} />
+                  <Route
+                    path="/teacher/profile"
+                    element={guarded("/teacher/profile", <TeacherProfile />)}
+                  />
+                  <Route
+                    path="/staff/profile"
+                    element={guarded("/staff/profile", <StaffProfile />)}
+                  />
+                  <Route
+                    path="/teacher/classes"
+                    element={guarded("/teacher/classes", <TeacherClasses />)}
+                  />
+                  <Route
+                    path="/teacher/students"
+                    element={guarded("/teacher/students", <TeacherStudents />)}
+                  />
+                  <Route
+                    path="/teacher/subjects"
+                    element={guarded("/teacher/subjects", <TeacherSubjects />)}
+                  />
+                  <Route
+                    path="/teacher/my-attendance"
+                    element={guarded("/teacher/my-attendance", <TeacherMyAttendance />)}
+                  />
+                  <Route
+                    path="/teacher/class-leave"
+                    element={guarded("/teacher/class-leave", <TeacherClassLeave />)}
+                  />
+                  <Route
+                    path="/staff/my-attendance"
+                    element={guarded("/staff/my-attendance", <StaffMyAttendance />)}
+                  />
+                  <Route path="/payroll" element={guarded("/payroll", <Salary mode="manage" />)} />
+                  <Route
+                    path="/my-salary"
+                    element={guarded("/my-salary", <Salary mode="personal" />)}
+                  />
+
+                  {/* Super Admin — SaaS/platform-level only, never school-internal data */}
+                  <Route
+                    path="/super-admin/schools"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminSchools />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/schools/:id"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminSchoolDetail />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/subscriptions"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminSubscriptions />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/plans"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminPlans />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/settings"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminSettings />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/school-admins"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminSchoolAdmins />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/leads"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminLeads />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/revenue"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminRevenue />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/renewals"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminRenewals />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/support"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminSupport />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/announcements"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminAnnouncements />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/features"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminFeatures />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/security"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminSecurity />
+                      </RequireRole>
+                    }
+                  />
+
+                  <Route path="*" element={<NotFound />} />
                 </Route>
-
-                <Route path="/students" element={guarded("/students", <StudentsPage />)} />
-                <Route path="/students/:id" element={guarded("/students", <StudentProfile />)} />
-                <Route path="/subjects" element={guarded("/subjects", <SubjectsPage />)} />
-                <Route path="/admissions" element={guarded("/admissions", <Admissions />)} />
-                <Route path="/attendance" element={guarded("/attendance", <Attendance />)} />
-                <Route path="/classes" element={guarded("/classes", <Classes />)} />
-                <Route path="/rooms" element={guarded("/rooms", <Rooms />)} />
-                <Route path="/events" element={guarded("/events", <Events />)} />
-                <Route path="/examinations" element={guarded("/examinations", <Examinations />)} />
-                <Route
-                  path="/fees/structure"
-                  element={guarded("/fees/structure", <Fees tab="structure" />)}
-                />
-                <Route
-                  path="/fees/collection"
-                  element={guarded("/fees/collection", <Fees tab="collection" />)}
-                />
-                <Route
-                  path="/fees/pending"
-                  element={guarded("/fees/pending", <Fees tab="pending" />)}
-                />
-                <Route
-                  path="/fees/reports"
-                  element={guarded("/fees/reports", <Fees tab="reports" />)}
-                />
-                <Route
-                  path="/fees/discounts"
-                  element={guarded("/fees/discounts", <Fees tab="discounts" />)}
-                />
-                <Route
-                  path="/payments/transactions"
-                  element={guarded("/payments/transactions", <Payments mode="transactions" />)}
-                />
-                <Route
-                  path="/payments/refunds"
-                  element={guarded("/payments/refunds", <Payments mode="refunds" />)}
-                />
-                <Route path="/expenses" element={guarded("/expenses", <Expenses tab="expenses" />)} />
-                <Route
-                  path="/expenses/categories"
-                  element={guarded("/expenses/categories", <Expenses tab="categories" />)}
-                />
-                <Route
-                  path="/expenses/vendors"
-                  element={guarded("/expenses/vendors", <Expenses tab="vendors" />)}
-                />
-                <Route path="/invoices" element={guarded("/invoices", <Invoices />)} />
-                <Route
-                  path="/financial-reports"
-                  element={guarded("/financial-reports", <FinancialReports />)}
-                />
-                <Route
-                  path="/financial-settings"
-                  element={guarded("/financial-settings", <FinancialSettings />)}
-                />
-                <Route path="/homework" element={guarded("/homework", <Homework />)} />
-                <Route
-                  path="/leave/students"
-                  element={guarded("/leave/students", <Leave type="STUDENT" />)}
-                />
-                <Route
-                  path="/leave/teachers"
-                  element={guarded("/leave/teachers", <Leave type="TEACHER" />)}
-                />
-                <Route
-                  path="/leave/staff"
-                  element={guarded("/leave/staff", <Leave type="STAFF" />)}
-                />
-                <Route path="/library" element={guarded("/library", <Library />)} />
-                <Route path="/notices" element={guarded("/notices", <Notices />)} />
-                <Route
-                  path="/announcements"
-                  element={guarded("/announcements", <Announcements />)}
-                />
-                <Route path="/certificates" element={guarded("/certificates", <Certificates />)} />
-                <Route
-                  path="/notifications"
-                  element={guarded("/notifications", <Notifications />)}
-                />
-                <Route path="/parents" element={guarded("/parents", <Parents />)} />
-                <Route path="/reports" element={guarded("/reports", <Reports />)} />
-                <Route path="/results" element={guarded("/results", <Results />)} />
-                <Route path="/roles" element={guarded("/roles", <RolesPage />)} />
-                <Route path="/settings" element={guarded("/settings", <SettingsPage />)} />
-                <Route
-                  path="/teaching-staff"
-                  element={guarded("/teaching-staff", <Teachers key="teaching" mode="Teaching" />)}
-                />
-                <Route
-                  path="/non-teaching-staff"
-                  element={guarded("/non-teaching-staff", <Teachers key="non-teaching" mode="Non-Teaching" />)}
-                />
-                <Route path="/timetable" element={guarded("/timetable", <Timetable />)} />
-                <Route path="/transport" element={guarded("/transport", <Transport />)} />
-                <Route
-                  path="/transport/drivers"
-                  element={guarded("/transport/drivers", <TransportDrivers tab="drivers" />)}
-                />
-                <Route
-                  path="/transport/attendants"
-                  element={guarded("/transport/drivers", <TransportDrivers tab="attendants" />)}
-                />
-                <Route
-                  path="/transport/students"
-                  element={guarded("/transport/students", <TransportStudents />)}
-                />
-                <Route
-                  path="/transport/attendance"
-                  element={guarded("/transport/attendance", <TransportAttendance />)}
-                />
-                <Route
-                  path="/transport/maintenance"
-                  element={guarded("/transport/maintenance", <TransportMaintenance />)}
-                />
-                <Route
-                  path="/transport/complaints"
-                  element={guarded("/transport/complaints", <TransportComplaints />)}
-                />
-                <Route
-                  path="/transport/fees"
-                  element={guarded("/transport/fees", <TransportFees />)}
-                />
-                <Route
-                  path="/transport/reports"
-                  element={guarded("/transport/reports", <TransportReports />)}
-                />
-                <Route path="/users" element={guarded("/users", <Users />)} />
-                <Route path="/profile" element={guarded("/profile", <Profile />)} />
-                <Route path="/my-subjects" element={guarded("/my-subjects", <MySubjects />)} />
-                <Route path="/my-leave" element={guarded("/my-leave", <MyLeave />)} />
-                <Route path="/holidays" element={guarded("/holidays", <Holidays />)} />
-                <Route path="/my-fees" element={guarded("/my-fees", <MyFees />)} />
-                <Route
-                  path="/teacher/profile"
-                  element={guarded("/teacher/profile", <TeacherProfile />)}
-                />
-                <Route
-                  path="/staff/profile"
-                  element={guarded("/staff/profile", <StaffProfile />)}
-                />
-                <Route
-                  path="/teacher/classes"
-                  element={guarded("/teacher/classes", <TeacherClasses />)}
-                />
-                <Route
-                  path="/teacher/students"
-                  element={guarded("/teacher/students", <TeacherStudents />)}
-                />
-                <Route
-                  path="/teacher/subjects"
-                  element={guarded("/teacher/subjects", <TeacherSubjects />)}
-                />
-                <Route
-                  path="/teacher/my-attendance"
-                  element={guarded("/teacher/my-attendance", <TeacherMyAttendance />)}
-                />
-                <Route
-                  path="/teacher/class-leave"
-                  element={guarded("/teacher/class-leave", <TeacherClassLeave />)}
-                />
-                <Route
-                  path="/staff/my-attendance"
-                  element={guarded("/staff/my-attendance", <StaffMyAttendance />)}
-                />
-                <Route path="/payroll" element={guarded("/payroll", <Salary mode="manage" />)} />
-                <Route
-                  path="/my-salary"
-                  element={guarded("/my-salary", <Salary mode="personal" />)}
-                />
-
-                {/* Super Admin — SaaS/platform-level only, never school-internal data */}
-                <Route
-                  path="/super-admin/schools"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminSchools />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/schools/:id"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminSchoolDetail />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/subscriptions"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminSubscriptions />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/plans"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminPlans />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/settings"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminSettings />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/school-admins"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminSchoolAdmins />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/leads"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminLeads />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/revenue"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminRevenue />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/renewals"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminRenewals />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/support"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminSupport />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/announcements"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminAnnouncements />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/features"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminFeatures />
-                    </RequireRole>
-                  }
-                />
-                <Route
-                  path="/super-admin/security"
-                  element={
-                    <RequireRole roles={["Super Admin"]}>
-                      <SuperAdminSecurity />
-                    </RequireRole>
-                  }
-                />
-
-                <Route path="*" element={<NotFound />} />
-              </Route>
-            </Routes></Suspense>
+              </Routes>
+            </Suspense>
           </ErrorBoundary>
           <Toaster position="top-right" />
         </AppProvider>

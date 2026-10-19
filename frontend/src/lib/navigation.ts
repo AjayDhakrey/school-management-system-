@@ -127,7 +127,6 @@ export const NAV: NavGroup[] = [
     label: "Fees",
     items: [
       { label: "Fee Details", to: "/parent/fees/details", icon: Wallet, roles: ["Parent"] },
-      { label: "Pay Fees", to: "/parent/fees/pay", icon: Wallet, roles: ["Parent"] },
       { label: "Payment History", to: "/parent/fees/history", icon: Wallet, roles: ["Parent"] },
     ],
   },
@@ -550,7 +549,8 @@ export const NAV: NavGroup[] = [
         label: "School Settings",
         to: "/settings",
         icon: Settings,
-        roles: ALL_SCHOOL.filter((r) => r !== "Student" && r !== "Parent"),
+        // School settings are for the school's admins — teachers get their own profile instead.
+        roles: ALL_SCHOOL.filter((r) => r !== "Student" && r !== "Parent" && r !== "Teacher"),
       },
     ],
   },
@@ -732,6 +732,7 @@ export const PROFILE_PATH_FOR_ROLE: Partial<Record<Role, string>> = {
 };
 
 export const SETTINGS_PATH_FOR_ROLE: Partial<Record<Role, string>> = {
+  Teacher: "/teacher/profile",
   Student: "/profile",
   Parent: "/parent/children/profile",
   "Super Admin": "/super-admin/settings",

@@ -9,9 +9,9 @@ backend/    Supabase: migrations, edge functions, config.toml, rollback SQL
 docs/       User guide PDF
 ```
 
-The frontend and backend each have their own `package.json`, `node_modules`
-and `.env` (copy the matching `.env.example`). Browser-safe `VITE_*` keys go in
-`frontend/.env`; the Supabase CLI access token goes in `backend/.env`.
+The frontend and backend each have their own `package.json` and `node_modules`.
+The frontend now runs with local demo data stored in the browser and needs no
+environment variables. `backend/.env` is used only by Supabase CLI operations.
 
 Run everything from the repo root:
 

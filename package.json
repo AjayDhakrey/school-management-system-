@@ -13,5 +13,8 @@
     "db:status": "npm --prefix backend run status",
     "db:push": "npm --prefix backend run push",
     "functions:deploy": "npm --prefix backend run functions:deploy"
+  },
+  "devDependencies": {
+    "supabase": "^2.120.0"
   }
 }

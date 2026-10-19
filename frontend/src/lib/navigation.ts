@@ -72,9 +72,7 @@ const admins: Role[] = ["School Admin"];
 export const NAV: NavGroup[] = [
   {
     label: "",
-    items: [
-      { label: "Dashboard", to: "/", icon: LayoutDashboard, roles: ALL },
-    ],
+    items: [{ label: "Dashboard", to: "/", icon: LayoutDashboard, roles: ALL }],
   },
   {
     label: "Student Management",
@@ -272,8 +270,18 @@ export const NAV: NavGroup[] = [
         label: "Holidays",
         to: "/holidays",
         icon: CalendarHeart,
-        roles: ["Student", "Parent"],
-        hideFromSidebar: ["Student"],
+        // Everyone can see the calendar; the School Admin also adds and removes holidays there.
+        roles: [
+          "School Admin",
+          "Teacher",
+          "Staff",
+          "Accountant",
+          "Librarian",
+          "Transport Manager",
+          "Student",
+          "Parent",
+        ],
+        hideFromSidebar: ["Student", "School Admin"],
       },
     ],
   },
@@ -696,6 +704,7 @@ export const SCHOOL_ADMIN_NAV: NavGroup[] = [
       },
       { label: "Parents", to: "/parents", icon: Users, roles: ["School Admin"] },
       { label: "Events", to: "/events", icon: CalendarDays, roles: ["School Admin"] },
+      { label: "Holiday Calendar", to: "/holidays", icon: CalendarHeart, roles: ["School Admin"] },
       { label: "Reports", to: "/reports", icon: FileText, roles: ["School Admin"] },
       { label: "School Settings", to: "/settings", icon: Settings, roles: ["School Admin"] },
     ],

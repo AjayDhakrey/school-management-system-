@@ -13,6 +13,7 @@ import {
   UserRound,
   Clock,
   Coffee,
+  CalendarHeart,
 } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageHeader } from "@/components/shared/ui-kit";
@@ -45,6 +46,7 @@ import { useAuth } from "@/lib/auth-context";
 import {
   useMyTeacherProfile,
   useTimetable,
+  useHolidays,
   useClassTimetable,
   useClasses,
   useTeachers,
@@ -59,26 +61,186 @@ import { useQueryClient } from "@tanstack/react-query";
 
 const NONE = "__none__";
 
-const PALETTE = [
-  "bg-info-soft text-info",
-  "bg-gold-soft text-gold-foreground",
-  "bg-success-soft text-success",
-  "bg-primary/10 text-primary",
+// Curated distinct colors for common school subjects to guarantee high visual contrast
+const SUBJECT_PRESETS: Record<string, string> = {
+  // Mathematics (Indigo)
+  mathematics:
+    "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40",
+  math: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40",
+  maths:
+    "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40",
+  algebra:
+    "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40",
+  geometry:
+    "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40",
+
+  // English & Literature (Sky Blue)
+  english:
+    "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/40",
+  literature:
+    "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/40",
+
+  // Hindi & Languages (Warm Pink / Rose)
+  hindi:
+    "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300 border border-pink-200/60 dark:border-pink-800/40",
+  sanskrit:
+    "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300 border border-pink-200/60 dark:border-pink-800/40",
+  french:
+    "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300 border border-pink-200/60 dark:border-pink-800/40",
+  german:
+    "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300 border border-pink-200/60 dark:border-pink-800/40",
+  spanish:
+    "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300 border border-pink-200/60 dark:border-pink-800/40",
+  language:
+    "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300 border border-pink-200/60 dark:border-pink-800/40",
+
+  // Technology / Computers (Teal / Cyan)
+  tech: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40",
+  computer:
+    "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40",
+  it: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40",
+  information:
+    "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40",
+  coding:
+    "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40",
+  ai: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40",
+
+  // Science & Nature (Emerald Green)
+  science:
+    "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40",
+  physics:
+    "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40",
+  chemistry:
+    "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40",
+  biology:
+    "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40",
+  evs: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40",
+
+  // Social Studies (Amber Gold)
+  social:
+    "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
+  sst: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
+  history:
+    "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
+  geography:
+    "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
+  civics:
+    "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
+
+  // Arts & Music (Violet)
+  art: "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/40",
+  drawing:
+    "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/40",
+  craft:
+    "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/40",
+  music:
+    "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/40",
+  dance:
+    "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/40",
+
+  // Physical Education & Sports (Orange)
+  pe: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40",
+  sports:
+    "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40",
+  games:
+    "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40",
+  yoga: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40",
+
+  // General Knowledge & Library (Fuchsia)
+  gk: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-300 border border-fuchsia-200/60 dark:border-fuchsia-800/40",
+  library:
+    "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-300 border border-fuchsia-200/60 dark:border-fuchsia-800/40",
+  moral:
+    "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-300 border border-fuchsia-200/60 dark:border-fuchsia-800/40",
+};
+
+// 12 distinct harmonious tones for any other subject name
+const DIVERSE_PALETTE = [
+  "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/40",
+  "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/40",
+  "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300 border border-pink-200/60 dark:border-pink-800/40",
+  "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40",
+  "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40",
+  "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40",
+  "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/40",
+  "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300 border border-orange-200/60 dark:border-orange-800/40",
+  "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300 border border-cyan-200/60 dark:border-cyan-800/40",
+  "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800/40",
+  "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-300 border border-fuchsia-200/60 dark:border-fuchsia-800/40",
+  "bg-lime-100 text-lime-800 dark:bg-lime-950/60 dark:text-lime-300 border border-lime-200/60 dark:border-lime-800/40",
 ];
 
-function toneFor(subject: string) {
-  if (subject === "Break") return "bg-muted text-muted-foreground";
-  let hash = 0;
-  for (let i = 0; i < subject.length; i++) hash = (hash * 31 + subject.charCodeAt(i)) % 1000;
-  return PALETTE[hash % PALETTE.length];
+function toneFor(subject: string | null | undefined): string {
+  if (!subject) return "bg-muted text-muted-foreground border border-border";
+  if (subject === "Break" || subject === "Free period")
+    return "bg-muted text-muted-foreground border border-border";
+
+  const lower = subject.toLowerCase().trim();
+
+  // Check exact or partial match in curated presets
+  for (const [key, className] of Object.entries(SUBJECT_PRESETS)) {
+    if (lower === key || lower.includes(key)) {
+      return className;
+    }
+  }
+
+  // Fallback to high-entropy DJB2 hash among 12 diverse colors
+  let hash = 5381;
+  for (let i = 0; i < lower.length; i++) {
+    hash = (hash << 5) + hash + lower.charCodeAt(i);
+  }
+  const idx = Math.abs(hash) % DIVERSE_PALETTE.length;
+  return DIVERSE_PALETTE[idx]!;
 }
 
 function weekLabel(offset: number, dayCount = 6) {
-  const base = new Date(2026, 7, 3 + offset * 7);
+  // Monday of the current week, moved by `offset` weeks.
+  const today = new Date();
+  const base = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  base.setDate(base.getDate() - ((base.getDay() + 6) % 7) + offset * 7);
   const end = new Date(base);
   end.setDate(base.getDate() + (dayCount - 1));
-  const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  return `${fmt(base)} – ${fmt(end)}, ${base.getFullYear()}`;
+  const fmt = (d: Date) => d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const prefix = offset === 0 ? "This week · " : "";
+  return `${prefix}${fmt(base)} – ${fmt(end)} ${end.getFullYear()}`;
+}
+
+const WEEK_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+/**
+ * Dates and holidays for one week (0 = this week). `on("Monday")` gives that day's date and,
+ * if the school has a holiday then, the holiday.
+ */
+function useWeekHolidays(offset = 0) {
+  const { data: holidays } = useHolidays();
+  return useMemo(() => {
+    const today = new Date();
+    const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7) + offset * 7);
+    const byDate = new Map((holidays ?? []).map((h) => [h.date.slice(0, 10), h]));
+    return (dayName: string) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + Math.max(0, WEEK_ORDER.indexOf(dayName)));
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return { date: d, holiday: byDate.get(iso) ?? null };
+    };
+  }, [holidays, offset]);
+}
+
+/** Shown instead of a day's periods when the school is closed for a holiday. */
+function HolidayDay({ name, date }: { name: string; date: Date }) {
+  return (
+    <div className="col-span-full flex flex-col items-center rounded-2xl border border-pink-300/50 bg-pink-50 px-4 py-8 text-center dark:bg-pink-950/30">
+      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-pink-500/15 text-pink-600">
+        <CalendarHeart className="h-5 w-5" />
+      </span>
+      <p className="mt-3 font-display text-base font-bold">Holiday — {name}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        No classes on{" "}
+        {date.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" })}.
+      </p>
+    </div>
+  );
 }
 
 function todayName(days: string[]) {
@@ -178,6 +340,7 @@ function TeacherScheduleList({
 }) {
   const { days: DAYS, periods } = useSchoolTimings();
   const [activeDay, setActiveDay] = useState(() => todayName(DAYS));
+  const weekDay = useWeekHolidays();
   const grid: Record<string, ApiTimetableSlot[]> = {};
   for (const day of DAYS)
     grid[day] = slots.filter((s) => s.day === day).sort((a, b) => a.period - b.period);
@@ -210,7 +373,9 @@ function TeacherScheduleList({
         </div>
       </div>
       <div className="grid gap-2.5 p-3 md:grid-cols-2 xl:grid-cols-3">
-        {(grid[activeDay] ?? []).length === 0 ? (
+        {weekDay(activeDay).holiday ? (
+          <HolidayDay name={weekDay(activeDay).holiday!.name} date={weekDay(activeDay).date} />
+        ) : (grid[activeDay] ?? []).length === 0 ? (
           <p className="col-span-full py-8 text-center text-sm text-muted-foreground">
             No classes on {activeDay}.
           </p>
@@ -255,6 +420,7 @@ function TeacherClassTimetable() {
   const activeClassId = classId || myClasses[0]?.id || "";
   const { days: DAYS, periods: PERIODS } = useSchoolTimings();
   const [day, setDay] = useState(() => todayName(DAYS));
+  const weekDay = useWeekHolidays();
   const { data: slots, isLoading } = useClassTimetable(activeClassId || undefined);
   const byPeriod = new Map((slots ?? []).filter((s) => s.day === day).map((s) => [s.period, s]));
   const classLabel = (c: { name: string; section: string; class_teacher_id: string | null }) =>
@@ -314,25 +480,29 @@ function TeacherClassTimetable() {
         <p className="p-4 text-sm text-muted-foreground">Loading…</p>
       ) : (
         <div className="grid gap-2.5 p-3 md:grid-cols-2 xl:grid-cols-3">
-          {PERIODS.map((p) => {
-            const slot = byPeriod.get(p.period);
-            return (
-              <PeriodCard
-                key={p.period}
-                period={p.period}
-                subject={slot?.subject ?? null}
-                live={isPeriodLive(day, p)}
-              >
-                <MetaItem icon={UserRound}>
-                  {slot?.teacher_name ?? "No teacher set"}
-                  {slot?.teacher_id && slot.teacher_id === teacher?.id && (
-                    <span className="ml-1 font-semibold text-primary">(You)</span>
-                  )}
-                </MetaItem>
-                <MetaItem icon={MapPin}>{slot?.room ?? "No room set"}</MetaItem>
-              </PeriodCard>
-            );
-          })}
+          {weekDay(day).holiday ? (
+            <HolidayDay name={weekDay(day).holiday!.name} date={weekDay(day).date} />
+          ) : (
+            PERIODS.map((p) => {
+              const slot = byPeriod.get(p.period);
+              return (
+                <PeriodCard
+                  key={p.period}
+                  period={p.period}
+                  subject={slot?.subject ?? null}
+                  live={isPeriodLive(day, p)}
+                >
+                  <MetaItem icon={UserRound}>
+                    {slot?.teacher_name ?? "No teacher set"}
+                    {slot?.teacher_id && slot.teacher_id === teacher?.id && (
+                      <span className="ml-1 font-semibold text-primary">(You)</span>
+                    )}
+                  </MetaItem>
+                  <MetaItem icon={MapPin}>{slot?.room ?? "No room set"}</MetaItem>
+                </PeriodCard>
+              );
+            })
+          )}
         </div>
       )}
     </SectionCard>
@@ -693,6 +863,7 @@ function AdminClassTimetable({ printRef }: { printRef: PrintRef }) {
   const classId = activeClass?.id;
 
   const [weekOffset, setWeekOffset] = useState(0);
+  const weekDay = useWeekHolidays(weekOffset);
   const [dialogTarget, setDialogTarget] = useState<{
     day: string;
     period: number;
@@ -835,14 +1006,30 @@ function AdminClassTimetable({ printRef }: { printRef: PrintRef }) {
               <div className="border-b border-border bg-muted/40 p-2 text-xs font-medium text-muted-foreground">
                 Period
               </div>
-              {DAYS.map((d) => (
-                <div
-                  key={d}
-                  className="border-b border-l border-border bg-muted/40 p-2 text-center text-xs font-medium text-muted-foreground"
-                >
-                  {d}
-                </div>
-              ))}
+              {DAYS.map((d) => {
+                const { date, holiday } = weekDay(d);
+                return (
+                  <div
+                    key={d}
+                    className={cn(
+                      "border-b border-l border-border p-2 text-center text-xs font-medium",
+                      holiday
+                        ? "bg-pink-50 text-pink-700 dark:bg-pink-950/30 dark:text-pink-300"
+                        : "bg-muted/40 text-muted-foreground",
+                    )}
+                  >
+                    <p>{d}</p>
+                    <p className="text-[10px] font-normal opacity-80">
+                      {date.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    </p>
+                    {holiday && (
+                      <p className="mt-0.5 truncate text-[10px] font-semibold" title={holiday.name}>
+                        🎉 {holiday.name}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
               {PERIODS.map((p, pi) => (
                 <Fragment key={p.period}>
                   <div className="border-b border-border p-2 text-xs">
@@ -851,6 +1038,18 @@ function AdminClassTimetable({ printRef }: { printRef: PrintRef }) {
                   </div>
                   {DAYS.map((d) => {
                     const slot = grid[d]?.[pi];
+                    const { holiday } = weekDay(d);
+                    if (holiday) {
+                      // Holiday: no classes and nothing to assign on this date.
+                      return (
+                        <div
+                          key={`${d}-${pi}`}
+                          className="grid place-items-center border-b border-l border-border bg-pink-50/70 p-1.5 text-[10px] font-medium text-pink-600/70 dark:bg-pink-950/20"
+                        >
+                          {pi === 0 ? "Holiday" : ""}
+                        </div>
+                      );
+                    }
                     return (
                       <button
                         key={`${d}-${pi}`}

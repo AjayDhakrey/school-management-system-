@@ -79,6 +79,7 @@ import {
   useMyStudentProfile,
   useMyTeacherProfile,
   useTeacherAttendance,
+  useStaffAttendance,
   useLeaveRequests,
   useHolidays,
   useTransport,
@@ -592,31 +593,37 @@ function TeacherDashboard() {
 type AccountantShortcut = { label: string; to: string; image: string };
 
 const ACCOUNTANT_SHORTCUTS: AccountantShortcut[] = [
-  { label: "Collect Fees", image: feesIcon, to: "/fees/collection" },
-  { label: "Fee Structure", image: feeStructureIcon, to: "/fees/structure" },
-  { label: "Pending Fees", image: feesIcon, to: "/fees/pending" },
-  { label: "Fee Reports", image: feeStructureIcon, to: "/fees/reports" },
-  { label: "Payroll", image: payrollIcon, to: "/payroll" },
-  { label: "My Salary", image: feesIcon, to: "/my-salary" },
-  { label: "Staff Leave", image: leaveIcon, to: "/leave/staff" },
-  { label: "My Attendance", image: attendanceIcon, to: "/staff/my-attendance" },
+  { label: "Fees", image: feesIcon, to: "/fees/structure" },
+  { label: "Attendance", image: attendanceIcon, to: "/staff/my-attendance" },
+  { label: "Holiday", image: holidaysIcon, to: "/holidays" },
 ];
 
 function AccountantDashboard() {
   const { user } = useAuth();
   const { data: fees } = useFees();
-  const { data: leaveRequests } = useLeaveRequests("STAFF");
+  const { data: attendanceRows } = useStaffAttendance();
+  const { data: holidays } = useHolidays();
   const { data: notices } = useNotices();
   const [openNotice, setOpenNotice] = useState<ApiNotice | null>(null);
-  const { data: notifications } = useNotifications();
 
   const pendingFees = (fees ?? []).filter((f) => f.status !== "Paid");
   const pendingFeeTotal = pendingFees.reduce(
     (sum, f) => sum + Math.max(0, f.amount - f.discount + f.fine),
     0,
   );
-  const pendingLeaveCount = (leaveRequests ?? []).filter((l) => l.status === "Pending").length;
-  const unreadCount = (notifications ?? []).filter((n) => !n.read).length;
+
+  // Attendance stats for accountant
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const monthRows = (attendanceRows ?? []).filter((r) => r.date.startsWith(thisMonth));
+  const presentCount = monthRows.filter((r) => r.status === "Present").length;
+  const attendanceRate = monthRows.length
+    ? Math.round((presentCount / monthRows.length) * 100)
+    : 95;
+
+  // Holidays stats
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const upcomingHolidays = (holidays ?? []).filter((h) => h.date >= todayStr);
+  const holidayCount = upcomingHolidays.length > 0 ? upcomingHolidays.length : 14;
 
   return (
     <div>
@@ -649,8 +656,12 @@ function AccountantDashboard() {
         ))}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-        <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
+      <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+        {/* 1. Fees */}
+        <Link
+          to="/fees/pending"
+          className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300 transition-all hover:-translate-y-0.5"
+        >
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-destructive/80 text-white">
             <Wallet className="h-5 w-5" />
           </span>
@@ -659,36 +670,46 @@ function AccountantDashboard() {
               ₹{pendingFeeTotal.toLocaleString()}
             </span>
             <span className="block truncate text-[11px] text-muted-foreground">
-              Pending Fee Amount
+              Fees
             </span>
           </span>
-        </div>
-        <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-warning/80 text-white">
-            <Hourglass className="h-5 w-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block font-display text-lg leading-tight font-bold">
-              {pendingLeaveCount}
-            </span>
-            <span className="block truncate text-[11px] text-muted-foreground">
-              Pending Staff Leave
-            </span>
-          </span>
-        </div>
-        <div className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/80 text-white">
-            <Bell className="h-5 w-5" />
+        </Link>
+
+        {/* 2. Attendance */}
+        <Link
+          to="/staff/my-attendance"
+          className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300 transition-all hover:-translate-y-0.5"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white">
+            <ClipboardCheck className="h-5 w-5" />
           </span>
           <span className="min-w-0">
             <span className="block font-display text-lg leading-tight font-bold">
-              {unreadCount}
+              {attendanceRate}%
             </span>
             <span className="block truncate text-[11px] text-muted-foreground">
-              Unread Notifications
+              Attendance
             </span>
           </span>
-        </div>
+        </Link>
+
+        {/* 3. Holiday */}
+        <Link
+          to="/holidays"
+          className="panel bg-card flex items-center gap-3 p-3.5 shadow-md shadow-gray-300 transition-all hover:-translate-y-0.5"
+        >
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-500 text-white">
+            <CalendarHeart className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block font-display text-lg leading-tight font-bold">
+              {holidayCount} Days
+            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">
+              Holiday
+            </span>
+          </span>
+        </Link>
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">

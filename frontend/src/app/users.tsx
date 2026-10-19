@@ -3,7 +3,17 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Users as UsersIcon, UserCheck, UserX, ShieldCheck, MoreHorizontal, Plus, Copy, Eye, EyeOff } from "lucide-react";
+import {
+  Users as UsersIcon,
+  UserCheck,
+  UserX,
+  ShieldCheck,
+  MoreHorizontal,
+  Plus,
+  Copy,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import {
   PageHeader,
   SearchInput,
@@ -64,7 +74,28 @@ import {
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 
-const ROLE_OPTIONS = ["SCHOOL_ADMIN", "TEACHER", "STAFF", "PARENT", "STUDENT"];
+// Staff logins are split by department, so the filter lists each kind on its own.
+const STAFF_KIND: Record<string, string> = {
+  ADMIN: "Office Staff",
+  ACCOUNTS: "Accountant",
+  LIBRARY: "Librarian",
+  TRANSPORT: "Transport Manager",
+};
+const ROLE_OPTIONS = [
+  "School Admin",
+  "Teacher",
+  "Office Staff",
+  "Accountant",
+  "Librarian",
+  "Transport Manager",
+  "Parent",
+  "Student",
+];
+/** "Accountant" for an accounts staff login, "Teacher" for a teacher, … */
+function userKind(u: { role: string; department?: string | null }) {
+  if (u.role === "STAFF") return STAFF_KIND[u.department ?? ""] ?? "Staff";
+  return roleLabel(u.role);
+}
 const CREATABLE_ROLES = ["TEACHER", "PARENT", "STUDENT", "STAFF", "SCHOOL_ADMIN"] as const;
 type CreatableRole = (typeof CREATABLE_ROLES)[number];
 const DEPARTMENTS = ["ADMIN", "ACCOUNTS", "LIBRARY", "TRANSPORT"];
@@ -98,7 +129,9 @@ export default function Page() {
   const [createDepartment, setCreateDepartment] = useState("ADMIN");
   const [creating, setCreating] = useState(false);
 
-  const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null);
+  const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(
+    null,
+  );
   const [resetTarget, setResetTarget] = useState<ApiUser | null>(null);
 
   const rows = users ?? [];
@@ -108,7 +141,7 @@ export default function Page() {
       const matchesSearch =
         u.name.toLowerCase().includes(search.toLowerCase()) ||
         u.email.toLowerCase().includes(search.toLowerCase());
-      const matchesRole = roleFilter === "all" || u.role === roleFilter;
+      const matchesRole = roleFilter === "all" || userKind(u) === roleFilter;
       const matchesStatus = statusFilter === "all" || u.status === statusFilter;
       return matchesSearch && matchesRole && matchesStatus;
     });
@@ -119,7 +152,7 @@ export default function Page() {
   const total = rows.length;
   const active = rows.filter((u) => u.status === "ACTIVE").length;
   const suspended = rows.filter((u) => u.status === "SUSPENDED").length;
-  const rolesCount = new Set(rows.map((u) => u.role)).size;
+  const rolesCount = new Set(rows.map((u) => userKind(u))).size;
 
   // Teachers with no login account yet — the "Teaching Staff" roster is a separate table from
   // logins, so a teacher can exist there with zero rows here. Surfaced below so it's obvious why
@@ -136,11 +169,17 @@ export default function Page() {
     }
     if (createRole === "PARENT") {
       const linked = new Set(rows.filter((u) => u.linked_parent_id).map((u) => u.linked_parent_id));
-      return (parents ?? []).filter((p) => !linked.has(p.id)).map((p) => ({ id: p.id, label: p.name }));
+      return (parents ?? [])
+        .filter((p) => !linked.has(p.id))
+        .map((p) => ({ id: p.id, label: p.name }));
     }
     if (createRole === "STUDENT") {
-      const linked = new Set(rows.filter((u) => u.linked_student_id).map((u) => u.linked_student_id));
-      return (students ?? []).filter((s) => !linked.has(s.id)).map((s) => ({ id: s.id, label: s.name }));
+      const linked = new Set(
+        rows.filter((u) => u.linked_student_id).map((u) => u.linked_student_id),
+      );
+      return (students ?? [])
+        .filter((s) => !linked.has(s.id))
+        .map((s) => ({ id: s.id, label: s.name }));
     }
     if (createRole === "STAFF") {
       // There's no linked_staff_id column tracking staff logins back to a specific
@@ -237,7 +276,13 @@ export default function Page() {
         description="Manage system accounts, roles and access status."
         breadcrumb={["Dashboard", "User Management"]}
         actions={
-          <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetCreateForm(); }}>
+          <Dialog
+            open={createOpen}
+            onOpenChange={(o) => {
+              setCreateOpen(o);
+              if (!o) resetCreateForm();
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm">
                 <Plus className="h-4 w-4" />
@@ -248,13 +293,20 @@ export default function Page() {
               <DialogHeader>
                 <DialogTitle>Create a login</DialogTitle>
                 <DialogDescription>
-                  Attach a new login account to an existing teacher, parent, student or staff record.
+                  Attach a new login account to an existing teacher, parent, student or staff
+                  record.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-3 py-2">
                 <div className="grid gap-1.5">
                   <Label>Role</Label>
-                  <Select value={createRole} onValueChange={(v) => { setCreateRole(v as CreatableRole); setCreateLinkedId(""); }}>
+                  <Select
+                    value={createRole}
+                    onValueChange={(v) => {
+                      setCreateRole(v as CreatableRole);
+                      setCreateLinkedId("");
+                    }}
+                  >
                     <SelectTrigger className="w-full">
                       <SelectValue />
                     </SelectTrigger>
@@ -273,11 +325,15 @@ export default function Page() {
                     <Label>Link to {roleLabel(createRole)} record</Label>
                     <Select value={createLinkedId} onValueChange={setCreateLinkedId}>
                       <SelectTrigger className="w-full">
-                        <SelectValue placeholder={`Select a ${roleLabel(createRole).toLowerCase()}…`} />
+                        <SelectValue
+                          placeholder={`Select a ${roleLabel(createRole).toLowerCase()}…`}
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {availableLinkTargets.length === 0 ? (
-                          <div className="px-3 py-2 text-xs text-muted-foreground">No available records without a login.</div>
+                          <div className="px-3 py-2 text-xs text-muted-foreground">
+                            No available records without a login.
+                          </div>
                         ) : (
                           availableLinkTargets.map((t) => (
                             <SelectItem key={t.id} value={t.id}>
@@ -310,11 +366,19 @@ export default function Page() {
 
                 <div className="grid gap-1.5">
                   <Label>Full name</Label>
-                  <Input value={createName} onChange={(e) => setCreateName(e.target.value)} placeholder="Jane Doe" />
+                  <Input
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                    placeholder="Jane Doe"
+                  />
                 </div>
                 <div className="grid gap-1.5">
                   <Label>Email</Label>
-                  <Input value={createEmail} onChange={(e) => setCreateEmail(e.target.value)} placeholder="jane@everbright.edu" />
+                  <Input
+                    value={createEmail}
+                    onChange={(e) => setCreateEmail(e.target.value)}
+                    placeholder="jane@everbright.edu"
+                  />
                 </div>
               </div>
               <DialogFooter>
@@ -343,11 +407,12 @@ export default function Page() {
             <UserX className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground">
-                {teachersWithoutLogin.length} teacher{teachersWithoutLogin.length === 1 ? "" : "s"} without a login account
+                {teachersWithoutLogin.length} teacher{teachersWithoutLogin.length === 1 ? "" : "s"}{" "}
+                without a login account
               </p>
               <p className="text-xs text-muted-foreground">
-                Filtering by "Teacher" below only lists accounts that can sign in — these teachers exist on the Teaching Staff roster
-                but have no login yet.
+                Filtering by "Teacher" below only lists accounts that can sign in — these teachers
+                exist on the Teaching Staff roster but have no login yet.
               </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {teachersWithoutLogin.map((t) => (
@@ -368,17 +433,30 @@ export default function Page() {
 
       <div className="panel mt-5 overflow-hidden">
         <div className="grid gap-2 border-b border-border p-4 sm:flex sm:items-center sm:justify-between">
-          <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search users…" />
+          <SearchInput
+            value={search}
+            onChange={(v) => {
+              setSearch(v);
+              setPage(1);
+            }}
+            placeholder="Search users…"
+          />
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <FilterSelect
               value={roleFilter}
-              onChange={(v) => { setRoleFilter(v); setPage(1); }}
+              onChange={(v) => {
+                setRoleFilter(v);
+                setPage(1);
+              }}
               options={ROLE_OPTIONS}
               placeholder="Role"
             />
             <FilterSelect
               value={statusFilter}
-              onChange={(v) => { setStatusFilter(v); setPage(1); }}
+              onChange={(v) => {
+                setStatusFilter(v);
+                setPage(1);
+              }}
               options={["ACTIVE", "SUSPENDED"]}
               placeholder="Status"
             />
@@ -404,7 +482,10 @@ export default function Page() {
                 </thead>
                 <tbody>
                   {paged.map((u) => (
-                    <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/40">
+                    <tr
+                      key={u.id}
+                      className="border-b border-border last:border-0 hover:bg-muted/40"
+                    >
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-2.5">
                           <Initials name={u.name} tone="navy" />
@@ -416,16 +497,22 @@ export default function Page() {
                       </td>
                       <td className="px-4 py-2.5">
                         <Badge variant="secondary" className="font-medium">
-                          {roleLabel(u.role)}
-                          {u.department ? ` · ${u.department}` : ""}
+                          {userKind(u)}
                         </Badge>
                       </td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{u.created_at?.slice(0, 10) ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">
+                        {u.created_at?.slice(0, 10) ?? "—"}
+                      </td>
                       <td className="px-4 py-2.5">
                         <StatusBadge status={u.status} />
                       </td>
                       <td className="px-4 py-2.5 text-right">
-                        <UserActions user={u} onToggle={toggleSuspend} onReset={setResetTarget} onDelete={deleteUser} />
+                        <UserActions
+                          user={u}
+                          onToggle={toggleSuspend}
+                          onReset={setResetTarget}
+                          onDelete={deleteUser}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -435,7 +522,10 @@ export default function Page() {
 
             <div className="grid gap-3 p-4 sm:hidden">
               {paged.map((u) => (
-                <div key={u.id} className="min-w-0 overflow-hidden rounded-xl border border-border p-3">
+                <div
+                  key={u.id}
+                  className="min-w-0 overflow-hidden rounded-xl border border-border p-3"
+                >
                   <div className="flex min-w-0 items-start justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <Initials name={u.name} tone="navy" />
@@ -445,13 +535,20 @@ export default function Page() {
                       </div>
                     </div>
                     <div className="shrink-0">
-                      <UserActions user={u} onToggle={toggleSuspend} onReset={setResetTarget} onDelete={deleteUser} />
+                      <UserActions
+                        user={u}
+                        onToggle={toggleSuspend}
+                        onReset={setResetTarget}
+                        onDelete={deleteUser}
+                      />
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">{roleLabel(u.role)}</Badge>
+                    <Badge variant="secondary">{userKind(u)}</Badge>
                     <StatusBadge status={u.status} />
-                    <span className="text-xs text-muted-foreground">{u.created_at?.slice(0, 10) ?? "—"}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {u.created_at?.slice(0, 10) ?? "—"}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -472,7 +569,9 @@ export default function Page() {
           </DialogHeader>
           {tempPassword && (
             <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 p-3">
-              <code className="flex-1 select-all break-all text-sm font-semibold">{tempPassword.password}</code>
+              <code className="flex-1 select-all break-all text-sm font-semibold">
+                {tempPassword.password}
+              </code>
               <Button
                 type="button"
                 variant="outline"
@@ -496,7 +595,10 @@ export default function Page() {
       <Dialog open={!!resetTarget} onOpenChange={(o) => !o && setResetTarget(null)}>
         <DialogContent className="max-w-sm">
           {resetTarget && (
-            <ResetPasswordForm user={resetTarget} onSave={(password) => savePassword(resetTarget, password)} />
+            <ResetPasswordForm
+              user={resetTarget}
+              onSave={(password) => savePassword(resetTarget, password)}
+            />
           )}
         </DialogContent>
       </Dialog>
@@ -505,10 +607,19 @@ export default function Page() {
 }
 
 function generateRandomPassword() {
-  return (Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 8)).slice(0, 10);
+  return (Math.random().toString(36).slice(2, 8) + Math.random().toString(36).slice(2, 8)).slice(
+    0,
+    10,
+  );
 }
 
-function ResetPasswordForm({ user, onSave }: { user: ApiUser; onSave: (password: string) => Promise<void> }) {
+function ResetPasswordForm({
+  user,
+  onSave,
+}: {
+  user: ApiUser;
+  onSave: (password: string) => Promise<void>;
+}) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -533,7 +644,9 @@ function ResetPasswordForm({ user, onSave }: { user: ApiUser; onSave: (password:
     <form onSubmit={handleSubmit} className="space-y-3">
       <DialogHeader>
         <DialogTitle>Reset Password</DialogTitle>
-        <DialogDescription>Set a new password for {user.name} ({user.email}).</DialogDescription>
+        <DialogDescription>
+          Set a new password for {user.name} ({user.email}).
+        </DialogDescription>
       </DialogHeader>
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
@@ -613,7 +726,8 @@ function UserActions({
             <AlertDialogHeader>
               <AlertDialogTitle>Delete this user?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently remove the login for {user.name}. This action cannot be undone.
+                This will permanently remove the login for {user.name}. This action cannot be
+                undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

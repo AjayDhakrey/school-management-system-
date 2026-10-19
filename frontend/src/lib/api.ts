@@ -911,6 +911,24 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
             photo_url: "teacher_photo_url",
           });
         });
+        // Students can't read the teachers table; fill in their own class's teachers.
+        if (
+          second === "my-class" &&
+          mapped.some((row) => row["teacher_id"] && !row["teacher_name"])
+        ) {
+          const { data: teachers } = await supabase.rpc("my_class_subject_teachers");
+          const bySubject = new Map(
+            ((teachers ?? []) as Row[]).map((t) => [String(t["subject_id"]), t]),
+          );
+          for (const row of mapped) {
+            const t = bySubject.get(String(row["subject_id"]));
+            if (!t) continue;
+            row["teacher_name"] = t["teacher_name"];
+            row["teacher_email"] = t["teacher_email"];
+            row["teacher_phone"] = t["teacher_phone"];
+            row["teacher_photo_url"] = t["teacher_photo_url"];
+          }
+        }
         return second === "my-teaching"
           ? byKeys(mapped, "subject_name", "class_name", "section")
           : second === "my-class"

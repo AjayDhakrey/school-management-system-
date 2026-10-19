@@ -74,19 +74,45 @@ import { cn } from "@/lib/utils";
 const SUBJECT_TYPES = ["Core", "Elective", "Language", "Practical", "Optional"];
 const UNASSIGNED = "__unassigned__";
 
+const SUBJECT_PRESETS: Record<string, string> = {
+  mathematics: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
+  math: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
+  maths: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
+  english: "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
+  hindi: "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300",
+  sanskrit: "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300",
+  tech: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
+  computer: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
+  science: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
+  social: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+  art: "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300",
+  sports: "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
+};
+
 const SUBJECT_TONES = [
-  "bg-info-soft text-info",
-  "bg-gold-soft text-gold-foreground",
-  "bg-success-soft text-success",
-  "bg-primary/10 text-primary",
-  "bg-destructive-soft text-destructive",
+  "bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300",
+  "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
+  "bg-pink-100 text-pink-800 dark:bg-pink-950/60 dark:text-pink-300",
+  "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
+  "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
+  "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300",
+  "bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300",
+  "bg-orange-100 text-orange-800 dark:bg-orange-950/60 dark:text-orange-300",
+  "bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300",
+  "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+  "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-950/60 dark:text-fuchsia-300",
+  "bg-lime-100 text-lime-800 dark:bg-lime-950/60 dark:text-lime-300",
 ];
 
 /** A stable colour per subject name. */
 function subjectTone(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) % 1000;
-  return SUBJECT_TONES[hash % SUBJECT_TONES.length];
+  const lower = (name ?? "").toLowerCase().trim();
+  for (const [key, val] of Object.entries(SUBJECT_PRESETS)) {
+    if (lower === key || lower.includes(key)) return val;
+  }
+  let hash = 5381;
+  for (let i = 0; i < lower.length; i++) hash = ((hash << 5) + hash) + lower.charCodeAt(i);
+  return SUBJECT_TONES[Math.abs(hash) % SUBJECT_TONES.length]!;
 }
 
 function typeTone(type: string | null | undefined) {

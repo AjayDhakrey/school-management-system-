@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useSchoolTimings } from "@/lib/school-timings";
 import { AttendanceHistory } from "@/components/shared/AttendanceHistory";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,6 +50,7 @@ import {
   useClasses,
   useMyTeacherProfile,
   useStaffAttendance,
+  useHolidays,
   useStaffAttendanceRoster,
   useTeacherAttendance,
   useTeacherAttendanceRoster,
@@ -156,6 +158,10 @@ function MonthCalendar({
   const daysInMonth = new Date(y, m, 0).getDate();
   const firstWeekday = new Date(y, m - 1, 1).getDay();
   const byDate = new Map(records.map((r) => [r.date, r.status as Status]));
+  // Sundays, weekly offs and holidays are days off — attendance never counts on them.
+  const { days: workingDays } = useSchoolTimings();
+  const { data: holidays } = useHolidays();
+  const holidayOn = new Map((holidays ?? []).map((h) => [h.date.slice(0, 10), h.name]));
   return (
     <SectionCard title="Monthly Attendance" subtitle={`${title} · ${month}`}>
       <div className="grid grid-cols-7 gap-1.5 text-center text-[10px]">
@@ -169,6 +175,28 @@ function MonthCalendar({
         ))}
         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
           const date = `${month}-${String(day).padStart(2, "0")}`;
+          const weekday = new Date(y, m - 1, day).toLocaleDateString("en-US", { weekday: "long" });
+          const holiday = holidayOn.get(date);
+          const off = weekday === "Sunday" || !workingDays.includes(weekday);
+          if (holiday || off) {
+            return (
+              <div
+                key={day}
+                className={cn(
+                  "flex aspect-square flex-col items-center justify-center rounded-lg border text-[10px] font-semibold",
+                  holiday
+                    ? "border-pink-300/60 bg-pink-50 text-pink-600 dark:bg-pink-950/30"
+                    : "border-transparent bg-muted/60 text-muted-foreground/70",
+                )}
+                title={
+                  holiday ? `${date}: Holiday — ${holiday}` : `${date}: ${weekday} — no school`
+                }
+              >
+                <span className="opacity-70">{day}</span>
+                <span className="text-xs">{holiday ? "H" : "Off"}</span>
+              </div>
+            );
+          }
           const st = byDate.get(date);
           return (
             <div
@@ -191,26 +219,26 @@ function MonthCalendar({
             <span className={cn("h-2 w-2 rounded-full", STATUS_TONE[s].split(" ")[0])} /> {s}
           </span>
         ))}
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-pink-400" /> Holiday
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2 w-2 rounded-full bg-muted-foreground/40" /> Sunday / Off
+        </span>
       </div>
     </SectionCard>
   );
 }
 
-function HolidayBanner({
-  holiday,
-  date,
-}: {
-  holiday: { name: string } | null | undefined;
-  date: string;
-}) {
-  if (!holiday) return null;
+/** Shown instead of the register when the school is closed on the chosen date. */
+function SchoolClosedCard({ title, note }: { title: string; note: string }) {
   return (
-    <div className="mb-4 flex items-center gap-2 rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
-      <AlertTriangle className="h-4 w-4 shrink-0" />
-      <span>
-        {date} is a holiday ({holiday.name}). You can still record attendance if the school worked
-        this day.
+    <div className="mb-4 flex flex-col items-center rounded-2xl border border-warning/30 bg-warning-soft/40 px-4 py-8 text-center">
+      <span className="grid h-12 w-12 place-items-center rounded-2xl bg-warning/15 text-warning">
+        <CalendarClock className="h-6 w-6" />
       </span>
+      <p className="mt-3 font-display text-base font-bold">{title}</p>
+      <p className="mt-1 max-w-sm text-sm text-muted-foreground">{note}</p>
     </div>
   );
 }
@@ -252,8 +280,17 @@ function AdminAttendanceView() {
 /* Student attendance marker (shared by School Admin + Class Teacher)         */
 /* -------------------------------------------------------------------------- */
 
+/** "19 Oct 2026" */
+const fmtDay = (iso: string) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
 function StudentAttendanceMarker({ teacherClassIds }: { teacherClassIds?: string[] }) {
   const { data: classes } = useClasses();
+  const { days: workingDays } = useSchoolTimings();
   const markableClasses = useMemo(
     () =>
       (classes ?? []).filter(
@@ -408,9 +445,38 @@ function StudentAttendanceMarker({ teacherClassIds }: { teacherClassIds?: string
         />
       ) : (
         <>
-          <HolidayBanner holiday={roster.holiday} date={date} />
-          {/* Keyed so switching class or date starts a fresh register. */}
-          <DailyRegister key={`${classId}:${date}`} classId={classId} date={date} roster={roster} />
+          {(() => {
+            // No attendance on a holiday or a weekly off — the school is closed.
+            const weekday = new Date(`${date}T00:00:00`).toLocaleDateString("en-US", {
+              weekday: "long",
+            });
+            const weeklyOff = weekday === "Sunday" || !workingDays.includes(weekday);
+            if (roster.holiday) {
+              return (
+                <SchoolClosedCard
+                  title={`Holiday — ${roster.holiday.name}`}
+                  note={`School is closed on ${fmtDay(date)}, so there's no attendance to mark. Pick another date to see or mark attendance.`}
+                />
+              );
+            }
+            if (weeklyOff) {
+              return (
+                <SchoolClosedCard
+                  title={`${weekday} — no school`}
+                  note={`${fmtDay(date)} is a weekly off, so there's no attendance to mark.`}
+                />
+              );
+            }
+            return (
+              // Keyed so switching class or date starts a fresh register.
+              <DailyRegister
+                key={`${classId}:${date}`}
+                classId={classId}
+                date={date}
+                roster={roster}
+              />
+            );
+          })()}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <SectionCard

@@ -1205,14 +1205,49 @@ export default function HolidaysPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground flex items-center gap-2">
-                    <Info className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span>
-                      {isWorkingWeekday(parseDate(selectedDate))
-                        ? "A normal school working day."
-                        : "Weekly off — no school."}
-                    </span>
-                  </div>
+                  (() => {
+                    const open = isWorkingWeekday(parseDate(selectedDate));
+                    return (
+                      <div
+                        className={cn(
+                          "flex items-center gap-3 rounded-xl border p-3",
+                          open
+                            ? "border-success/30 bg-success-soft/40"
+                            : "border-destructive/20 bg-destructive-soft/30",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "grid h-9 w-9 shrink-0 place-items-center rounded-lg",
+                            open
+                              ? "bg-success/15 text-success"
+                              : "bg-destructive/10 text-destructive",
+                          )}
+                        >
+                          {open ? (
+                            <School className="h-4 w-4" />
+                          ) : (
+                            <CalendarX2 className="h-4 w-4" />
+                          )}
+                        </span>
+                        <div className="min-w-0">
+                          <p
+                            className={cn(
+                              "text-sm font-semibold",
+                              open ? "text-success" : "text-destructive",
+                            )}
+                          >
+                            {open ? "School is open" : "No school"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {open
+                              ? "Regular class day — no holiday on this date."
+                              : "Sunday / weekly off — school is closed."}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()
                 )}
               </div>
             )}

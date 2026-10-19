@@ -66,7 +66,18 @@ export function SidebarNav({
                           !mobile && !collapsed && "h-[18px] w-[18px]",
                         )}
                       />
-                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {!collapsed && (
+                        <span className="truncate">
+                          {item.label === "My Attendance" ? (
+                            <>
+                              <span className="sm:hidden">Attendance</span>
+                              <span className="hidden sm:inline">My Attendance</span>
+                            </>
+                          ) : (
+                            item.label
+                          )}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );

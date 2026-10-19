@@ -172,7 +172,7 @@ export const NAV: NavGroup[] = [
         to: "/leave/staff",
         icon: PlaneTakeoff,
         roles: [...admins, "Staff", "Accountant", "Librarian", "Transport Manager"],
-        hideFromSidebar: ["School Admin", "Transport Manager"],
+        hideFromSidebar: ["School Admin", "Transport Manager", "Accountant"],
       },
       {
         label: "My Attendance",
@@ -718,8 +718,30 @@ export const SCHOOL_ADMIN_NAV: NavGroup[] = [
   },
 ];
 
+// The Accountant's sidebar sequence as customized:
+const ACCOUNTANT_SIDEBAR: { to: string; label?: string }[] = [
+  { to: "/" },
+  { to: "/fees/structure" },
+  { to: "/payments/transactions", label: "Transactions" },
+  { to: "/payroll", label: "Payroll" },
+  { to: "/staff/my-attendance" },
+  { to: "/holidays" },
+  { to: "/notices" },
+  { to: "/announcements" },
+  { to: "/my-salary" },
+  { to: "/staff/profile" },
+];
+
 export function navForRole(role: Role): NavGroup[] {
   if (role === "School Admin") return SCHOOL_ADMIN_NAV;
+  if (role === "Accountant") {
+    const all = NAV.flatMap((g) => g.items).filter((i) => !i.roles || i.roles.includes(role));
+    const items = ACCOUNTANT_SIDEBAR.map(({ to, label }) => {
+      const item = all.find((i) => i.to === to);
+      return item ? { ...item, ...(label ? { label } : {}), hideFromSidebar: [] } : null;
+    }).filter((i): i is NonNullable<typeof i> => i !== null);
+    return [{ label: "", items }];
+  }
   return NAV.map((g) => ({
     ...g,
     items: g.items.filter(

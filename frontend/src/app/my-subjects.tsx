@@ -5,7 +5,6 @@ import {
   BookOpen,
   GraduationCap,
   Clock,
-  Mail,
   Phone,
   User,
   TableIcon,
@@ -86,15 +85,6 @@ function ContactButtons({
           className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-success-soft text-success transition-transform active:scale-90"
         >
           <Phone className="h-3.5 w-3.5" />
-        </a>
-      )}
-      {email && (
-        <a
-          href={`mailto:${email}`}
-          aria-label={`Email ${name}`}
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-info-soft text-info transition-transform active:scale-90"
-        >
-          <Mail className="h-3.5 w-3.5" />
         </a>
       )}
     </>

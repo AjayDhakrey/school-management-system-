@@ -751,10 +751,10 @@ function AccountantDashboard() {
 const TRANSPORT_SHORTCUTS: ImageAction[] = [
   { label: "Transport", icon: transportIcon, to: "/transport" },
   { label: "Drivers", icon: driversIcon, to: "/transport/drivers" },
-  { label: "Attendance", icon: attendanceIcon, to: "/transport/attendance" },
   { label: "Maintenance", icon: maintenanceIcon, to: "/transport/maintenance" },
   { label: "Complaints", icon: addNoticeIcon, to: "/transport/complaints" },
-  { label: "T-Fees", icon: feesIcon, to: "/transport/fees" },
+  { label: "Attendance", icon: attendanceIcon, to: "/staff/my-attendance" },
+  { label: "Holidays", icon: holidaysIcon, to: "/holidays" },
 ];
 
 function TransportManagerDashboard() {

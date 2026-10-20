@@ -95,6 +95,7 @@ export const NAV: NavGroup[] = [
         to: "/parent/children/profile",
         icon: UserSquare2,
         roles: ["Parent"],
+        hideFromSidebar: ["Parent"],
       },
       {
         label: "Attendance",
@@ -116,8 +117,20 @@ export const NAV: NavGroup[] = [
   {
     label: "Fees",
     items: [
-      { label: "Fee Details", to: "/parent/fees/details", icon: Wallet, roles: ["Parent"] },
-      { label: "Payment History", to: "/parent/fees/history", icon: Wallet, roles: ["Parent"] },
+      {
+        label: "Fee Details",
+        to: "/parent/fees/details",
+        icon: Wallet,
+        roles: ["Parent"],
+        hideFromSidebar: ["Parent"],
+      },
+      {
+        label: "Payment History",
+        to: "/parent/fees/history",
+        icon: Wallet,
+        roles: ["Parent"],
+        hideFromSidebar: ["Parent"],
+      },
     ],
   },
   {
@@ -454,6 +467,7 @@ export const NAV: NavGroup[] = [
         to: "/transport/attendance",
         icon: ClipboardCheck,
         roles: [...admins, "Transport Manager"],
+        hideFromSidebar: ["Transport Manager"],
       },
       {
         label: "Maintenance",
@@ -472,6 +486,7 @@ export const NAV: NavGroup[] = [
         to: "/transport/fees",
         icon: IndianRupee,
         roles: [...admins, "Transport Manager"],
+        hideFromSidebar: ["Transport Manager"],
       },
       {
         label: "Transport Reports",
@@ -551,6 +566,7 @@ export const NAV: NavGroup[] = [
         icon: Settings,
         // School settings are for the school's admins — teachers get their own profile instead.
         roles: ALL_SCHOOL.filter((r) => r !== "Student" && r !== "Parent" && r !== "Teacher"),
+        hideFromSidebar: ["Transport Manager"],
       },
     ],
   },
@@ -732,11 +748,36 @@ const ACCOUNTANT_SIDEBAR: { to: string; label?: string }[] = [
   { to: "/staff/profile" },
 ];
 
+// The Transport Manager's sidebar sequence as customized:
+const TRANSPORT_MANAGER_SIDEBAR: { to: string; label?: string }[] = [
+  { to: "/" },
+  { to: "/transport/drivers" },
+  { to: "/transport" },
+  { to: "/transport/students" },
+  { to: "/transport/maintenance" },
+  { to: "/staff/my-attendance" },
+  { to: "/holidays" },
+  { to: "/transport/complaints" },
+  { to: "/transport/reports" },
+  { to: "/notices" },
+  { to: "/announcements" },
+  { to: "/my-salary" },
+  { to: "/staff/profile" },
+];
+
 export function navForRole(role: Role): NavGroup[] {
   if (role === "School Admin") return SCHOOL_ADMIN_NAV;
   if (role === "Accountant") {
     const all = NAV.flatMap((g) => g.items).filter((i) => !i.roles || i.roles.includes(role));
     const items = ACCOUNTANT_SIDEBAR.map(({ to, label }) => {
+      const item = all.find((i) => i.to === to);
+      return item ? { ...item, ...(label ? { label } : {}), hideFromSidebar: [] } : null;
+    }).filter((i): i is NonNullable<typeof i> => i !== null);
+    return [{ label: "", items }];
+  }
+  if (role === "Transport Manager") {
+    const all = NAV.flatMap((g) => g.items).filter((i) => !i.roles || i.roles.includes(role));
+    const items = TRANSPORT_MANAGER_SIDEBAR.map(({ to, label }) => {
       const item = all.find((i) => i.to === to);
       return item ? { ...item, ...(label ? { label } : {}), hideFromSidebar: [] } : null;
     }).filter((i): i is NonNullable<typeof i> => i !== null);

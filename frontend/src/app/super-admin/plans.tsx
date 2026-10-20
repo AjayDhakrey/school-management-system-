@@ -46,7 +46,7 @@ import { api } from "@/lib/api";
 function planError(err: unknown, fallback: string) {
   const message = err instanceof Error ? err.message : fallback;
   return /max_students/i.test(message)
-    ? "Run migration 64_plan_student_limit.sql in Supabase to enable student limits"
+    ? "Run migration 68_plan_student_limit.sql in Supabase to enable student limits"
     : message;
 }
 

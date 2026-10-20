@@ -417,7 +417,7 @@ function PayrollActionsMenu({
           <DropdownMenuItem onClick={() => onAction("release")}>Release hold</DropdownMenuItem>
         )}
         {row.rawStatus === "APPROVED" && (
-          <DropdownMenuItem onClick={() => onAction("pay")}>Record bank payment</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => onAction("pay")}>Mark as paid</DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={() => toast.success(`Payslip sent to ${row.name}`)}>
           <Send className="mr-2 h-4 w-4" /> Send payslip

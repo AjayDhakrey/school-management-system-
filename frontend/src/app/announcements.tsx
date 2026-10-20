@@ -180,11 +180,12 @@ function AnnouncementCard({ notice: n, onOpen }: { notice: ApiNotice; onOpen: ()
 export default function AnnouncementsPage() {
   const { user } = useAuth();
   const isTeacher = user?.role === "TEACHER";
+  const isParent = user?.role === "PARENT";
   const { data: teacherCanPost } = useHasPermission("notices.post_to_class", isTeacher);
-  // Students and staff only read; teachers post to their own classes unless switched off.
+  // Parents, students and staff only read; teachers post to their own classes unless switched off.
   const canPublish = isTeacher
     ? Boolean(teacherCanPost)
-    : user?.role !== "STUDENT" && user?.role !== "STAFF";
+    : user?.role !== "STUDENT" && user?.role !== "STAFF" && !isParent;
   const { data: notices, isLoading } = useNotices();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<ApiNotice | null>(null);
@@ -235,7 +236,11 @@ export default function AnnouncementsPage() {
         ) : rows.length === 0 ? (
           <EmptyState
             title="No announcements yet"
-            description="Publish one to notify the school."
+            description={
+              isParent
+                ? "Announcements from the school will appear here."
+                : "Publish one to notify the school."
+            }
           />
         ) : (
           <ul className="grid gap-3 p-3 sm:grid-cols-2 sm:p-4">

@@ -197,6 +197,47 @@ function sortPapers(a: ApiExam, b: ApiExam) {
   );
 }
 
+function parseTimeToMinutes(timeStr: string | null | undefined): number | null {
+  if (!timeStr) return null;
+  const m = /^\s*(\d{1,2})[:.](\d{2})(?::\d{2})?\s*(am|pm)?\s*$/i.exec(timeStr);
+  if (!m) return null;
+  let h = Number(m[1]);
+  const min = Number(m[2]);
+  const ap = m[3]?.toLowerCase();
+  if (ap === "pm" && h < 12) h += 12;
+  if (ap === "am" && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+/**
+ * An exam paper is considered completed once its scheduled date and end time
+ * have passed. Marks entry should only open for completed papers.
+ */
+function isPaperCompleted(exam: Pick<ApiExam, "date" | "start_time" | "end_time">): boolean {
+  if (!exam.date) return false;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const todayStr = `${year}-${month}-${day}`;
+
+  const paperDate = exam.date.slice(0, 10);
+  if (paperDate < todayStr) return true;
+  if (paperDate > todayStr) return false;
+
+  // Paper is scheduled for today: check end_time or start_time
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const endMinutes = parseTimeToMinutes(exam.end_time);
+  if (endMinutes !== null) {
+    return nowMinutes >= endMinutes;
+  }
+  const startMinutes = parseTimeToMinutes(exam.start_time);
+  if (startMinutes !== null) {
+    return nowMinutes >= startMinutes + 60;
+  }
+  return false;
+}
+
 /** Plain-language status for a subject paper. */
 function paperStatus(exam: ApiExam): {
   label: string;
@@ -204,7 +245,10 @@ function paperStatus(exam: ApiExam): {
 } {
   switch (exam.status) {
     case "DRAFT":
-      return { label: "Draft", tone: "neutral" };
+      if (!exam.date) return { label: "Draft", tone: "neutral" };
+      return isPaperCompleted(exam)
+        ? { label: "Completed", tone: "info" }
+        : { label: "Scheduled", tone: "neutral" };
     case "MARKS_ENTRY":
       return exam.review_note
         ? { label: "Returned", tone: "danger" }
@@ -2231,6 +2275,7 @@ function ScheduleTab({
     (p) => classFilter === "all" || paperClassLabel(p, classesById) === classFilter,
   );
   const drafts = papers.filter((p) => p.status === "DRAFT");
+  const completedDrafts = papers.filter((p) => p.status === "DRAFT" && isPaperCompleted(p));
   const [view, setView] = useState<"sheet" | "list">("sheet");
   const [sheetClass, setSheetClass] = useState("all");
   const school = useSchoolBranding();
@@ -2254,17 +2299,22 @@ function ScheduleTab({
   }
 
   function openMarks(papersToOpen: ApiExam[]) {
+    const validPapers = papersToOpen.filter((p) => p.status === "DRAFT" && isPaperCompleted(p));
+    if (validPapers.length === 0) {
+      toast.error("Marks entry can only be opened after the exam has completed.");
+      return;
+    }
     confirm.ask({
       title:
-        papersToOpen.length === 1
+        validPapers.length === 1
           ? "Open marks entry?"
-          : `Open marks entry for ${papersToOpen.length} papers?`,
+          : `Open marks entry for ${validPapers.length} papers?`,
       description:
         "Teachers will be able to enter marks. The date, time and marks of these papers can no longer be changed.",
       confirmLabel: "Open Marks Entry",
       run: async () => {
         const failures: string[] = [];
-        for (const p of papersToOpen) {
+        for (const p of validPapers) {
           try {
             await api.patch(`/exams/${p.id}`, { status: "MARKS_ENTRY" });
           } catch (err) {
@@ -2342,9 +2392,9 @@ function ScheduleTab({
                 </Button>
               )
             )}
-            {canManage && drafts.length > 0 && (
-              <Button size="sm" variant="outline" onClick={() => openMarks(drafts)}>
-                <PlayCircle className="mr-1.5 h-4 w-4" /> Open Marks Entry ({drafts.length})
+            {canManage && completedDrafts.length > 0 && (
+              <Button size="sm" variant="outline" onClick={() => openMarks(completedDrafts)}>
+                <PlayCircle className="mr-1.5 h-4 w-4" /> Open Marks Entry ({completedDrafts.length})
               </Button>
             )}
             {canManage && (
@@ -2511,9 +2561,11 @@ function ScheduleTab({
                               >
                                 <Pencil className="mr-2 h-4 w-4" /> Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem onSelect={() => openMarks([p])}>
-                                <PlayCircle className="mr-2 h-4 w-4" /> Open marks entry
-                              </DropdownMenuItem>
+                              {isPaperCompleted(p) && (
+                                <DropdownMenuItem onSelect={() => openMarks([p])}>
+                                  <PlayCircle className="mr-2 h-4 w-4" /> Open marks entry
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onSelect={() =>
@@ -3475,6 +3527,12 @@ function TeacherExamsView() {
     [examinationsData],
   );
 
+  const isClassTeacher = useMemo(
+    () => (classesData ?? []).some((c) => teacher?.id && c.class_teacher_id === teacher.id),
+    [classesData, teacher],
+  );
+  const canTeacherEnterMarks = canEnter === true || isClassTeacher || (teaching ?? []).length > 0;
+
   // Papers this teacher may enter marks for: their subject in that class, or any paper of
   // a class they are Class Teacher of. The backend enforces the same rule.
   const myPapers = useMemo(() => {
@@ -3595,7 +3653,7 @@ function TeacherExamsView() {
             examinations={examinationsData ?? []}
             classesById={classesById}
             mode="teacher"
-            canEnterMarks={canEnter === true}
+            canEnterMarks={canTeacherEnterMarks}
           />
         </TabsContent>
       </Tabs>

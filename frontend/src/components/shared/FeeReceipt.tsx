@@ -300,7 +300,7 @@ export function FeeReceipt({
               <div className="border-t border-slate-500 pt-1 text-xs font-semibold">
                 Authorized Signatory
               </div>
-              <p className="text-[10px] text-slate-500">Accounts Department</p>
+              <p className="text-[10px] text-slate-500">School Administration</p>
             </div>
           </div>
           <Separator className="my-5 bg-slate-200" />

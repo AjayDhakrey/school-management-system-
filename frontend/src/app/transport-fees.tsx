@@ -43,7 +43,7 @@ export default function TransportFeesPage() {
     <div>
       <PageHeader
         title="Transport Fees"
-        description="Read-only view of transport fee billing and collection — managed by Accounts."
+        description="Read-only view of transport fee billing and collection."
         breadcrumb={["Dashboard", "Transport", "Transport Fees"]}
       />
 

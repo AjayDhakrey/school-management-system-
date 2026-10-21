@@ -183,7 +183,7 @@ function PayNowDialog({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {["Card", "UPI", "Net Banking", "Wallet"].map((m) => (
+          {["Card", "UPI", "Wallet"].map((m) => (
             <SelectItem key={m} value={m}>
               {m}
             </SelectItem>

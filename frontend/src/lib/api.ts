@@ -2130,6 +2130,47 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
           .select()
           .single();
         if (error) fail(error);
+
+        // Keep current month's unapproved payroll item in sync with newly saved salary structure
+        try {
+          const grossSalary =
+            (Number(row.basic_salary) || 0) +
+            (Number(row.hra) || 0) +
+            (Number(row.special_allowance) || 0);
+          const fixedDed = Number(row.fixed_deductions) || 0;
+
+          const { data: existingItems } = await supabase
+            .from("payroll_items")
+            .select("id, leave_deduction, working_days, paid_days, status")
+            .eq("school_id", current.school_id)
+            .eq("employee_type", row.employee_type)
+            .eq("employee_id", row.employee_id)
+            .not("status", "in", '("PAID","APPROVED")');
+
+          if (existingItems && existingItems.length > 0) {
+            for (const item of existingItems) {
+              const leaveDed =
+                item.paid_days === 0 && Number(item.leave_deduction) >= grossSalary
+                  ? 0
+                  : Number(item.leave_deduction || 0);
+              const netSalary = Math.max(0, grossSalary - leaveDed - fixedDed);
+              await supabase
+                .from("payroll_items")
+                .update({
+                  salary_structure_id: data.id,
+                  gross_salary: grossSalary,
+                  fixed_deductions: fixedDed,
+                  leave_deduction: leaveDed,
+                  net_salary: netSalary,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", item.id);
+            }
+          }
+        } catch {
+          // Non-critical sync failure: next calculate payroll will refresh
+        }
+
         return data;
       }
       break;

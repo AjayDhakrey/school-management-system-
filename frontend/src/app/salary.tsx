@@ -1,19 +1,18 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  Banknote,
   CalendarDays,
   CheckCircle2,
   CircleDollarSign,
   Download,
   Eye,
   FileText,
-  Landmark,
   MoreHorizontal,
   Pencil,
   Search,
   Send,
   Users,
+  Wallet,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -70,10 +69,12 @@ type SalaryRow = {
   name: string;
   role: string;
   department: "Teaching" | "Non-Teaching";
-  account: string;
   gross: number;
   deductions: number;
   fixedDeductions?: number;
+  leaveDeductions?: number;
+  paidDays?: number;
+  workingDays?: number;
   net: number;
   status: PayrollStatus;
   employeeId?: string;
@@ -92,7 +93,6 @@ const payroll: SalaryRow[] = [
     name: "Aarav Sharma",
     role: "Mathematics Teacher",
     department: "Teaching",
-    account: "•••• 4832",
     gross: 58200,
     deductions: 4950,
     net: 53250,
@@ -103,7 +103,6 @@ const payroll: SalaryRow[] = [
     name: "Meera Iyer",
     role: "Science Teacher",
     department: "Teaching",
-    account: "•••• 2091",
     gross: 61400,
     deductions: 5280,
     net: 56120,
@@ -114,7 +113,6 @@ const payroll: SalaryRow[] = [
     name: "Kabir Singh",
     role: "Sports Teacher",
     department: "Teaching",
-    account: "•••• 7714",
     gross: 46500,
     deductions: 3820,
     net: 42680,
@@ -125,7 +123,6 @@ const payroll: SalaryRow[] = [
     name: "Nisha Verma",
     role: "Accountant",
     department: "Non-Teaching",
-    account: "•••• 6108",
     gross: 43800,
     deductions: 3340,
     net: 40460,
@@ -136,7 +133,6 @@ const payroll: SalaryRow[] = [
     name: "Rohan Das",
     role: "Librarian",
     department: "Non-Teaching",
-    account: "•••• 5520",
     gross: 36700,
     deductions: 2740,
     net: 33960,
@@ -147,7 +143,6 @@ const payroll: SalaryRow[] = [
     name: "Pooja Nair",
     role: "Office Assistant",
     department: "Non-Teaching",
-    account: "•••• 9136",
     gross: 32900,
     deductions: 2320,
     net: 30580,
@@ -175,9 +170,14 @@ function StatusPill({ status, className }: { status: PayrollStatus; className?: 
 }
 
 function PayslipBreakdown({ row }: { row: SalaryRow }) {
-  const basic = Math.round(row.gross * 0.62);
-  const hra = Math.round(row.gross * 0.22);
-  const allowance = row.gross - basic - hra;
+  const basic = row.basic ?? Math.round(row.gross * 0.62);
+  const hra = row.hra ?? Math.round(row.gross * 0.22);
+  const allowance = row.allowance ?? Math.max(0, row.gross - basic - hra);
+  const pfDeductions = row.fixedDeductions ?? row.deductions;
+  const leaveDeductions = row.leaveDeductions ?? Math.max(0, row.deductions - pfDeductions);
+  const totalDeductions = pfDeductions + leaveDeductions;
+  const netSalary = row.net;
+
   return (
     <div className="space-y-5">
       <div className="rounded-xl bg-muted/50 p-4">
@@ -196,8 +196,8 @@ function PayslipBreakdown({ row }: { row: SalaryRow }) {
             <p className="font-medium">September 2026</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Bank account</p>
-            <p className="font-medium">{row.account}</p>
+            <p className="text-xs text-muted-foreground">Department</p>
+            <p className="font-medium">{row.department}</p>
           </div>
         </div>
       </div>
@@ -225,16 +225,30 @@ function PayslipBreakdown({ row }: { row: SalaryRow }) {
           Deductions
         </p>
         <div className="flex justify-between border-b py-2.5 text-sm">
-          <span>Provident fund & professional tax</span>
-          <span className="font-medium text-destructive">−{money(row.deductions)}</span>
+          <span>Provident fund & tax (PF)</span>
+          <span className="font-medium text-destructive">−{money(pfDeductions)}</span>
         </div>
+        {leaveDeductions > 0 && (
+          <div className="flex justify-between border-b py-2.5 text-sm">
+            <span>Leave deduction</span>
+            <span className="font-medium text-destructive">−{money(leaveDeductions)}</span>
+          </div>
+        )}
+        {leaveDeductions > 0 && (
+          <div className="flex justify-between pt-2.5 text-sm font-semibold">
+            <span>Total deductions</span>
+            <span className="text-destructive">−{money(totalDeductions)}</span>
+          </div>
+        )}
       </div>
       <div className="flex items-center justify-between rounded-xl bg-primary p-4 text-primary-foreground">
         <div>
           <p className="text-xs opacity-75">Net salary</p>
-          <p className="text-xs opacity-75">31 paid days</p>
+          <p className="text-xs opacity-75">
+            {row.paidDays !== undefined ? `${row.paidDays} paid days` : "31 paid days"}
+          </p>
         </div>
-        <p className="font-display text-2xl font-bold">{money(row.net)}</p>
+        <p className="font-display text-2xl font-bold">{money(netSalary)}</p>
       </div>
       <Button className="w-full gap-2" onClick={() => toast.success("Payslip download started")}>
         <Download className="h-4 w-4" /> Download payslip
@@ -255,7 +269,7 @@ function SalaryStructureDialog({
   const [basic, setBasic] = useState(String(defaultBasic));
   const [hra, setHra] = useState(String(defaultHra));
   const [allowance, setAllowance] = useState(
-    String(employee.allowance ?? employee.gross - defaultBasic - defaultHra),
+    String(employee.allowance ?? Math.max(0, employee.gross - defaultBasic - defaultHra)),
   );
   const [deductions, setDeductions] = useState(String(employee.fixedDeductions ?? employee.deductions));
   const [effectiveMonth, setEffectiveMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -275,6 +289,8 @@ function SalaryStructureDialog({
       hra: Number(hra),
       allowance: Number(allowance),
       deductions: Number(deductions) || 0,
+      fixedDeductions: Number(deductions) || 0,
+      leaveDeductions: 0,
       net,
       effectiveFrom: `${effectiveMonth}-01`,
       status: "Ready",
@@ -467,9 +483,22 @@ function AdminPayroll() {
       const gross =
         item?.gross_salary ??
         (structure ? structure.basic_salary + structure.hra + structure.special_allowance : 0);
-      const deductions = item
-        ? item.fixed_deductions + item.leave_deduction
-        : (structure?.fixed_deductions ?? 0);
+      const fixedDeductions = structure?.fixed_deductions ?? item?.fixed_deductions ?? 0;
+      // If leave deduction was wiping out the entire gross salary because paid_days was 0 (unrecorded attendance), do not penalize
+      const leaveDeduction =
+        item && item.paid_days === 0 && item.leave_deduction >= item.gross_salary
+          ? 0
+          : (item?.leave_deduction ?? 0);
+      const deductions = fixedDeductions + leaveDeduction;
+      const net =
+        item && !(item.paid_days === 0 && item.leave_deduction >= item.gross_salary)
+          ? item.net_salary
+          : Math.max(0, gross - deductions);
+      const paidDays =
+        item && !(item.paid_days === 0 && item.leave_deduction >= item.gross_salary)
+          ? item.paid_days
+          : (item?.working_days || lastDay);
+
       return {
         id: person.employee_id ?? person.id.slice(0, 8),
         employeeId: person.id,
@@ -479,18 +508,20 @@ function AdminPayroll() {
         name: person.name,
         role: person.designation ?? (type === "TEACHER" ? "Teacher" : "Staff"),
         department,
-        account: item?.payment_reference ?? "Not recorded",
         gross,
         deductions,
-        fixedDeductions: structure?.fixed_deductions ?? item?.fixed_deductions ?? 0,
-        net: item?.net_salary ?? Math.max(0, gross - deductions),
+        fixedDeductions,
+        leaveDeductions: leaveDeduction,
+        paidDays,
+        workingDays: item?.working_days ?? lastDay,
+        net,
         status: item?.status === "PAID" ? "Paid" : item?.status === "ON_HOLD" ? "On hold" : "Ready",
         basic: structure?.basic_salary,
         hra: structure?.hra,
         allowance: structure?.special_allowance,
       };
     });
-  }, [teachers, staff, structures, payrollItems]);
+  }, [teachers, staff, structures, payrollItems, lastDay]);
   const rows = useMemo(
     () =>
       payrollRows.filter(
@@ -512,10 +543,12 @@ function AdminPayroll() {
         basicSalary: updated.basic ?? Math.round(updated.gross * 0.62),
         hra: updated.hra ?? Math.round(updated.gross * 0.22),
         specialAllowance: updated.allowance ?? 0,
-        fixedDeductions: updated.deductions,
+        fixedDeductions: updated.fixedDeductions ?? updated.deductions,
         effectiveFrom: updated.effectiveFrom ?? `${month}-01`,
       });
       await queryClient.invalidateQueries({ queryKey: ["salary-structures"] });
+      await queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      await queryClient.invalidateQueries({ queryKey: [`payroll-${month}`] });
       toast.success(`${updated.name}'s salary structure saved`);
       setEditing(null);
     } catch (error) {
@@ -528,6 +561,7 @@ function AdminPayroll() {
         month: `${month}-01`,
       });
       await queryClient.invalidateQueries({ queryKey: [`payroll-${month}`] });
+      await queryClient.invalidateQueries({ queryKey: ["payroll"] });
       toast.success(`Calculated payroll for ${result.count} employees`);
     } catch (error) {
       toast.error(error instanceof ApiError ? error.message : "Failed to calculate payroll");
@@ -575,7 +609,7 @@ function AdminPayroll() {
       />
       {user?.role === "STAFF" && (
         <div className="mb-4 rounded-xl border border-info/20 bg-info-soft px-4 py-3 text-sm">
-          <span className="font-semibold text-info">Accounts access:</span> You can manage employee
+          <span className="font-semibold text-info">Payroll access:</span> You can manage employee
           salary structures and prepare payroll. Final payment authorization remains with the school
           administration.
         </div>
@@ -605,7 +639,7 @@ function AdminPayroll() {
           label="Awaiting payment"
           value={money(payable)}
           hint="Ready or on hold"
-          icon={Banknote}
+          icon={Wallet}
           tone="warning"
         />
       </div>
@@ -780,18 +814,53 @@ function AdminPayroll() {
 function EmployeeSalary() {
   const { user } = useAuth();
   const { data: items } = usePayroll();
+  const { data: structures } = useSalaryStructures();
   const latest = items?.[0];
   const fallback = payroll[0]!;
+
+  const structure = (structures ?? []).find(
+    (s) =>
+      s.active &&
+      ((user?.role === "TEACHER" && s.employee_type === "TEACHER") ||
+        (user?.role === "STAFF" && s.employee_type === "STAFF")),
+  );
+
+  const gross =
+    latest?.gross_salary ??
+    (structure ? structure.basic_salary + structure.hra + structure.special_allowance : fallback.gross);
+  const fixedDeductions =
+    structure?.fixed_deductions ?? latest?.fixed_deductions ?? fallback.deductions;
+  const leaveDeduction =
+    latest && latest.paid_days === 0 && latest.leave_deduction >= latest.gross_salary
+      ? 0
+      : (latest?.leave_deduction ?? 0);
+  const totalDeductions = fixedDeductions + leaveDeduction;
+  const net =
+    latest && !(latest.paid_days === 0 && latest.leave_deduction >= latest.gross_salary)
+      ? latest.net_salary
+      : Math.max(0, gross - totalDeductions);
+  const paidDays =
+    latest && !(latest.paid_days === 0 && latest.leave_deduction >= latest.gross_salary)
+      ? latest.paid_days
+      : 31;
+
   const row: SalaryRow = {
     ...fallback,
     name: user?.name || fallback.name,
     role: user?.role === "TEACHER" ? "Teacher" : "School Staff",
-    gross: latest?.gross_salary ?? 0,
-    deductions: latest ? latest.fixed_deductions + latest.leave_deduction : 0,
-    net: latest?.net_salary ?? 0,
+    department: user?.role === "TEACHER" ? "Teaching" : "Non-Teaching",
+    gross,
+    deductions: totalDeductions,
+    fixedDeductions,
+    leaveDeductions: leaveDeduction,
+    paidDays,
+    net,
     status: latest?.status === "PAID" ? "Paid" : latest?.status === "ON_HOLD" ? "On hold" : "Ready",
     rawStatus: latest?.status,
     payrollId: latest?.id,
+    basic: structure?.basic_salary,
+    hra: structure?.hra,
+    allowance: structure?.special_allowance,
   };
   const history = (items ?? []).map((item) => ({
     month: new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(
@@ -824,7 +893,7 @@ function EmployeeSalary() {
           label="Net salary"
           value={money(row.net)}
           hint={period}
-          icon={Banknote}
+          icon={Wallet}
           tone="success"
         />
         <InfoCard
@@ -836,7 +905,7 @@ function EmployeeSalary() {
         <InfoCard
           label="Total deductions"
           value={money(row.deductions)}
-          hint="PF & professional tax"
+          hint="PF & deductions"
           icon={FileText}
           tone="warning"
         />
@@ -853,7 +922,7 @@ function EmployeeSalary() {
           title={`${period} payslip`}
           subtitle={
             latest
-              ? `${latest.paid_days} paid days · ${latest.unpaid_days} unpaid days`
+              ? `${row.paidDays ?? latest.paid_days} paid days · ${latest.paid_days === 0 && latest.leave_deduction >= latest.gross_salary ? 0 : latest.unpaid_days} unpaid days`
               : "Payroll has not been generated"
           }
         >
@@ -869,11 +938,11 @@ function EmployeeSalary() {
               {history.map((item) => (
                 <div key={item.month} className="flex items-center gap-3 p-4">
                   <span className="grid h-9 w-9 place-items-center rounded-xl bg-success-soft text-success">
-                    <Landmark className="h-4 w-4" />
+                    <CheckCircle2 className="h-4 w-4" />
                   </span>
                   <div className="flex-1">
                     <p className="text-sm font-medium">{item.month}</p>
-                    <p className="text-xs text-muted-foreground">Bank transfer · {item.paid}</p>
+                    <p className="text-xs text-muted-foreground">Paid on {item.paid}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold">{money(item.net)}</p>
@@ -886,8 +955,7 @@ function EmployeeSalary() {
           <div className="rounded-2xl border border-info/20 bg-info-soft p-4 text-sm">
             <p className="font-semibold text-info">Need help with your salary?</p>
             <p className="mt-1 text-muted-foreground">
-              Contact the school accounts office if your bank details or salary information is
-              incorrect.
+              Contact the school office if your salary information is incorrect.
             </p>
           </div>
         </div>

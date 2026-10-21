@@ -173,7 +173,7 @@ export function printFeeStatement(
           </table>`
         : "<p>No fees billed yet.</p>"
     }
-    <div class="sign"><span>Accounts Office</span></div>
+    <div class="sign"><span>School Office</span></div>
     <footer><span>This is a computer-generated statement.</span><span>Printed ${printed}</span></footer>`,
     STATEMENT_CSS,
   );

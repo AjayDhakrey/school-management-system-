@@ -160,7 +160,7 @@ export default function TransportReportsPage() {
         </TabsContent>
 
         <TabsContent value="fees">
-          <SectionCard title="Transport Fee Report" subtitle="Read-only — collection handled by Accounts">
+          <SectionCard title="Transport Fee Report" subtitle="Read-only fee collection summary">
             <Row label="Total Billed" value={`₹${feeBilled.toLocaleString()}`} />
             <Row label="Collected" value={`₹${feeCollected.toLocaleString()}`} tone="success" />
             <Row label="Outstanding" value={`₹${(feeBilled - feeCollected).toLocaleString()}`} tone="warning" />

@@ -9,6 +9,7 @@ import {
   FileText,
   MoreHorizontal,
   Pencil,
+  Printer,
   Search,
   Send,
   Users,
@@ -62,6 +63,8 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useSchoolBranding } from "@/hooks/use-school-branding";
+import { downloadPayslip, printPayslip, type PayslipData } from "@/lib/payslip";
 
 type PayrollStatus = "Paid" | "Ready" | "On hold";
 type SalaryRow = {
@@ -73,8 +76,8 @@ type SalaryRow = {
   deductions: number;
   fixedDeductions?: number;
   leaveDeductions?: number;
-  paidDays?: number;
-  workingDays?: number;
+  paidDays?: number | undefined;
+  workingDays?: number | undefined;
   net: number;
   status: PayrollStatus;
   employeeId?: string;
@@ -85,7 +88,14 @@ type SalaryRow = {
   hra?: number | undefined;
   allowance?: number | undefined;
   effectiveFrom?: string;
+  period?: string;
+  paymentMethod?: string | null | undefined;
+  paymentReference?: string | null | undefined;
+  paidOn?: string | null;
 };
+
+const monthLabel = (date: Date) =>
+  new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(date);
 
 const payroll: SalaryRow[] = [
   {
@@ -169,14 +179,60 @@ function StatusPill({ status, className }: { status: PayrollStatus; className?: 
   );
 }
 
-function PayslipBreakdown({ row }: { row: SalaryRow }) {
+function payslipFromRow(row: SalaryRow): PayslipData {
   const basic = row.basic ?? Math.round(row.gross * 0.62);
   const hra = row.hra ?? Math.round(row.gross * 0.22);
   const allowance = row.allowance ?? Math.max(0, row.gross - basic - hra);
   const pfDeductions = row.fixedDeductions ?? row.deductions;
   const leaveDeductions = row.leaveDeductions ?? Math.max(0, row.deductions - pfDeductions);
+  return {
+    employeeName: row.name,
+    employeeCode: row.id,
+    designation: row.role,
+    department: row.department,
+    period: row.period ?? monthLabel(new Date()),
+    basic,
+    hra,
+    allowance,
+    gross: row.gross,
+    pfDeductions,
+    leaveDeductions,
+    net: row.net,
+    paidDays: row.paidDays,
+    workingDays: row.workingDays,
+    status: row.rawStatus?.replaceAll("_", " ") ?? row.status,
+    paymentMethod: row.paymentMethod,
+    paymentReference: row.paymentReference,
+    paidOn: row.paidOn,
+  };
+}
+
+/** Download state plus handlers for a row's payslip PDF and print-out. */
+function usePayslipActions(row: SalaryRow) {
+  const school = useSchoolBranding();
+  const [downloading, setDownloading] = useState(false);
+
+  async function download() {
+    setDownloading(true);
+    try {
+      await downloadPayslip(school, payslipFromRow(row));
+      toast.success("Payslip downloaded");
+    } catch {
+      toast.error("Could not generate the payslip PDF");
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return { downloading, download, print: () => printPayslip(school, payslipFromRow(row)) };
+}
+
+function PayslipBreakdown({ row }: { row: SalaryRow }) {
+  const { basic, hra, allowance, pfDeductions, leaveDeductions, period } = payslipFromRow(row);
   const totalDeductions = pfDeductions + leaveDeductions;
   const netSalary = row.net;
+  const paidDays = row.paidDays ?? row.workingDays;
+  const { downloading, download, print } = usePayslipActions(row);
 
   return (
     <div className="space-y-5">
@@ -193,7 +249,7 @@ function PayslipBreakdown({ row }: { row: SalaryRow }) {
         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <div>
             <p className="text-xs text-muted-foreground">Pay period</p>
-            <p className="font-medium">September 2026</p>
+            <p className="font-medium">{period}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Department</p>
@@ -245,14 +301,21 @@ function PayslipBreakdown({ row }: { row: SalaryRow }) {
         <div>
           <p className="text-xs opacity-75">Net salary</p>
           <p className="text-xs opacity-75">
-            {row.paidDays !== undefined ? `${row.paidDays} paid days` : "31 paid days"}
+            {paidDays !== undefined
+              ? `${paidDays} paid ${paidDays === 1 ? "day" : "days"}`
+              : "Paid days not recorded"}
           </p>
         </div>
         <p className="font-display text-2xl font-bold">{money(netSalary)}</p>
       </div>
-      <Button className="w-full gap-2" onClick={() => toast.success("Payslip download started")}>
-        <Download className="h-4 w-4" /> Download payslip
-      </Button>
+      <div className="grid grid-cols-2 gap-2">
+        <Button className="gap-2" disabled={downloading} onClick={() => void download()}>
+          <Download className="h-4 w-4" /> {downloading ? "Preparing…" : "Download payslip"}
+        </Button>
+        <Button variant="outline" className="gap-2" onClick={print}>
+          <Printer className="h-4 w-4" /> Print payslip
+        </Button>
+      </div>
     </div>
   );
 }
@@ -448,7 +511,7 @@ function AdminPayroll() {
   const queryClient = useQueryClient();
   const month = new Date().toISOString().slice(0, 7);
   const payrollDate = new Date(`${month}-01T00:00:00`);
-  const payrollMonthLabel = new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(payrollDate);
+  const payrollMonthLabel = monthLabel(payrollDate);
   const lastDay = new Date(payrollDate.getFullYear(), payrollDate.getMonth() + 1, 0).getDate();
   const shortMonth = new Intl.DateTimeFormat("en-IN", { month: "short" }).format(payrollDate);
   const { data: teachers } = useTeachers();
@@ -519,9 +582,13 @@ function AdminPayroll() {
         basic: structure?.basic_salary,
         hra: structure?.hra,
         allowance: structure?.special_allowance,
+        period: payrollMonthLabel,
+        paymentMethod: item?.payment_method,
+        paymentReference: item?.payment_reference,
+        paidOn: item?.paid_at ? new Date(item.paid_at).toLocaleDateString("en-IN") : null,
       };
     });
-  }, [teachers, staff, structures, payrollItems, lastDay]);
+  }, [teachers, staff, structures, payrollItems, lastDay, payrollMonthLabel]);
   const rows = useMemo(
     () =>
       payrollRows.filter(
@@ -842,7 +909,10 @@ function EmployeeSalary() {
   const paidDays =
     latest && !(latest.paid_days === 0 && latest.leave_deduction >= latest.gross_salary)
       ? latest.paid_days
-      : 31;
+      : latest?.working_days;
+  const period = latest
+    ? monthLabel(new Date(`${latest.payroll_month}T00:00:00`))
+    : monthLabel(new Date());
 
   const row: SalaryRow = {
     ...fallback,
@@ -854,6 +924,11 @@ function EmployeeSalary() {
     fixedDeductions,
     leaveDeductions: leaveDeduction,
     paidDays,
+    workingDays: latest?.working_days,
+    period,
+    paymentMethod: latest?.payment_method,
+    paymentReference: latest?.payment_reference,
+    paidOn: latest?.paid_at ? new Date(latest.paid_at).toLocaleDateString("en-IN") : null,
     net,
     status: latest?.status === "PAID" ? "Paid" : latest?.status === "ON_HOLD" ? "On hold" : "Ready",
     rawStatus: latest?.status,
@@ -875,7 +950,7 @@ function EmployeeSalary() {
         }).format(new Date(item.paid_at))
       : item.status.replaceAll("_", " "),
   }));
-  const period = history[0]?.month ?? "No payroll generated";
+  const { downloading, download, print } = usePayslipActions(row);
   return (
     <>
       <PageHeader
@@ -883,16 +958,21 @@ function EmployeeSalary() {
         description="View your salary breakdown, payment history, and download payslips."
         breadcrumb={["My workspace", "My Salary"]}
         actions={
-          <Button className="gap-2" onClick={() => toast.success("Payslip download started")}>
-            <Download className="h-4 w-4" /> Download payslip
-          </Button>
+          <>
+            <Button variant="outline" className="gap-2" onClick={print}>
+              <Printer className="h-4 w-4" /> Print
+            </Button>
+            <Button className="gap-2" disabled={downloading} onClick={() => void download()}>
+              <Download className="h-4 w-4" /> {downloading ? "Preparing…" : "Download payslip"}
+            </Button>
+          </>
         }
       />
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <InfoCard
           label="Net salary"
           value={money(row.net)}
-          hint={period}
+          hint={latest ? period : "No payroll generated"}
           icon={Wallet}
           tone="success"
         />
@@ -919,7 +999,7 @@ function EmployeeSalary() {
       </div>
       <div className="grid gap-5 lg:grid-cols-[1.15fr_.85fr]">
         <SectionCard
-          title={`${period} payslip`}
+          title={`${latest ? period : "No payroll generated"} payslip`}
           subtitle={
             latest
               ? `${row.paidDays ?? latest.paid_days} paid days · ${latest.paid_days === 0 && latest.leave_deduction >= latest.gross_salary ? 0 : latest.unpaid_days} unpaid days`

@@ -4,7 +4,14 @@ import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bus, MapPin } from "lucide-react";
-import { PageHeader, EmptyState, SearchInput, Initials, Pager, usePaged } from "@/components/shared/ui-kit";
+import {
+  PageHeader,
+  EmptyState,
+  SearchInput,
+  Initials,
+  Pager,
+  usePaged,
+} from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { FilterSelect } from "@/components/shared/ui-kit";
 import { Button } from "@/components/ui/button";
@@ -18,8 +25,15 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useStudents, useTransport, type ApiStudent } from "@/hooks/useApi";
+import { useUrlPrefill } from "@/hooks/useUrlPrefill";
 import { api, ApiError } from "@/lib/api";
 
 const NONE = "__none__";
@@ -91,11 +105,19 @@ function AssignDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>Pickup Point</Label>
-              <Input value={pickupPoint} onChange={(e) => setPickupPoint(e.target.value)} placeholder="e.g. Main Gate" />
+              <Input
+                value={pickupPoint}
+                onChange={(e) => setPickupPoint(e.target.value)}
+                placeholder="e.g. Main Gate"
+              />
             </div>
             <div className="grid gap-1.5">
               <Label>Drop Point</Label>
-              <Input value={dropPoint} onChange={(e) => setDropPoint(e.target.value)} placeholder="e.g. Main Gate" />
+              <Input
+                value={dropPoint}
+                onChange={(e) => setDropPoint(e.target.value)}
+                placeholder="e.g. Main Gate"
+              />
             </div>
           </div>
           <DialogFooter>
@@ -117,6 +139,11 @@ export default function TransportStudentsPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
+  useUrlPrefill("q", (value) => {
+    setSearch(value);
+    setFilter("all");
+    setPage(1);
+  });
   const [target, setTarget] = useState<ApiStudent | null>(null);
 
   const vehiclesById = useMemo(() => new Map((vehicles ?? []).map((v) => [v.id, v])), [vehicles]);
@@ -160,7 +187,9 @@ export default function TransportStudentsPage() {
         </div>
         <div className="panel p-3.5">
           <p className="text-xs text-muted-foreground">Not Assigned</p>
-          <p className="mt-0.5 font-display text-xl font-bold">{(students ?? []).length - assignedCount}</p>
+          <p className="mt-0.5 font-display text-xl font-bold">
+            {(students ?? []).length - assignedCount}
+          </p>
         </div>
       </div>
 
@@ -210,7 +239,10 @@ export default function TransportStudentsPage() {
                   {rows.map((s) => {
                     const vehicle = s.vehicle_id ? vehiclesById.get(s.vehicle_id) : undefined;
                     return (
-                      <tr key={s.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                      <tr
+                        key={s.id}
+                        className="border-b border-border last:border-0 hover:bg-muted/30"
+                      >
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-2">
                             <Initials name={s.name} className="h-7 w-7 text-[10px]" />
@@ -229,10 +261,17 @@ export default function TransportStudentsPage() {
                             <span className="text-xs text-muted-foreground">Not assigned</span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5 text-muted-foreground">{s.pickup_point ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-muted-foreground">
+                          {s.pickup_point ?? "—"}
+                        </td>
                         <td className="px-4 py-2.5 text-muted-foreground">{s.drop_point ?? "—"}</td>
                         <td className="px-4 py-2.5 text-right">
-                          <Button variant="outline" size="sm" className="h-8" onClick={() => setTarget(s)}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => setTarget(s)}
+                          >
                             {vehicle ? "Change" : "Assign"}
                           </Button>
                         </td>
@@ -246,7 +285,10 @@ export default function TransportStudentsPage() {
               {rows.map((s) => {
                 const vehicle = s.vehicle_id ? vehiclesById.get(s.vehicle_id) : undefined;
                 return (
-                  <div key={s.id} className="min-w-0 overflow-hidden rounded-xl border border-border p-3">
+                  <div
+                    key={s.id}
+                    className="min-w-0 overflow-hidden rounded-xl border border-border p-3"
+                  >
                     <div className="flex min-w-0 items-center gap-2">
                       <Initials name={s.name} className="h-8 w-8 shrink-0 text-[10px]" />
                       <div className="min-w-0 flex-1">
@@ -259,7 +301,9 @@ export default function TransportStudentsPage() {
                     <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin className="h-3.5 w-3.5 shrink-0" />
                       <span className="truncate">
-                        {vehicle ? `${vehicle.number ?? "—"} · ${s.pickup_point ?? "—"}` : "Not assigned"}
+                        {vehicle
+                          ? `${vehicle.number ?? "—"} · ${s.pickup_point ?? "—"}`
+                          : "Not assigned"}
                       </span>
                     </div>
                     <Button

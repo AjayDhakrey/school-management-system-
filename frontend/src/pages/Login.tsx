@@ -34,7 +34,15 @@ export default function Login() {
       const fallback = DASHBOARD_PATH_FOR_ROLE[user.role];
       navigate(location.state?.from?.pathname ?? fallback, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      const message = err instanceof ApiError ? err.message : "";
+      // The browser couldn't reach the server at all (offline, blocked, or wrong server address).
+      if (/failed to fetch|networkerror|load failed/i.test(message)) {
+        setError(
+          "Can't reach the server. Check your internet connection, turn off any VPN or ad/web blocker for this site, and try again.",
+        );
+      } else {
+        setError(message || "Something went wrong. Please try again.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -64,7 +72,10 @@ export default function Login() {
         {/* Brand / left panel */}
         <div
           className="relative flex shrink-0 flex-col justify-center overflow-hidden bg-gradient-to-br from-[#8FB8FB] via-[#5F9AF8] to-[#2F5FC4] px-7 py-7 text-white md:w-[46%] md:justify-between md:px-10 md:py-10 md:pb-10 md:pt-10 md:rounded-r-[160px]"
-          style={{ boxShadow: "inset -12px -12px 30px rgba(0,0,0,0.18), inset 8px 8px 20px rgba(255,255,255,0.25)" }}
+          style={{
+            boxShadow:
+              "inset -12px -12px 30px rgba(0,0,0,0.18), inset 8px 8px 20px rgba(255,255,255,0.25)",
+          }}
         >
           {/* glossy highlight */}
           <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/20 blur-2xl" />
@@ -73,7 +84,9 @@ export default function Login() {
             <div className="flex flex-col items-center gap-2 md:items-start md:gap-3">
               <span
                 className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-white/40 to-white/5 md:h-16 md:w-16"
-                style={{ boxShadow: "0 10px 20px rgba(0,0,0,0.25), inset 0 2px 4px rgba(255,255,255,0.6)" }}
+                style={{
+                  boxShadow: "0 10px 20px rgba(0,0,0,0.25), inset 0 2px 4px rgba(255,255,255,0.6)",
+                }}
               >
                 <GraduationCap className="h-7 w-7 text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)] md:h-8 md:w-8" />
               </span>
@@ -120,7 +133,9 @@ export default function Login() {
 
         {/* Form / right panel */}
         <div className="flex flex-1 flex-col justify-center px-6 py-5 md:px-14 md:py-8">
-          <h2 className="text-center text-[20px] font-extrabold text-[#5F9AF8] md:text-left md:text-[26px]">welcome</h2>
+          <h2 className="text-center text-[20px] font-extrabold text-[#5F9AF8] md:text-left md:text-[26px]">
+            welcome
+          </h2>
           <p className="mt-1 text-center text-[12px] text-gray-400 md:text-left md:text-[13px]">
             Login in to your account to continue
           </p>
@@ -134,14 +149,21 @@ export default function Login() {
               />
               <input
                 id="email"
-                type="email"
+                // Text, not email: students sign in with a Student ID such as DPSSH0042,
+                // parents with their registered mobile number.
+                type="text"
                 autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="User id"
+                placeholder="Email, Student ID or mobile number"
                 className="w-full rounded-full border-0 bg-[#eef2f9] py-2.5 pl-11 pr-5 text-[13px] text-[#1c1c28] placeholder:text-[#7fa8dd] focus:outline-none focus:ring-2 focus:ring-[#5F9AF8]/40 md:py-3"
-                style={{ boxShadow: "inset 4px 4px 8px rgba(163,177,198,0.45), inset -4px -4px 8px rgba(255,255,255,0.9)" }}
+                style={{
+                  boxShadow:
+                    "inset 4px 4px 8px rgba(163,177,198,0.45), inset -4px -4px 8px rgba(255,255,255,0.9)",
+                }}
               />
             </div>
 
@@ -160,7 +182,10 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 className="w-full rounded-full border-0 bg-[#eef2f9] py-2.5 pl-11 pr-11 text-[13px] text-[#1c1c28] placeholder:text-[#7fa8dd] focus:outline-none focus:ring-2 focus:ring-[#5F9AF8]/40 md:py-3"
-                style={{ boxShadow: "inset 4px 4px 8px rgba(163,177,198,0.45), inset -4px -4px 8px rgba(255,255,255,0.9)" }}
+                style={{
+                  boxShadow:
+                    "inset 4px 4px 8px rgba(163,177,198,0.45), inset -4px -4px 8px rgba(255,255,255,0.9)",
+                }}
               />
               <button
                 type="button"
@@ -172,7 +197,11 @@ export default function Login() {
               </button>
             </div>
 
-            {error && <p className="text-center text-[11px] font-medium text-destructive md:text-left">{error}</p>}
+            {error && (
+              <p className="text-center text-[11px] font-medium text-destructive md:text-left">
+                {error}
+              </p>
+            )}
 
             <p className="text-center text-[12px] text-gray-500 md:text-left">
               <a href="#" className="hover:text-[#5F9AF8]">
@@ -185,7 +214,10 @@ export default function Login() {
                 type="submit"
                 disabled={submitting}
                 className="flex w-40 items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#8FB8FB] to-[#5F9AF8] py-2 text-[13px] font-semibold tracking-wide text-white transition-all duration-150 hover:brightness-105 active:translate-y-[2px] disabled:opacity-60 md:py-2.5"
-                style={{ boxShadow: "0 10px 20px rgba(95,154,248,0.4), inset 0 2px 3px rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.15)" }}
+                style={{
+                  boxShadow:
+                    "0 10px 20px rgba(95,154,248,0.4), inset 0 2px 3px rgba(255,255,255,0.5), inset 0 -3px 6px rgba(0,0,0,0.15)",
+                }}
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "LOG IN"}
               </button>

@@ -23,9 +23,15 @@ export const ROLES: Role[] = [
   "Transport Manager",
 ];
 
+export type TextSize = "small" | "default" | "large";
+const TEXT_SIZE_PX: Record<TextSize, string> = { small: "15px", default: "16px", large: "17.5px" };
+
 type AppState = {
   theme: "light" | "dark";
   toggleTheme: () => void;
+  setTheme: (theme: "light" | "dark") => void;
+  textSize: TextSize;
+  setTextSize: (size: TextSize) => void;
   sidebarOpen: boolean;
   setSidebarOpen: (v: boolean) => void;
   collapsed: boolean;
@@ -38,17 +44,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [textSize, setTextSize] = useState<TextSize>("default");
 
   useEffect(() => {
     const storedTheme = localStorage.getItem("scholaris-theme");
     if (storedTheme === "dark" || storedTheme === "light") setTheme(storedTheme);
     const storedCollapsed = localStorage.getItem("scholaris-collapsed");
     if (storedCollapsed) setCollapsed(storedCollapsed === "1");
+    const storedTextSize = localStorage.getItem("scholaris-text-size");
+    if (storedTextSize === "small" || storedTextSize === "large") setTextSize(storedTextSize);
   }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
+
+  // Everything is sized in rem, so the root font size scales the whole interface.
+  useEffect(() => {
+    document.documentElement.style.fontSize = TEXT_SIZE_PX[textSize];
+  }, [textSize]);
 
   const value = useMemo<AppState>(
     () => ({
@@ -59,6 +73,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           localStorage.setItem("scholaris-theme", next);
           return next;
         }),
+      setTheme: (next) => {
+        localStorage.setItem("scholaris-theme", next);
+        setTheme(next);
+      },
+      textSize,
+      setTextSize: (size) => {
+        localStorage.setItem("scholaris-text-size", size);
+        setTextSize(size);
+      },
       sidebarOpen,
       setSidebarOpen,
       collapsed,
@@ -68,7 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return !c;
         }),
     }),
-    [theme, sidebarOpen, collapsed],
+    [theme, textSize, sidebarOpen, collapsed],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

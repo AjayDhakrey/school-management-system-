@@ -63,6 +63,7 @@ import {
   type ApiStudent,
   type PaymentMethod,
 } from "@/hooks/useApi";
+import { useUrlPrefill } from "@/hooks/useUrlPrefill";
 import { api, ApiError } from "@/lib/api";
 import {
   billingMonthOf,
@@ -2698,6 +2699,11 @@ export default function Page({
   const [recordsStatus, setRecordsStatus] = useState("all");
   const [recordsPage, setRecordsPage] = useState(1);
   const [recordsPageSize, setRecordsPageSize] = useState(10);
+  // Header search → /fees/collection?q=<student> opens the records filtered to them.
+  useUrlPrefill("q", (value) => {
+    setRecordsSearch(value);
+    setRecordsPage(1);
+  });
 
   const studentsById = useMemo(() => new Map((students ?? []).map((s) => [s.id, s])), [students]);
 

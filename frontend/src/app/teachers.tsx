@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -333,6 +334,22 @@ export default function Page({ mode = "Teaching" }: { mode?: Mode }) {
     () => (isTeaching ? (teachers ?? []).map(toRow) : (staff ?? []).map(staffToRow)),
     [isTeaching, teachers, staff],
   );
+
+  // The header search links here with ?open=<id> to show that person's profile.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openId = searchParams.get("open");
+  useEffect(() => {
+    if (!openId || isLoading) return;
+    const row = allRows.find((r) => r.id === openId);
+    if (row) setSelected(row);
+    setSearchParams(
+      (params) => {
+        params.delete("open");
+        return params;
+      },
+      { replace: true },
+    );
+  }, [openId, isLoading, allRows, setSearchParams]);
 
   const departmentOptions = useMemo(
     () =>

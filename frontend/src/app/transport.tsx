@@ -58,6 +58,7 @@ import {
   type ApiVehicle,
   type TransportComplaintCategory,
 } from "@/hooks/useApi";
+import { useUrlPrefill } from "@/hooks/useUrlPrefill";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { PhoneInput } from "@/components/shared/PhoneInput";
@@ -613,6 +614,7 @@ function AdminTransportView() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [selected, setSelected] = useState<ApiVehicle | null>(null);
+  useUrlPrefill("q", setSearch);
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ApiVehicle | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ApiVehicle | null>(null);

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   CalendarDays,
@@ -334,7 +335,9 @@ function SalaryStructureDialog({
   const [allowance, setAllowance] = useState(
     String(employee.allowance ?? Math.max(0, employee.gross - defaultBasic - defaultHra)),
   );
-  const [deductions, setDeductions] = useState(String(employee.fixedDeductions ?? employee.deductions));
+  const [deductions, setDeductions] = useState(
+    String(employee.fixedDeductions ?? employee.deductions),
+  );
   const [effectiveMonth, setEffectiveMonth] = useState(new Date().toISOString().slice(0, 7));
   const gross = (Number(basic) || 0) + (Number(hra) || 0) + (Number(allowance) || 0);
   const net = Math.max(0, gross - (Number(deductions) || 0));
@@ -560,7 +563,7 @@ function AdminPayroll() {
       const paidDays =
         item && !(item.paid_days === 0 && item.leave_deduction >= item.gross_salary)
           ? item.paid_days
-          : (item?.working_days || lastDay);
+          : item?.working_days || lastDay;
 
       return {
         id: person.employee_id ?? person.id.slice(0, 8),
@@ -589,6 +592,24 @@ function AdminPayroll() {
       };
     });
   }, [teachers, staff, structures, payrollItems, lastDay, payrollMonthLabel]);
+
+  // The header search links here with ?open=TEACHER:<id> or STAFF:<id> to show that payslip.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openKey = searchParams.get("open");
+  useEffect(() => {
+    if (!openKey || teachers === undefined || staff === undefined) return;
+    const [type, id] = openKey.split(":");
+    const row = payrollRows.find((r) => r.employeeType === type && r.employeeId === id);
+    if (row) setSelected(row);
+    setSearchParams(
+      (params) => {
+        params.delete("open");
+        return params;
+      },
+      { replace: true },
+    );
+  }, [openKey, teachers, staff, payrollRows, setSearchParams]);
+
   const rows = useMemo(
     () =>
       payrollRows.filter(
@@ -638,7 +659,10 @@ function AdminPayroll() {
     row: SalaryRow,
     action: "review" | "approve" | "hold" | "release" | "pay",
   ) {
-    if (!row.payrollId) { toast.error("Calculate payroll before changing its status"); return; }
+    if (!row.payrollId) {
+      toast.error("Calculate payroll before changing its status");
+      return;
+    }
     try {
       await api.patch(`/payroll/${row.payrollId}`, {
         action,
@@ -813,7 +837,10 @@ function AdminPayroll() {
             <div key={row.id} className="panel min-w-0 overflow-hidden p-3.5">
               <div className="flex min-w-0 items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <Initials name={row.name} tone={row.department === "Teaching" ? "navy" : "gold"} />
+                  <Initials
+                    name={row.name}
+                    tone={row.department === "Teaching" ? "navy" : "gold"}
+                  />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{row.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
@@ -833,7 +860,9 @@ function AdminPayroll() {
               </div>
 
               <div className="mt-3 flex min-w-0 items-center justify-between gap-2">
-                <Badge variant="secondary" className="truncate">{row.department}</Badge>
+                <Badge variant="secondary" className="truncate">
+                  {row.department}
+                </Badge>
                 <StatusPill status={row.status} className="shrink-0" />
               </div>
 
@@ -880,21 +909,24 @@ function AdminPayroll() {
 
 function EmployeeSalary() {
   const { user } = useAuth();
-  const { data: items } = usePayroll();
+  const { data: allItems } = usePayroll();
   const { data: structures } = useSalaryStructures();
-  const latest = items?.[0];
+  // Accountants can read everyone's payroll, so always narrow to the signed-in employee.
+  const myType = user?.role === "TEACHER" ? "TEACHER" : "STAFF";
+  const myId = user?.role === "TEACHER" ? user.linkedTeacherId : user?.linkedStaffId;
+  const isMine = (row: { employee_type: string; employee_id: string }) =>
+    row.employee_type === myType && row.employee_id === myId;
+  const items = (allItems ?? []).filter(isMine);
+  const latest = items[0];
   const fallback = payroll[0]!;
 
-  const structure = (structures ?? []).find(
-    (s) =>
-      s.active &&
-      ((user?.role === "TEACHER" && s.employee_type === "TEACHER") ||
-        (user?.role === "STAFF" && s.employee_type === "STAFF")),
-  );
+  const structure = (structures ?? []).find((s) => s.active && isMine(s));
 
   const gross =
     latest?.gross_salary ??
-    (structure ? structure.basic_salary + structure.hra + structure.special_allowance : fallback.gross);
+    (structure
+      ? structure.basic_salary + structure.hra + structure.special_allowance
+      : fallback.gross);
   const fixedDeductions =
     structure?.fixed_deductions ?? latest?.fixed_deductions ?? fallback.deductions;
   const leaveDeduction =

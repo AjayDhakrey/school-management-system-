@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bus, Pencil, Phone, Plus, Trash2, UserSquare2, Users2 } from "lucide-react";
+import { Bus, Download, Pencil, Phone, Plus, Trash2, UserSquare2, Users2 } from "lucide-react";
 import { PageHeader, EmptyState, Initials } from "@/components/shared/ui-kit";
 import { SectionCard } from "@/components/shared/SectionCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
@@ -19,7 +19,13 @@ import {
   DialogFooter,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   useTransport,
   useTransportDrivers,
@@ -29,11 +35,37 @@ import {
   type TransportPersonStatus,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { PhoneInput } from "@/components/shared/PhoneInput";
 
 const NONE = "__none__";
 type Kind = "drivers" | "attendants";
 type Person = ApiTransportDriver | ApiTransportAttendant;
+
+/** "Expires 12 Mar 2027", flagged amber within 30 days and red once expired. */
+function licenseState(expiry: string | null | undefined) {
+  if (!expiry) return null;
+  const when = new Date(`${expiry.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(when.getTime())) return null;
+  const days = Math.ceil((when.getTime() - Date.now()) / 86_400_000);
+  const date = when.toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  if (days < 0) return { label: `Expired ${date}`, tone: "font-semibold text-destructive" };
+  if (days <= 30)
+    return { label: `Expires ${date} · ${days}d left`, tone: "font-semibold text-warning" };
+  return { label: `Expires ${date}`, tone: "text-muted-foreground" };
+}
 
 function PersonDialog({
   kind,
@@ -115,7 +147,12 @@ function PersonDialog({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label>Name</Label>
-              <Input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Full name" />
+              <Input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Full name"
+              />
             </div>
             <div className="space-y-1">
               <Label>Phone</Label>
@@ -129,7 +166,11 @@ function PersonDialog({
                 </div>
                 <div className="space-y-1">
                   <Label>License Expiry</Label>
-                  <Input type="date" value={licenseExpiry ?? ""} onChange={(e) => setLicenseExpiry(e.target.value)} />
+                  <Input
+                    type="date"
+                    value={licenseExpiry ?? ""}
+                    onChange={(e) => setLicenseExpiry(e.target.value)}
+                  />
                 </div>
               </>
             )}
@@ -189,7 +230,10 @@ function PersonList({ kind }: { kind: Kind }) {
   const { data: vehicles } = useTransport();
   const queryClient = useQueryClient();
 
-  const people: Person[] = (isDriver ? driversQuery.data : attendantsQuery.data) ?? [];
+  const people: Person[] = useMemo(
+    () => (isDriver ? driversQuery.data : attendantsQuery.data) ?? [],
+    [isDriver, driversQuery.data, attendantsQuery.data],
+  );
   const isLoading = isDriver ? driversQuery.isLoading : attendantsQuery.isLoading;
 
   const [addOpen, setAddOpen] = useState(false);
@@ -204,6 +248,45 @@ function PersonList({ kind }: { kind: Kind }) {
   async function invalidate() {
     await queryClient.invalidateQueries({ queryKey: [`transport-${kind}`] });
     await queryClient.invalidateQueries({ queryKey: ["transport"] });
+  }
+
+  // Drivers typed straight onto a vehicle (its driver name/phone fields) before driver
+  // profiles existed have no row here. Offer to turn them into profiles on that vehicle.
+  const unprofiledDrivers = useMemo(() => {
+    if (!isDriver || driversQuery.isLoading) return [];
+    const profiledVehicles = new Set(people.map((p) => p.assigned_vehicle_id).filter(Boolean));
+    const profiledNames = new Set(people.map((p) => p.name.trim().toLowerCase()));
+    return (vehicles ?? []).filter(
+      (v) =>
+        v.driver?.trim() &&
+        !profiledVehicles.has(v.id) &&
+        !profiledNames.has(v.driver.trim().toLowerCase()),
+    );
+  }, [isDriver, driversQuery.isLoading, people, vehicles]);
+  const [importing, setImporting] = useState(false);
+
+  async function importFromVehicles() {
+    setImporting(true);
+    let added = 0;
+    try {
+      for (const v of unprofiledDrivers) {
+        await api.post("/transport-drivers", {
+          name: v.driver!.trim(),
+          phone: v.driver_phone?.trim() || null,
+          status: "Active",
+          assignedVehicleId: v.id,
+        });
+        added++;
+      }
+      toast.success(`${added} driver${added === 1 ? "" : "s"} imported`);
+    } catch (err) {
+      toast.error(
+        `${added ? `${added} imported, then: ` : ""}${err instanceof ApiError ? err.message : "Import failed"}`,
+      );
+    } finally {
+      await invalidate();
+      setImporting(false);
+    }
   }
 
   async function handleDelete() {
@@ -227,6 +310,34 @@ function PersonList({ kind }: { kind: Kind }) {
         </Button>
       }
     >
+      {unprofiledDrivers.length > 0 && (
+        <div className="m-4 mb-0 flex flex-col gap-3 rounded-xl border border-info/25 bg-info-soft/50 p-3.5 sm:flex-row sm:items-center">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-info/15 text-info">
+            <Download className="h-4 w-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">
+              {unprofiledDrivers.length} driver{unprofiledDrivers.length === 1 ? " is" : "s are"}{" "}
+              named on vehicles but {unprofiledDrivers.length === 1 ? "has" : "have"} no profile
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {unprofiledDrivers
+                .map((v) => `${v.driver!.trim()} (${v.number ?? "vehicle"})`)
+                .join(", ")}
+              . Import them to manage licenses, status and assignments here.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            className="shrink-0 gap-1.5"
+            onClick={() => void importFromVehicles()}
+            disabled={importing}
+          >
+            <Download className="h-4 w-4" />
+            {importing ? "Importing…" : "Import from vehicles"}
+          </Button>
+        </div>
+      )}
       {isLoading ? (
         <p className="p-6 text-center text-sm text-muted-foreground">Loading…</p>
       ) : people.length === 0 ? (
@@ -236,50 +347,101 @@ function PersonList({ kind }: { kind: Kind }) {
           icon={isDriver ? UserSquare2 : Users2}
         />
       ) : (
-        <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3">
-          {people.map((p) => (
-            <div key={p.id} className="panel flex flex-col gap-2.5 p-3.5">
-              <div className="flex items-center gap-2.5">
-                <Initials name={p.name} tone="gold" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">{p.name}</p>
-                  <p className="truncate text-xs text-muted-foreground">{p.phone ?? "—"}</p>
-                </div>
-                <StatusBadge status={p.status} />
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Bus className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">
-                  {p.assigned_vehicle_id ? (vehiclesById.get(p.assigned_vehicle_id) ?? "Assigned") : "Unassigned"}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 flex-1 gap-1.5"
-                  onClick={() => setEditTarget(p)}
-                >
-                  <Pencil className="h-3.5 w-3.5" /> Edit
-                </Button>
-                {p.phone && (
-                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" asChild>
-                    <a href={`tel:${p.phone}`}>
-                      <Phone className="h-3.5 w-3.5" />
-                    </a>
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                  onClick={() => setDeleteTarget(p)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-10 pl-5">#</TableHead>
+                <TableHead>{isDriver ? "Driver" : "Attendant"}</TableHead>
+                <TableHead>Phone</TableHead>
+                {isDriver && <TableHead>License</TableHead>}
+                <TableHead>Vehicle</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="pr-5 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {people.map((p, index) => {
+                const driver = isDriver ? (p as ApiTransportDriver) : null;
+                const expiry = licenseState(driver?.license_expiry);
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell className="pl-5 text-xs text-muted-foreground">
+                      {index + 1}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex min-w-[160px] items-center gap-2.5">
+                        <Initials name={p.name} tone="gold" />
+                        <span className="truncate text-sm font-semibold">{p.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">
+                      {p.phone ? (
+                        <a href={`tel:${p.phone}`} className="hover:text-primary hover:underline">
+                          {p.phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    {isDriver && (
+                      <TableCell className="whitespace-nowrap">
+                        <p className="text-sm">{driver?.license_no ?? "—"}</p>
+                        {expiry && <p className={cn("text-[11px]", expiry.tone)}>{expiry.label}</p>}
+                      </TableCell>
+                    )}
+                    <TableCell className="whitespace-nowrap">
+                      {p.assigned_vehicle_id ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm">
+                          <Bus className="h-3.5 w-3.5 text-primary" />
+                          {vehiclesById.get(p.assigned_vehicle_id) ?? "Assigned"}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Unassigned</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={p.status} />
+                    </TableCell>
+                    <TableCell className="pr-5">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5"
+                          onClick={() => setEditTarget(p)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Edit
+                        </Button>
+                        {p.phone && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            asChild
+                            aria-label={`Call ${p.name}`}
+                          >
+                            <a href={`tel:${p.phone}`}>
+                              <Phone className="h-3.5 w-3.5" />
+                            </a>
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteTarget(p)}
+                          aria-label={`Remove ${p.name}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         </div>
       )}
 
@@ -312,7 +474,8 @@ function PersonList({ kind }: { kind: Kind }) {
           <DialogHeader>
             <DialogTitle>Remove {isDriver ? "Driver" : "Attendant"}</DialogTitle>
             <DialogDescription>
-              Remove {deleteTarget?.name ?? "this person"}? Their vehicle assignment will be cleared.
+              Remove {deleteTarget?.name ?? "this person"}? Their vehicle assignment will be
+              cleared.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -4,9 +4,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   Building2,
   CircleCheck,
-  CheckCircle2,
   Crown,
   IndianRupee,
   Layers,
@@ -15,7 +15,8 @@ import {
   Rocket,
   School,
   Sparkles,
-  Users,
+  Star,
+  TrendingUp,
 } from "lucide-react";
 import { PageHeader, EmptyState, TableSkeleton } from "@/components/shared/ui-kit";
 import { InfoCard } from "@/components/shared/InfoCard";
@@ -137,72 +138,116 @@ function AddPlanForm({ onDone }: { onDone: () => void }) {
 }
 
 const TIER_ICON = [Sparkles, Rocket, Crown, Building2];
-// One accent per tier: top bar, icon tile and check marks.
+// One accent per tier: header wash, icon tile, check marks and revenue-mix segment.
 const TIER_TONE = [
-  { bar: "bg-sky-500", tile: "bg-sky-500/10 text-sky-600", check: "text-sky-600" },
-  { bar: "bg-violet-500", tile: "bg-violet-500/10 text-violet-600", check: "text-violet-600" },
-  { bar: "bg-amber-500", tile: "bg-amber-500/10 text-amber-600", check: "text-amber-600" },
-  { bar: "bg-emerald-500", tile: "bg-emerald-500/10 text-emerald-600", check: "text-emerald-600" },
+  {
+    head: "from-sky-500/15 via-sky-500/5",
+    tile: "bg-sky-500 text-white",
+    check: "text-sky-600",
+    bar: "bg-sky-500",
+  },
+  {
+    head: "from-violet-500/15 via-violet-500/5",
+    tile: "bg-violet-500 text-white",
+    check: "text-violet-600",
+    bar: "bg-violet-500",
+  },
+  {
+    head: "from-amber-500/15 via-amber-500/5",
+    tile: "bg-amber-500 text-white",
+    check: "text-amber-600",
+    bar: "bg-amber-500",
+  },
+  {
+    head: "from-emerald-500/15 via-emerald-500/5",
+    tile: "bg-emerald-500 text-white",
+    check: "text-emerald-600",
+    bar: "bg-emerald-500",
+  },
 ];
+const toneFor = (tier: number) => TIER_TONE[Math.min(tier, TIER_TONE.length - 1)]!;
+const iconFor = (tier: number) => TIER_ICON[Math.min(tier, TIER_ICON.length - 1)]!;
 
-/** One pricing card: price, what it covers, schools on it, status and edit. */
+type View = "MONTHLY" | "YEARLY";
+const rupees = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+/** What the plan earns per school per month, whatever cycle it is billed on. */
+const monthlyPrice = (plan: ApiPlan) =>
+  plan.billing_cycle === "YEARLY" ? plan.price / 12 : plan.price;
+
+/** One pricing card: price in the chosen view, what it covers, its revenue and controls. */
 function PlanCard({
   plan,
   tier,
   schools,
+  mrr,
+  share,
   popular,
+  view,
+  onToggle,
   onEdit,
 }: {
   plan: ApiPlan;
   tier: number;
   schools: number;
+  /** Monthly revenue from the schools on this plan. */
+  mrr: number;
+  /** This plan's share of total monthly revenue, 0–100. */
+  share: number;
   popular: boolean;
+  view: View;
   onToggle: () => void;
   onEdit: () => void;
 }) {
-  const yearly = plan.billing_cycle === "YEARLY";
   const active = plan.status === "ACTIVE";
-  const t = Math.min(tier, TIER_ICON.length - 1);
-  const Icon = TIER_ICON[t]!;
-  const tone = TIER_TONE[t]!;
-  const monthly = yearly ? plan.price / 12 : plan.price;
-  const perStudent = plan.max_students
-    ? Math.round((monthly / plan.max_students) * 100) / 100
-    : null;
-  const rupees = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+  const Icon = iconFor(tier);
+  const tone = toneFor(tier);
+  const monthly = monthlyPrice(plan);
+  const shown = view === "YEARLY" ? monthly * 12 : monthly;
+  const billedYearly = plan.billing_cycle === "YEARLY";
+  const perStudent = plan.max_students ? monthly / plan.max_students : null;
 
   const points = [
     plan.max_students
       ? `Up to ${plan.max_students.toLocaleString("en-IN")} students`
       : "Unlimited students",
-    perStudent !== null ? `${rupees(perStudent)} per student a month` : null,
-    yearly
-      ? `≈ ${rupees(Math.round(plan.price / 12))} a month`
-      : `${rupees(plan.price * 12)} a year`,
-    `Billed ${yearly ? "yearly" : "monthly"}`,
+    perStudent !== null
+      ? `${perStudent < 10 ? `₹${perStudent.toFixed(2)}` : rupees(perStudent)} per student / month`
+      : null,
+    view === "YEARLY" ? `${rupees(monthly)} a month` : `${rupees(monthly * 12)} a year`,
+    `Billed ${billedYearly ? "yearly" : "monthly"}`,
   ].filter(Boolean) as string[];
 
   return (
     <div
       className={cn(
-        "relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg",
-        popular ? "border-primary/60 ring-2 ring-primary/15" : "border-border",
-        !active && "opacity-60",
+        "group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition-all hover:-translate-y-1 hover:shadow-xl",
+        popular ? "border-primary/60 ring-2 ring-primary/20" : "border-border",
+        !active && "opacity-70 saturate-50",
       )}
     >
-      <span className={cn("h-1.5 w-full", tone.bar)} />
-      <div className="flex flex-1 flex-col p-5">
+      {/* Tinted header */}
+      <div className={cn("bg-gradient-to-b to-transparent px-5 pt-5 pb-4", tone.head)}>
         <div className="flex items-start justify-between gap-2">
-          <span className={cn("grid h-11 w-11 place-items-center rounded-xl", tone.tile)}>
+          <span
+            className={cn(
+              "grid h-11 w-11 place-items-center rounded-xl shadow-md transition-transform group-hover:scale-105",
+              tone.tile,
+            )}
+          >
             <Icon className="h-5 w-5" />
           </span>
-          {popular && (
-            <span className="rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold tracking-wide text-primary-foreground uppercase shadow-sm">
-              ★ Most popular
+          {popular ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-[10px] font-bold tracking-wide text-primary-foreground uppercase shadow-sm">
+              <Star className="h-3 w-3 fill-current" /> Most popular
             </span>
+          ) : (
+            !active && (
+              <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-bold tracking-wide text-muted-foreground uppercase">
+                Hidden
+              </span>
+            )
           )}
         </div>
-
         <h3 className="mt-4 font-display text-xl font-bold">{plan.name}</h3>
         <p className="text-xs text-muted-foreground">
           For schools with{" "}
@@ -210,54 +255,60 @@ function PlanCard({
             ? `up to ${plan.max_students.toLocaleString("en-IN")} students`
             : "any number of students"}
         </p>
-
-        <div className="mt-5 flex items-baseline gap-1">
-          <span className="font-display text-4xl font-extrabold tracking-tight">
-            {rupees(plan.price)}
+        <div className="mt-4 flex items-baseline gap-1">
+          <span className="font-display text-[2.5rem] leading-none font-extrabold tracking-tight">
+            {rupees(shown)}
           </span>
           <span className="text-sm font-medium text-muted-foreground">
-            /{yearly ? "year" : "month"}
+            /{view === "YEARLY" ? "year" : "month"}
           </span>
         </div>
+      </div>
 
-        <ul className="mt-5 space-y-2.5 border-t border-dashed border-border pt-5">
-          {points.map((p) => (
-            <li key={p} className="flex items-start gap-2 text-sm">
+      <div className="flex flex-1 flex-col px-5 pb-5">
+        <ul className="space-y-2.5 border-t border-dashed border-border pt-4">
+          {points.map((point) => (
+            <li key={point} className="flex items-start gap-2 text-sm">
               <CircleCheck className={cn("mt-0.5 h-4 w-4 shrink-0", tone.check)} />
-              <span className="text-foreground/85">{p}</span>
+              <span className="text-foreground/85">{point}</span>
             </li>
           ))}
         </ul>
 
         <div className="mt-auto pt-5">
-          <div className="mb-3 flex items-center justify-between gap-2 rounded-xl bg-muted/50 px-3 py-2">
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <School className="h-3.5 w-3.5" /> Schools on plan
-            </span>
-            <span className="font-display text-sm font-bold tabular-nums">{schools}</span>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold",
-                active ? "bg-success-soft text-success" : "bg-muted text-muted-foreground",
-              )}
-            >
+          {/* What this plan is earning right now */}
+          <div className="rounded-xl border border-border bg-muted/40 p-3">
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <School className="h-3.5 w-3.5" />
+                {schools} school{schools === 1 ? "" : "s"}
+              </span>
+              <span className="font-semibold tabular-nums">
+                {rupees(mrr)}
+                <span className="font-normal text-muted-foreground">/mo</span>
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
               <span
-                className={cn(
-                  "h-1.5 w-1.5 rounded-full",
-                  active ? "bg-success" : "bg-muted-foreground/50",
-                )}
+                className={cn("block h-full rounded-full", tone.bar)}
+                style={{ width: `${share}%` }}
               />
-              {active ? "Available" : "Hidden"}
-            </span>
-            <Button
-              type="button"
-              size="sm"
-              variant={popular ? "default" : "outline"}
-              className="h-8 gap-1.5"
-              onClick={onEdit}
-            >
+            </div>
+            <p className="mt-1.5 text-[11px] text-muted-foreground">{share}% of platform revenue</p>
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <label className="flex cursor-pointer items-center gap-2 text-xs font-medium">
+              <Switch
+                checked={active}
+                onCheckedChange={onToggle}
+                aria-label={`${plan.name} available to schools`}
+              />
+              <span className={active ? "text-success" : "text-muted-foreground"}>
+                {active ? "Available" : "Hidden"}
+              </span>
+            </label>
+            <Button type="button" size="sm" className="h-8 gap-1.5" onClick={onEdit}>
               <Pencil className="h-3.5 w-3.5" /> Edit plan
             </Button>
           </div>
@@ -424,23 +475,38 @@ export default function PlansPage() {
   const [editing, setEditing] = useState<ApiPlan | null>(null);
 
   const { data: schools } = useSchools();
+  const [view, setView] = useState<View>("MONTHLY");
   const rows = plans ?? [];
   const active = rows.filter((p) => p.status === "ACTIVE").length;
-  const sorted = [...rows].sort((a, b) => a.price - b.price);
+  const sorted = [...rows].sort((a, b) => monthlyPrice(a) - monthlyPrice(b));
   const schoolsOn = (planName: string) =>
     (schools ?? []).filter((sc) => (sc.plan ?? "").toLowerCase() === planName.toLowerCase()).length;
   const subscribed = (schools ?? []).filter((sc) =>
     rows.some((p) => p.name.toLowerCase() === (sc.plan ?? "").toLowerCase()),
+  ).length;
+  // Schools naming a plan that no longer exists (e.g. after a rename); no plan at all is fine.
+  const unmatched = (schools ?? []).filter(
+    (sc) => sc.plan?.trim() && !rows.some((p) => p.name.toLowerCase() === sc.plan!.toLowerCase()),
   ).length;
   // The plan most schools are on gets the "Most popular" ribbon (only when it leads).
   const counts = sorted.map((p) => ({ id: p.id, n: schoolsOn(p.name) }));
   const top = counts.reduce((m, c) => (c.n > m.n ? c : m), { id: "", n: 0 });
   const popularId = counts.filter((c) => c.n === top.n).length === 1 ? top.id : "";
 
+  // Monthly recurring revenue: each school pays its plan's monthly-equivalent price.
+  const revenue = sorted.map((p, tier) => ({
+    plan: p,
+    tier,
+    mrr: monthlyPrice(p) * schoolsOn(p.name),
+  }));
+  const totalMrr = revenue.reduce((sum, r) => sum + r.mrr, 0);
+  const shareOf = (mrr: number) => (totalMrr ? Math.round((mrr / totalMrr) * 100) : 0);
+
   async function toggleStatus(id: string, current: string) {
     try {
       await api.patch(`/plans/${id}`, { status: current === "ACTIVE" ? "INACTIVE" : "ACTIVE" });
       await queryClient.invalidateQueries({ queryKey: ["plans"] });
+      toast.success(current === "ACTIVE" ? "Plan hidden from schools" : "Plan available again");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update plan");
     }
@@ -471,17 +537,105 @@ export default function PlansPage() {
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <InfoCard label="Total Plans" value={rows.length} icon={Layers} tone="navy" />
-        <InfoCard label="Active Plans" value={active} icon={CheckCircle2} tone="success" />
-        <InfoCard label="Schools Subscribed" value={subscribed} icon={School} tone="info" />
         <InfoCard
-          label="Starting Price"
-          value={
-            rows.length ? `₹${Math.min(...rows.map((p) => p.price)).toLocaleString("en-IN")}` : "—"
-          }
+          label="Monthly revenue"
+          value={rupees(totalMrr)}
           icon={IndianRupee}
+          tone="success"
+        />
+        <InfoCard
+          label="Avg. per school"
+          value={subscribed ? rupees(totalMrr / subscribed) : "—"}
+          icon={TrendingUp}
           tone="gold"
         />
+        <InfoCard label="Schools subscribed" value={subscribed} icon={School} tone="info" />
+        <InfoCard
+          label="Active plans"
+          value={`${active} / ${rows.length}`}
+          icon={Layers}
+          tone="navy"
+        />
+      </div>
+
+      {totalMrr > 0 && (
+        <section className="panel mb-4 p-4 sm:p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <p className="text-sm font-semibold">Revenue mix</p>
+            <p className="text-xs text-muted-foreground">
+              {rupees(totalMrr)}/month · {rupees(totalMrr * 12)}/year
+            </p>
+          </div>
+          <div className="mt-3 flex h-3 overflow-hidden rounded-full bg-muted">
+            {revenue.map(
+              (r) =>
+                r.mrr > 0 && (
+                  <span
+                    key={r.plan.id}
+                    className={cn("h-full", toneFor(r.tier).bar)}
+                    style={{ width: `${(r.mrr / totalMrr) * 100}%` }}
+                    title={`${r.plan.name}: ${rupees(r.mrr)}/month`}
+                  />
+                ),
+            )}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
+            {revenue.map((r) => (
+              <span key={r.plan.id} className="flex items-center gap-1.5 text-xs">
+                <span className={cn("h-2.5 w-2.5 rounded-full", toneFor(r.tier).bar)} />
+                <span className="font-medium">{r.plan.name}</span>
+                <span className="text-muted-foreground tabular-nums">
+                  {shareOf(r.mrr)}% · {rupees(r.mrr)}
+                </span>
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {unmatched > 0 && (
+        <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-warning/30 bg-warning-soft/40 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+          <p>
+            <span className="font-semibold">
+              {unmatched} school{unmatched === 1 ? " is" : "s are"} on a plan that isn&apos;t listed
+              here
+            </span>{" "}
+            <span className="text-muted-foreground">
+              (often after a plan is renamed). Update them under Schools so revenue counts them.
+            </span>
+          </p>
+        </div>
+      )}
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-semibold">
+          {rows.length} plan{rows.length === 1 ? "" : "s"}
+          <span className="font-normal text-muted-foreground"> · cheapest first</span>
+        </p>
+        <div
+          role="radiogroup"
+          aria-label="Show prices"
+          className="inline-flex rounded-xl border border-border bg-muted/40 p-1"
+        >
+          {(["MONTHLY", "YEARLY"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={view === v}
+              onClick={() => setView(v)}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                view === v
+                  ? "bg-surface text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {v === "MONTHLY" ? "Monthly" : "Yearly"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (
@@ -492,15 +646,18 @@ export default function PlansPage() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {sorted.map((p, i) => (
+          {revenue.map(({ plan, tier, mrr }) => (
             <PlanCard
-              key={p.id}
-              plan={p}
-              tier={i}
-              schools={schoolsOn(p.name)}
-              popular={p.id === popularId}
-              onToggle={() => toggleStatus(p.id, p.status)}
-              onEdit={() => setEditing(p)}
+              key={plan.id}
+              plan={plan}
+              tier={tier}
+              schools={schoolsOn(plan.name)}
+              mrr={mrr}
+              share={shareOf(mrr)}
+              popular={plan.id === popularId}
+              view={view}
+              onToggle={() => toggleStatus(plan.id, plan.status)}
+              onEdit={() => setEditing(plan)}
             />
           ))}
         </div>

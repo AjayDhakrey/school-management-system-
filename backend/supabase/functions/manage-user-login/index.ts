@@ -9,10 +9,24 @@
 //   set_status          — { user_id, status }    -> { ok }   (also bans/unbans the auth user)
 //   delete              — { user_id }            -> { ok }   (FK cascades clean up profile/notifs/messages)
 //   upsert_school_admin — { school_id, email, name, password } -> { userId, reset }
+//   create_student_logins  — { class_id, student_ids? } -> { created, switched, skipped, existing }
+//                          Student-ID logins (no email needed): password = DOB as DDMMYYYY,
+//                          changed by the student on first login. Older email logins are
+//                          switched onto the Student ID (students sign in with it only).
+//   reset_student_password — { student_id } -> { ok }   back to the DOB, change required again
+//   create_parent_logins   — { school_id?, parent_ids? } -> { created, switched, skipped, existing }
+//                          Mobile-number logins: parents sign in with their registered mobile;
+//                          the first password is the first four letters of their name (first
+//                          one capital) + the first four digits of the mobile, e.g. Raje9876.
+//                          Changed by the parent on first login. Older email logins are switched.
+//   reset_parent_password  — { parent_id } -> { ok }   back to the first password (and onto the
+//                          current mobile number if it changed), change required again
 //
 // Caller authz: SUPER_ADMIN may act on any school; SCHOOL_ADMIN only within their own.
+// The two student actions are also open to the class teacher of the student's class.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
+// npm: rather than jsr: — the dashboard deployer's jsr.io manifest fetch can time out.
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 
@@ -56,6 +70,38 @@ function tempPassword(): string {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 16);
 }
 
+// Supabase Auth needs an email, so a Student ID login gets an internal address that is
+// never mailed (.invalid is reserved). The login page turns a typed Student ID into this.
+// Keep in sync with STUDENT_LOGIN_DOMAIN in frontend/src/lib/student-login.ts.
+const STUDENT_LOGIN_DOMAIN = "students.edunex.invalid";
+const studentLoginEmail = (code: string) => `${code.toLowerCase()}@${STUDENT_LOGIN_DOMAIN}`;
+
+/** "2016-03-14" -> "14032016" */
+function dobPassword(dob: string): string {
+  const [y, m, d] = dob.slice(0, 10).split("-");
+  return `${d}${m}${y}`;
+}
+
+// Parents sign in with their mobile number, stored the same way under its own domain.
+// Keep in sync with PARENT_LOGIN_DOMAIN in frontend/src/lib/parent-login.ts.
+const PARENT_LOGIN_DOMAIN = "parents.edunex.invalid";
+const parentLoginEmail = (phone: string) => `${phone}@${PARENT_LOGIN_DOMAIN}`;
+
+/** "+91 98765 43210" -> "9876543210"; null unless it is a 10-digit mobile number. */
+function cleanMobile(value: string | null): string | null {
+  let digits = String(value ?? "").replace(/\D/g, "");
+  if (digits.length > 10 && digits.startsWith("91")) digits = digits.slice(2);
+  if (digits.length > 10 && digits.startsWith("0")) digits = digits.slice(1);
+  return /^\d{10}$/.test(digits) ? digits : null;
+}
+
+/** ("Rajesh Kumar", "9876543210") -> "Raje9876"; null when the name gives too few letters. */
+function parentPassword(name: string, phone: string): string | null {
+  const letters = name.replace(/[^A-Za-z]/g, "").slice(0, 4);
+  const pw = letters.charAt(0).toUpperCase() + letters.slice(1).toLowerCase() + phone.slice(0, 4);
+  return pw.length >= 6 ? pw : null;
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -89,16 +135,25 @@ Deno.serve(async (req) => {
 
   const { data: callerProfile } = await admin
     .from("user_profiles")
-    .select("role, school_id")
+    .select("role, school_id, linked_teacher_id")
     .eq("id", user.id)
     .single();
   if (!callerProfile) return json({ error: "Forbidden" }, 403);
   const callerRole = callerProfile.role as Role;
   const callerSchool = callerProfile.school_id as string | null;
+  const callerTeacherId = callerProfile.linked_teacher_id as string | null;
 
   const canManageSchool = (schoolId: string | null) =>
     callerRole === "SUPER_ADMIN" ||
     (callerRole === "SCHOOL_ADMIN" && schoolId != null && schoolId === callerSchool);
+
+  /** School admins, plus the class teacher of this class, may manage its students' logins. */
+  const canManageClass = (cls: { school_id: string; class_teacher_id: string | null }) =>
+    canManageSchool(cls.school_id) ||
+    (callerRole === "TEACHER" &&
+      cls.school_id === callerSchool &&
+      callerTeacherId != null &&
+      cls.class_teacher_id === callerTeacherId);
 
   // Resolve the school a target login belongs to (for authz on the by-id actions).
   const targetSchool = async (userId: string): Promise<string | null | undefined> => {
@@ -277,6 +332,285 @@ Deno.serve(async (req) => {
         return json({ error: profileErr.message }, 400);
       }
       return json({ userId: created.user.id, reset: false }, 201);
+    }
+
+    if (action === "create_student_logins") {
+      const classId = body.class_id as string;
+      if (!classId) return json({ error: "class_id is required" }, 400);
+      const { data: cls } = await admin
+        .from("classes")
+        .select("id, school_id, class_teacher_id")
+        .eq("id", classId)
+        .single();
+      if (!cls) return json({ error: "Class not found" }, 404);
+      if (!canManageClass(cls)) {
+        return json({ error: "Only the class teacher or the school admin can create these logins" }, 403);
+      }
+
+      let query = admin
+        .from("students")
+        .select("id, name, dob, student_code")
+        .eq("class_id", classId)
+        .eq("school_id", cls.school_id);
+      const onlyIds = Array.isArray(body.student_ids) ? (body.student_ids as string[]) : null;
+      if (onlyIds?.length) query = query.in("id", onlyIds);
+      const { data: students, error: studentsErr } = await query;
+      if (studentsErr) return json({ error: studentsErr.message }, 400);
+
+      const ids = (students ?? []).map((s) => s.id as string);
+      const { data: existingProfiles } = ids.length
+        ? await admin
+            .from("user_profiles")
+            .select("id, email, linked_student_id")
+            .in("linked_student_id", ids)
+        : { data: [] };
+      const loginByStudent = new Map<string, { id: string; email: string }>(
+        (existingProfiles ?? []).map((p: Record<string, unknown>) => [
+          String(p.linked_student_id),
+          { id: String(p.id), email: String(p.email) },
+        ]),
+      );
+
+      const created: { student_id: string; name: string; student_code: string }[] = [];
+      const switched: { student_id: string; name: string; student_code: string }[] = [];
+      const skipped: { student_id: string; name: string; reason: string }[] = [];
+      let existing = 0;
+      for (const s of students ?? []) {
+        const login = loginByStudent.get(s.id);
+        if (login && login.email.endsWith(`@${STUDENT_LOGIN_DOMAIN}`)) {
+          existing++;
+          continue;
+        }
+        if (!s.student_code) {
+          skipped.push({ student_id: s.id, name: s.name, reason: "No Student ID yet" });
+          continue;
+        }
+        if (!s.dob) {
+          skipped.push({ student_id: s.id, name: s.name, reason: "Date of birth missing" });
+          continue;
+        }
+        const email = studentLoginEmail(s.student_code);
+
+        // Students sign in with their Student ID only: an older email login is moved onto
+        // the Student ID (same account and data) and its password goes back to the DOB.
+        if (login) {
+          const { error: moveErr } = await admin.auth.admin.updateUserById(login.id, {
+            email,
+            password: dobPassword(s.dob),
+            email_confirm: true,
+          });
+          if (moveErr) {
+            skipped.push({ student_id: s.id, name: s.name, reason: moveErr.message });
+            continue;
+          }
+          await admin
+            .from("user_profiles")
+            .update({ email, must_change_password: true })
+            .eq("id", login.id);
+          switched.push({ student_id: s.id, name: s.name, student_code: s.student_code });
+          continue;
+        }
+
+        const { data: authUser, error: createErr } = await admin.auth.admin.createUser({
+          email,
+          password: dobPassword(s.dob),
+          email_confirm: true,
+        });
+        if (createErr || !authUser.user) {
+          skipped.push({
+            student_id: s.id,
+            name: s.name,
+            reason: createErr?.message ?? "Could not create the login",
+          });
+          continue;
+        }
+        const { error: profileErr } = await admin.from("user_profiles").insert({
+          id: authUser.user.id,
+          school_id: cls.school_id,
+          role: "STUDENT",
+          name: s.name,
+          email,
+          linked_student_id: s.id,
+          must_change_password: true,
+        });
+        if (profileErr) {
+          await admin.auth.admin.deleteUser(authUser.user.id);
+          skipped.push({ student_id: s.id, name: s.name, reason: profileErr.message });
+          continue;
+        }
+        created.push({ student_id: s.id, name: s.name, student_code: s.student_code });
+      }
+      return json({ created, switched, skipped, existing });
+    }
+
+    if (action === "reset_student_password") {
+      const studentId = body.student_id as string;
+      if (!studentId) return json({ error: "student_id is required" }, 400);
+      const { data: student } = await admin
+        .from("students")
+        .select("id, school_id, class_id, dob")
+        .eq("id", studentId)
+        .single();
+      if (!student) return json({ error: "Student not found" }, 404);
+      const { data: cls } = student.class_id
+        ? await admin
+            .from("classes")
+            .select("school_id, class_teacher_id")
+            .eq("id", student.class_id)
+            .single()
+        : { data: null };
+      const allowed = cls ? canManageClass(cls) : canManageSchool(student.school_id);
+      if (!allowed) return json({ error: "Forbidden" }, 403);
+      if (!student.dob) return json({ error: "Add the student's date of birth first" }, 400);
+
+      const { data: login } = await admin
+        .from("user_profiles")
+        .select("id")
+        .eq("linked_student_id", studentId)
+        .maybeSingle();
+      if (!login) return json({ error: "This student has no login yet" }, 404);
+      const { error: pwErr } = await admin.auth.admin.updateUserById(login.id, {
+        password: dobPassword(student.dob),
+      });
+      if (pwErr) return json({ error: pwErr.message }, 400);
+      await admin.from("user_profiles").update({ must_change_password: true }).eq("id", login.id);
+      return json({ ok: true });
+    }
+
+    if (action === "create_parent_logins") {
+      const schoolId = (body.school_id as string | undefined) ?? callerSchool;
+      if (!schoolId || !canManageSchool(schoolId)) return json({ error: "Forbidden" }, 403);
+
+      let query = admin.from("parents").select("id, name, phone").eq("school_id", schoolId);
+      const onlyIds = Array.isArray(body.parent_ids) ? (body.parent_ids as string[]) : null;
+      if (onlyIds?.length) query = query.in("id", onlyIds);
+      const { data: parents, error: parentsErr } = await query;
+      if (parentsErr) return json({ error: parentsErr.message }, 400);
+
+      const ids = (parents ?? []).map((p) => p.id as string);
+      const { data: existingProfiles } = ids.length
+        ? await admin
+            .from("user_profiles")
+            .select("id, email, linked_parent_id")
+            .in("linked_parent_id", ids)
+        : { data: [] };
+      const loginByParent = new Map<string, { id: string; email: string }>(
+        (existingProfiles ?? []).map((p: Record<string, unknown>) => [
+          String(p.linked_parent_id),
+          { id: String(p.id), email: String(p.email) },
+        ]),
+      );
+
+      const created: { parent_id: string; name: string; phone: string }[] = [];
+      const switched: { parent_id: string; name: string; phone: string }[] = [];
+      const skipped: { parent_id: string; name: string; reason: string }[] = [];
+      let existing = 0;
+      for (const p of parents ?? []) {
+        const login = loginByParent.get(p.id);
+        if (login && login.email.endsWith(`@${PARENT_LOGIN_DOMAIN}`)) {
+          existing++;
+          continue;
+        }
+        const phone = cleanMobile(p.phone);
+        if (!phone) {
+          skipped.push({ parent_id: p.id, name: p.name, reason: "No valid 10-digit mobile number" });
+          continue;
+        }
+        const password = parentPassword(p.name, phone);
+        if (!password) {
+          skipped.push({ parent_id: p.id, name: p.name, reason: "Name has fewer than 2 letters" });
+          continue;
+        }
+        const email = parentLoginEmail(phone);
+
+        // Parents sign in with their mobile number: an older email login is moved onto it
+        // (same account and data) and its password goes back to the first password.
+        if (login) {
+          const { error: moveErr } = await admin.auth.admin.updateUserById(login.id, {
+            email,
+            password,
+            email_confirm: true,
+          });
+          if (moveErr) {
+            skipped.push({ parent_id: p.id, name: p.name, reason: moveErr.message });
+            continue;
+          }
+          await admin
+            .from("user_profiles")
+            .update({ email, must_change_password: true })
+            .eq("id", login.id);
+          switched.push({ parent_id: p.id, name: p.name, phone });
+          continue;
+        }
+
+        const { data: authUser, error: createErr } = await admin.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+        });
+        if (createErr || !authUser.user) {
+          skipped.push({
+            parent_id: p.id,
+            name: p.name,
+            reason: /already|registered|exists/i.test(createErr?.message ?? "")
+              ? "This mobile number is already used by another login"
+              : (createErr?.message ?? "Could not create the login"),
+          });
+          continue;
+        }
+        const { error: profileErr } = await admin.from("user_profiles").insert({
+          id: authUser.user.id,
+          school_id: schoolId,
+          role: "PARENT",
+          name: p.name,
+          email,
+          linked_parent_id: p.id,
+          must_change_password: true,
+        });
+        if (profileErr) {
+          await admin.auth.admin.deleteUser(authUser.user.id);
+          skipped.push({ parent_id: p.id, name: p.name, reason: profileErr.message });
+          continue;
+        }
+        created.push({ parent_id: p.id, name: p.name, phone });
+      }
+      return json({ created, switched, skipped, existing });
+    }
+
+    if (action === "reset_parent_password") {
+      const parentId = body.parent_id as string;
+      if (!parentId) return json({ error: "parent_id is required" }, 400);
+      const { data: parent } = await admin
+        .from("parents")
+        .select("id, school_id, name, phone")
+        .eq("id", parentId)
+        .single();
+      if (!parent) return json({ error: "Parent not found" }, 404);
+      if (!canManageSchool(parent.school_id)) return json({ error: "Forbidden" }, 403);
+      const phone = cleanMobile(parent.phone);
+      if (!phone) return json({ error: "Add the parent's 10-digit mobile number first" }, 400);
+      const password = parentPassword(parent.name, phone);
+      if (!password) return json({ error: "The parent's name needs at least 2 letters" }, 400);
+
+      const { data: login } = await admin
+        .from("user_profiles")
+        .select("id")
+        .eq("linked_parent_id", parentId)
+        .maybeSingle();
+      if (!login) return json({ error: "This parent has no login yet" }, 404);
+      // Also moves the login onto the current mobile number, in case it was edited.
+      const email = parentLoginEmail(phone);
+      const { error: pwErr } = await admin.auth.admin.updateUserById(login.id, {
+        email,
+        password,
+        email_confirm: true,
+      });
+      if (pwErr) return json({ error: pwErr.message }, 400);
+      await admin
+        .from("user_profiles")
+        .update({ email, must_change_password: true })
+        .eq("id", login.id);
+      return json({ ok: true });
     }
 
     return json({ error: `Unknown action: ${action}` }, 400);

@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { cleanPhone, isValidPhone } from "./phone";
+import { formatName } from "./utils";
 
 export class ApiError extends Error {
   status: number;
@@ -561,7 +562,40 @@ function parse(path: string) {
 
 async function get<T>(path: string): Promise<T> {
   const { parts, search } = parse(path);
-  return cleanPhonesDeep(await read(parts, search)) as T;
+  const data = cleanPhonesDeep(await read(parts, search));
+  return formatNames(data, PERSON_RESOURCES.has(parts[0] ?? "")) as T;
+}
+
+// People's names are typed in any case ("SHREY", "daksh"); every screen shows them in Title
+// Case. A plain `name` is only a person on these resources (elsewhere it's a class, subject…).
+const PERSON_RESOURCES = new Set([
+  "students",
+  "teachers",
+  "staff",
+  "parents",
+  "users",
+  "school-admins",
+  "student-logins",
+  "transport-drivers",
+  "transport-attendants",
+]);
+const PERSON_NAME_KEY =
+  /^(applicant|(teacher|student|parent|guardian|person|contact|author|actor|borrower|invigilator|class_teacher|driver|attendant|requester|created_by|collected_by|changed_by|verified_by|uploaded_by|refunded_by|marked_by)_name)$/;
+
+function formatNames(value: unknown, topLevelName: boolean): unknown {
+  if (Array.isArray(value)) return value.map((item) => formatNames(item, topLevelName));
+  if (!value || typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) {
+    return value;
+  }
+  const out: Row = {};
+  for (const [key, item] of Object.entries(value as Row)) {
+    const isName = PERSON_NAME_KEY.test(key) || (topLevelName && key === "name");
+    out[key] =
+      isName && typeof item === "string" && item.trim()
+        ? formatName(item)
+        : formatNames(item, false);
+  }
+  return out;
 }
 
 // Older rows may hold numbers saved as "+91…"; every screen shows the plain 10-digit form.
@@ -587,6 +621,14 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
   switch (resource) {
     case "roles":
       return rpc("get_school_role_matrix");
+
+    // Student-ID logins of one class (class teacher or school admin).
+    case "student-logins":
+      return rpc("class_student_logins", { p_class_id: param("classId") });
+
+    // Super Admin header search across every school (students, teachers, staff).
+    case "platform-search":
+      return rpc("platform_search_people", { p_query: param("q") ?? "", p_limit: 8 });
 
     // Lets the UI hide actions the signed-in user's role has been switched off for.
     case "permissions":
@@ -779,7 +821,8 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
             current.linked_teacher_id ?? "00000000-0000-0000-0000-000000000000",
           );
         }
-        if (resource === "staff" && current.role === "STAFF") {
+        // Accountants are the exception: they run payroll for every staff member.
+        if (resource === "staff" && current.role === "STAFF" && current.department !== "ACCOUNTS") {
           query = query.eq("id", current.linked_staff_id ?? "00000000-0000-0000-0000-000000000000");
         }
         const department = param("department");
@@ -1639,7 +1682,22 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
 
 async function mutate<T>(method: Method, path: string, body?: unknown): Promise<T> {
   const { parts } = parse(path);
-  return (await write(method, parts, normalizePhones((body ?? {}) as Row))) as T;
+  const named = normalizeNames(normalizePhones((body ?? {}) as Row), parts[0] ?? "");
+  return (await write(method, parts, named)) as T;
+}
+
+// Names are saved the way they're shown, so the stored data stays consistent too.
+function normalizeNames(body: Row, resource: string): Row {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return body;
+  const out: Row = { ...body };
+  for (const [key, value] of Object.entries(out)) {
+    if (typeof value !== "string" || !value.trim()) continue;
+    const snake = key.replace(/[A-Z]/g, (ch) => `_${ch.toLowerCase()}`);
+    if (PERSON_NAME_KEY.test(snake) || (key === "name" && PERSON_RESOURCES.has(resource))) {
+      out[key] = formatName(value);
+    }
+  }
+  return out;
 }
 
 // Every phone field (phone, driverPhone, contactPhone, …) is a 10-digit mobile number with no
@@ -1663,6 +1721,43 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
   switch (resource) {
     case "auth":
       if (second === "password" && method === "PATCH") return changePassword(values());
+      // The forced first-login change is done: stop asking for it.
+      if (second === "complete-password-change" && method === "POST") {
+        await rpc("complete_password_change");
+        return { ok: true };
+      }
+      break;
+
+    case "student-logins":
+      if (method === "POST" && second === "create") {
+        return invokeFunction("manage-user-login", {
+          action: "create_student_logins",
+          class_id: body["classId"],
+          ...(Array.isArray(body["studentIds"]) ? { student_ids: body["studentIds"] } : {}),
+        });
+      }
+      if (method === "POST" && second && third === "reset") {
+        return invokeFunction("manage-user-login", {
+          action: "reset_student_password",
+          student_id: second,
+        });
+      }
+      break;
+
+    // Mobile-number logins for parents (school admin).
+    case "parent-logins":
+      if (method === "POST" && second === "create") {
+        return invokeFunction("manage-user-login", {
+          action: "create_parent_logins",
+          ...(Array.isArray(body["parentIds"]) ? { parent_ids: body["parentIds"] } : {}),
+        });
+      }
+      if (method === "POST" && second && third === "reset") {
+        return invokeFunction("manage-user-login", {
+          action: "reset_parent_password",
+          parent_id: second,
+        });
+      }
       break;
 
     case "users":
@@ -1737,7 +1832,7 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
             phone: input["phone"] ?? null,
             email: input["email"] ?? null,
             status: "TRIAL",
-            plan: input["plan"] || "Basic",
+            plan: input["plan"] || (await defaultPlanName()),
             billing_cycle: input["billing_cycle"] || "MONTHLY",
             payment_status: "PENDING",
             subscription_started_at: new Date().toISOString(),
@@ -1904,7 +1999,7 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
       if (method === "POST" && second && third === "convert") {
         const schoolId = await rpc<string>("convert_lead", {
           p_lead_id: second,
-          p_plan: str(body["plan"]) || "Basic",
+          p_plan: str(body["plan"]) || (await defaultPlanName()),
           p_billing_cycle: str(body["billingCycle"]) || "MONTHLY",
         });
         return { schoolId };
@@ -2416,7 +2511,9 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
           if (data?.length)
             throw new ApiError(409, "A guardian with this email or phone already exists");
         }
-        return insertRow("parents", { name, email, phone });
+        const created = await insertRow("parents", { name, email, phone });
+        await autoCreateParentLogin(str(created["id"]));
+        return created;
       }
       break;
 
@@ -2726,6 +2823,19 @@ function blanksToNull(values: Row) {
   ) as Row;
 }
 
+/** Cheapest active plan, used when a new school is created without one. */
+async function defaultPlanName() {
+  const { data } = await supabase
+    .from("plans")
+    .select("name")
+    .eq("status", "ACTIVE")
+    .order("price")
+    .limit(1)
+    .maybeSingle();
+  // Only an empty plans table falls back to the old hard-coded name.
+  return (data?.name as string | undefined) ?? "Basic";
+}
+
 async function changePassword(values: Row) {
   const currentPassword = values["current_password"];
   const newPassword = values["new_password"];
@@ -2791,6 +2901,17 @@ async function manageLogin(
       throw new ApiError(400, "A name is required to create a login");
     }
     if (!values["school_id"]) throw new ApiError(400, "A school is required to create a login");
+    // Parents always sign in with their registered mobile number, never an email.
+    if (values["role"] === "PARENT" && typeof values["linked_id"] === "string") {
+      const result = await invokeFunction("manage-user-login", {
+        action: "create_parent_logins",
+        school_id: values["school_id"],
+        parent_ids: [values["linked_id"]],
+      });
+      const skipped = (result["skipped"] as { reason: string }[] | undefined)?.[0];
+      if (skipped) throw new ApiError(400, skipped.reason);
+      return { ok: true, mobileLogin: true };
+    }
     const created = await invokeFunction("manage-user-login", { ...values, action: "create" });
     return { ...created, id: created["userId"] };
   }
@@ -2943,6 +3064,47 @@ async function deleteStudent(studentId: string) {
   return { archived: false };
 }
 
+/**
+ * New admissions get their Student-ID login straight away when they already have a class
+ * and a date of birth. Best effort: if it can't be made now (no DOB yet, function not
+ * deployed), the class teacher's "Create logins" picks the student up later.
+ */
+async function autoCreateStudentLogin(studentId: string) {
+  if (!studentId) return;
+  try {
+    const { data } = await supabase
+      .from("students")
+      .select("class_id,dob")
+      .eq("id", studentId)
+      .maybeSingle();
+    if (!data?.class_id || !data.dob) return;
+    await invokeFunction("manage-user-login", {
+      action: "create_student_logins",
+      class_id: data.class_id,
+      student_ids: [studentId],
+    });
+  } catch {
+    // Never block saving the student over the login.
+  }
+}
+
+/**
+ * New parents get their mobile-number login straight away (first password: four name
+ * letters + four mobile digits). Best effort: without a mobile number, or if the function
+ * isn't deployed, the admin's "Create logins" on the Parents page picks them up later.
+ */
+async function autoCreateParentLogin(parentId: string) {
+  if (!parentId) return;
+  try {
+    await invokeFunction("manage-user-login", {
+      action: "create_parent_logins",
+      parent_ids: [parentId],
+    });
+  } catch {
+    // Never block saving the parent over the login.
+  }
+}
+
 // Students form: the class decides class_name/section/academic year (database trigger), and a
 // chosen parent becomes the student's primary guardian link.
 async function saveStudent(method: "POST" | "PATCH", id: string | undefined, input: Row) {
@@ -3015,6 +3177,7 @@ async function saveStudent(method: "POST" | "PATCH", id: string | undefined, inp
   if (method === "POST") {
     if (!("name" in row)) throw new ApiError(400, "A valid name is required");
     const created = await insertRow("students", row);
+    await autoCreateStudentLogin(str(created["id"]));
     if (parentId) {
       await rpc("link_guardian", {
         p_parent_id: parentId,
@@ -3419,6 +3582,14 @@ async function mutateAdmission(method: Method, parts: string[], body: unknown): 
       p_admission_id: admissionId,
     });
     if (error) fail(error);
+    await autoCreateStudentLogin(str(data.id));
+    // Converting may create the parent record too; give it its mobile login.
+    const { data: enrolled } = await supabase
+      .from("students")
+      .select("parent_id")
+      .eq("id", str(data.id))
+      .maybeSingle();
+    if (enrolled?.parent_id) await autoCreateParentLogin(str(enrolled.parent_id));
     return { studentId: data.id, admissionNo: data.admission_no };
   }
 

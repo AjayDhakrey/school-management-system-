@@ -38,6 +38,9 @@ const Reports = lazy(() => import("@/app/reports"));
 const Results = lazy(() => import("@/app/results"));
 const RolesPage = lazy(() => import("@/app/roles"));
 const SettingsPage = lazy(() => import("@/app/settings"));
+const AppSettings = lazy(() => import("@/app/app-settings"));
+const MyProfile = lazy(() => import("@/app/my-profile"));
+const StudentLogins = lazy(() => import("@/app/student-logins"));
 const Teachers = lazy(() => import("@/app/teachers"));
 const Certificates = lazy(() => import("@/app/certificates"));
 const Timetable = lazy(() => import("@/app/timetable"));
@@ -87,6 +90,7 @@ const SuperAdminSchoolDetail = lazy(() => import("@/app/super-admin/schools/scho
 const SuperAdminSubscriptions = lazy(() => import("@/app/super-admin/subscriptions"));
 const SuperAdminPlans = lazy(() => import("@/app/super-admin/plans"));
 const SuperAdminSettings = lazy(() => import("@/app/super-admin/settings"));
+const SuperAdminNotifications = lazy(() => import("@/app/super-admin/notifications"));
 const SuperAdminSchoolAdmins = lazy(() => import("@/app/super-admin/school-admins"));
 const SuperAdminLeads = lazy(() => import("@/app/super-admin/leads"));
 const SuperAdminRevenue = lazy(() => import("@/app/super-admin/revenue"));
@@ -291,6 +295,20 @@ export default function App() {
                   <Route path="/results" element={guarded("/results", <Results />)} />
                   <Route path="/roles" element={guarded("/roles", <RolesPage />)} />
                   <Route path="/settings" element={guarded("/settings", <SettingsPage />)} />
+                  {/* Personal app preferences — open to every signed-in role. */}
+                  <Route path="/app-settings" element={guarded("/app-settings", <AppSettings />)} />
+                  <Route
+                    path="/student-logins"
+                    element={guarded("/student-logins", <StudentLogins />)}
+                  />
+                  <Route
+                    path="/my-profile"
+                    element={
+                      <RequireRole roles={["Super Admin", "School Admin"]}>
+                        <MyProfile />
+                      </RequireRole>
+                    }
+                  />
                   <Route
                     path="/teaching-staff"
                     element={guarded(
@@ -413,6 +431,14 @@ export default function App() {
                     element={
                       <RequireRole roles={["Super Admin"]}>
                         <SuperAdminPlans />
+                      </RequireRole>
+                    }
+                  />
+                  <Route
+                    path="/super-admin/notifications"
+                    element={
+                      <RequireRole roles={["Super Admin"]}>
+                        <SuperAdminNotifications />
                       </RequireRole>
                     }
                   />

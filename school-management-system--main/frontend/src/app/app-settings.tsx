@@ -26,6 +26,8 @@ import { PROFILE_PATH_FOR_ROLE } from "@/lib/navigation";
 import { useMyPhotoUrl } from "@/hooks/useMyPhotoUrl";
 import { useSchoolProfile } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { mobileFromEmail } from "@/lib/parent-login";
+import { studentIdFromEmail } from "@/lib/student-login";
 import { cn } from "@/lib/utils";
 
 /** One labelled row: text on the left, its control on the right (stacked on phones). */
@@ -140,11 +142,20 @@ function PasswordField({
 }
 
 function ChangePasswordForm() {
+  const { user, refreshUser } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const mismatch = confirmPassword.length > 0 && confirmPassword !== newPassword;
+  // Still on the starting password the school gave out: remind them what it is.
+  const firstPasswordRule = !user?.mustChangePassword
+    ? null
+    : mobileFromEmail(user.email)
+      ? "the first four letters of your name (first one capital) followed by the first four digits of your mobile number"
+      : studentIdFromEmail(user.email)
+        ? "your date of birth (DDMMYYYY)"
+        : null;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -159,6 +170,11 @@ function ChangePasswordForm() {
     setSubmitting(true);
     try {
       await api.patch("/auth/password", { currentPassword, newPassword });
+      if (user?.mustChangePassword) {
+        // Marks the starting password as replaced (shown to admins on the login lists).
+        await api.post("/auth/complete-password-change", {});
+        await refreshUser();
+      }
       toast.success("Password updated");
       setCurrentPassword("");
       setNewPassword("");
@@ -172,6 +188,11 @@ function ChangePasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="grid max-w-md gap-4">
+      {firstPasswordRule && (
+        <p className="rounded-xl bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
+          Your current password is {firstPasswordRule}.
+        </p>
+      )}
       <PasswordField
         id="current-password"
         label="Current password"

@@ -1721,7 +1721,7 @@ async function write(method: Method, parts: string[], body: Row): Promise<unknow
   switch (resource) {
     case "auth":
       if (second === "password" && method === "PATCH") return changePassword(values());
-      // The forced first-login change is done: stop asking for it.
+      // The starting password has been replaced from Settings.
       if (second === "complete-password-change" && method === "POST") {
         await rpc("complete_password_change");
         return { ok: true };

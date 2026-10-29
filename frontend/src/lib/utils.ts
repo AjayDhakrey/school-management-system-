@@ -19,3 +19,12 @@ export function withClassPrefix(name: string) {
   const trimmed = name.trim();
   return /^class\b/i.test(trimmed) ? trimmed : `Class ${trimmed}`;
 }
+
+/** People's names as typed in any case → "Title Case": "SHREY kumar" → "Shrey Kumar". */
+export function formatName(name: string | null | undefined) {
+  return String(name ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/(^|[\s\-'.])(\p{L})/gu, (_, sep: string, ch: string) => sep + ch.toUpperCase());
+}

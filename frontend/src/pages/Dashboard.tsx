@@ -72,6 +72,8 @@ import {
   useNotices,
   useExams,
   useTimetable,
+  useTeachers,
+  useClasses,
   useSchools,
   useAttendance,
   useResults,
@@ -669,9 +671,7 @@ function AccountantDashboard() {
             <span className="block font-display text-lg leading-tight font-bold">
               ₹{pendingFeeTotal.toLocaleString()}
             </span>
-            <span className="block truncate text-[11px] text-muted-foreground">
-              Fees
-            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">Fees</span>
           </span>
         </Link>
 
@@ -687,9 +687,7 @@ function AccountantDashboard() {
             <span className="block font-display text-lg leading-tight font-bold">
               {attendanceRate}%
             </span>
-            <span className="block truncate text-[11px] text-muted-foreground">
-              Attendance
-            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">Attendance</span>
           </span>
         </Link>
 
@@ -705,9 +703,7 @@ function AccountantDashboard() {
             <span className="block font-display text-lg leading-tight font-bold">
               {holidayCount} Days
             </span>
-            <span className="block truncate text-[11px] text-muted-foreground">
-              Holiday
-            </span>
+            <span className="block truncate text-[11px] text-muted-foreground">Holiday</span>
           </span>
         </Link>
       </div>
@@ -1046,6 +1042,8 @@ function SchoolDashboard() {
   const [openNotice, setOpenNotice] = useState<ApiNotice | null>(null);
   const { data: exams } = useExams(canExams);
   const { data: todaySlots } = useTimetable(canTimetable);
+  const { data: teachers } = useTeachers(canTimetable && canView(user, "teachers"));
+  const { data: classes } = useClasses(canTimetable && canView(user, "classes"));
   const { data: holidays } = useHolidays();
   const { periods: schoolPeriods } = useSchoolTimings();
 
@@ -1053,6 +1051,26 @@ function SchoolDashboard() {
   const today = (todaySlots ?? [])
     .filter((s) => s.day === todayDay)
     .sort((a, b) => a.period - b.period);
+
+  // Today's periods grouped by the teacher taking them; unassigned periods go last.
+  const teacherName = new Map((teachers ?? []).map((t) => [t.id, t.name]));
+  const classLabel = new Map((classes ?? []).map((c) => [c.id, `${c.name}-${c.section}`]));
+  const scheduleByTeacher = Array.from(
+    // Breaks are timetable slots too, but nobody teaches them — leave them out.
+    today
+      .filter((slot) => slot.subject?.trim().toLowerCase() !== "break")
+      .reduce((groups, slot) => {
+        const key = slot.teacher_id ?? "";
+        groups.set(key, [...(groups.get(key) ?? []), slot]);
+        return groups;
+      }, new Map<string, typeof today>()),
+  )
+    .map(([teacherId, slots]) => ({
+      teacherId,
+      name: teacherId ? (teacherName.get(teacherId) ?? "Unknown teacher") : "No teacher assigned",
+      slots,
+    }))
+    .sort((a, b) => (!a.teacherId ? 1 : !b.teacherId ? -1 : a.name.localeCompare(b.name)));
 
   const upcomingHolidays = (holidays ?? [])
     .filter((h) => new Date(h.date) >= new Date(new Date().toISOString().slice(0, 10)))
@@ -1283,24 +1301,53 @@ function SchoolDashboard() {
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
-        <SectionCard title="Today's Classes" subtitle={todayDay} bodyClassName="space-y-2">
-          {today.length === 0 ? (
+        <SectionCard
+          title="Today's Teaching Schedule"
+          subtitle={`${todayDay} · who teaches which class`}
+          bodyClassName="scrollbar-slim max-h-[26rem] space-y-2.5 overflow-y-auto"
+        >
+          {scheduleByTeacher.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
               No classes scheduled today.
             </p>
           ) : (
-            today.slice(0, 5).map((slot) => (
+            scheduleByTeacher.map((group) => (
               <div
-                key={slot.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2"
+                key={group.teacherId || "unassigned"}
+                className="rounded-xl border border-border px-3 py-2.5"
               >
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{slot.subject}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">Period {slot.period}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p
+                    className={cn(
+                      "truncate text-sm font-semibold",
+                      !group.teacherId && "text-destructive",
+                    )}
+                  >
+                    {group.name}
+                  </p>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {group.slots.length} {group.slots.length === 1 ? "period" : "periods"}
+                  </span>
                 </div>
-                <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
-                  {schoolPeriods[slot.period - 1]?.time}
-                </span>
+                <ul className="mt-1.5 space-y-1">
+                  {group.slots.map((slot) => (
+                    <li key={slot.id} className="flex items-baseline gap-2 text-[12px]">
+                      <span className="w-8 shrink-0 font-semibold text-primary">
+                        P{slot.period}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">
+                        <span className="font-medium">{slot.subject ?? "—"}</span>
+                        <span className="text-muted-foreground">
+                          {" · "}
+                          {(slot.class_id && classLabel.get(slot.class_id)) ?? "Class —"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {schoolPeriods[slot.period - 1]?.time}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))
           )}

@@ -1,8 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { LogOut, MoreVertical, User } from "lucide-react";
+import { LogOut, MoreVertical, Settings, User } from "lucide-react";
 import { useApp } from "@/lib/app-context";
 import { useAuth, toDisplayRole } from "@/lib/auth-context";
-import { navForRole, PROFILE_PATH_FOR_ROLE } from "@/lib/navigation";
+import { APP_SETTINGS_PATH, navForRole, PROFILE_PATH_FOR_ROLE } from "@/lib/navigation";
 import { useSchoolBranding } from "@/hooks/use-school-branding";
 import { cn } from "@/lib/utils";
 import { AccountAvatar } from "@/components/shared/AccountAvatar";
@@ -26,6 +26,14 @@ export function SidebarNav({
   const { user } = useAuth();
   const { pathname } = useLocation();
   const groups = navForRole(toDisplayRole(user));
+  // Highlight only the most specific matching link, so /transport/drivers lights up
+  // "Drivers & Attendants" and not its parent "Transport" as well.
+  const activeTo = groups
+    .flatMap((g) => g.items.map((i) => i.to))
+    .filter((to) =>
+      to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`),
+    )
+    .sort((a, b) => b.length - a.length)[0];
 
   return (
     <nav
@@ -40,7 +48,7 @@ export function SidebarNav({
           <div key={g.label || gi}>
             <ul className="space-y-0.5">
               {g.items.map((item) => {
-                const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+                const active = item.to === activeTo;
                 return (
                   <li key={item.to}>
                     <Link
@@ -145,7 +153,7 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "hidden h-full shrink-0 flex-col overflow-hidden border-r border-border/80 bg-card text-foreground transition-[width] duration-200 lg:flex",
+        "glass-bar hidden h-full shrink-0 flex-col overflow-hidden border-r border-white/60 text-foreground dark:border-border/60 transition-[width] duration-200 lg:flex",
         collapsed ? "w-[76px]" : "w-[248px]",
       )}
     >
@@ -177,7 +185,14 @@ export function AppSidebar() {
               <DropdownMenuContent align="end" className="w-44">
                 <DropdownMenuItem asChild>
                   <Link to={profilePath}>
-                    <User className="mr-2 h-4 w-4" />Profile
+                    <User className="mr-2 h-4 w-4" />
+                    My Profile
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to={APP_SETTINGS_PATH}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={handleSignOut}>

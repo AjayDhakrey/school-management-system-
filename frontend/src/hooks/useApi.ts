@@ -706,12 +706,7 @@ export interface ApiTransportMaintenance {
 }
 
 export type TransportComplaintCategory =
-  | "Safety"
-  | "Delay"
-  | "Behavior"
-  | "Cleanliness"
-  | "Emergency"
-  | "Other";
+  "Safety" | "Delay" | "Behavior" | "Cleanliness" | "Emergency" | "Other";
 
 export interface ApiTransportComplaint {
   id: string;
@@ -1058,6 +1053,20 @@ export const useStudents = (
   const suffix = params.toString();
   return useApiQuery<ApiStudent[]>("students", `/students${suffix ? `?${suffix}` : ""}`, enabled);
 };
+export interface ApiPlatformPerson {
+  kind: "STUDENT" | "TEACHER" | "STAFF";
+  id: string;
+  name: string;
+  detail: string | null;
+  school_id: string;
+  school_name: string;
+}
+export const usePlatformPeopleSearch = (query: string, enabled = true) =>
+  useApiQuery<ApiPlatformPerson[]>(
+    "platform-search",
+    `/platform-search?q=${encodeURIComponent(query)}`,
+    enabled && query.length > 0,
+  );
 export const useStudent = (id: string | undefined) =>
   useApiQuery<ApiStudent>(`student-${id}`, `/students/${id}`, Boolean(id));
 export const useMyStudentProfile = (enabled = true) =>
@@ -1280,7 +1289,11 @@ export const useFeePayments = (studentId?: string, enabled = true) =>
     enabled,
   );
 export const useFeePaymentsForFee = (feeId?: string) =>
-  useApiQuery<ApiFeePayment[]>(`fee-payments-for-${feeId ?? "none"}`, `/fees/${feeId}/payments`, !!feeId);
+  useApiQuery<ApiFeePayment[]>(
+    `fee-payments-for-${feeId ?? "none"}`,
+    `/fees/${feeId}/payments`,
+    !!feeId,
+  );
 export const useFeeRefunds = (feePaymentId?: string, enabled = true) =>
   useApiQuery<ApiFeeRefund[]>(
     `fee-refunds-${feePaymentId ?? "all"}`,
@@ -1289,9 +1302,12 @@ export const useFeeRefunds = (feePaymentId?: string, enabled = true) =>
   );
 export const useExpenseCategories = (enabled = true) =>
   useApiQuery<ApiExpenseCategory[]>("expense-categories", "/expense-categories", enabled);
-export const useVendors = (enabled = true) => useApiQuery<ApiVendor[]>("vendors", "/vendors", enabled);
-export const useExpenses = (enabled = true) => useApiQuery<ApiExpense[]>("expenses", "/expenses", enabled);
-export const useInvoices = (enabled = true) => useApiQuery<ApiInvoice[]>("invoices", "/invoices", enabled);
+export const useVendors = (enabled = true) =>
+  useApiQuery<ApiVendor[]>("vendors", "/vendors", enabled);
+export const useExpenses = (enabled = true) =>
+  useApiQuery<ApiExpense[]>("expenses", "/expenses", enabled);
+export const useInvoices = (enabled = true) =>
+  useApiQuery<ApiInvoice[]>("invoices", "/invoices", enabled);
 export const useFinancialSettings = (enabled = true) =>
   useApiQuery<ApiFinancialSettings>("financial-settings", "/financial-settings", enabled);
 export const useFinancialAuditLog = (enabled = true) =>
@@ -1363,6 +1379,8 @@ export interface ApiUser {
   linked_teacher_id: string | null;
   linked_parent_id: string | null;
   linked_student_id: string | null;
+  /** Still on a first password (Student ID / parent mobile logins); older databases omit it. */
+  must_change_password?: boolean;
   created_at: string;
 }
 
@@ -1385,6 +1403,25 @@ export interface ApiRolesResponse {
 }
 
 export const useUsers = (enabled = true) => useApiQuery<ApiUser[]>("users", "/users", enabled);
+/** One student's Student-ID login status (class teacher / school admin view). */
+export interface ApiStudentLogin {
+  student_id: string;
+  name: string;
+  roll: number | null;
+  admission_no: string | null;
+  student_code: string | null;
+  dob: string | null;
+  has_login: boolean;
+  /** False when the student signs in with a real email instead of their Student ID. */
+  login_is_student_id: boolean;
+  must_change_password: boolean;
+}
+export const useStudentLogins = (classId: string | undefined) =>
+  useApiQuery<ApiStudentLogin[]>(
+    `student-logins-${classId ?? "none"}`,
+    `/student-logins?classId=${classId}`,
+    Boolean(classId),
+  );
 export const useRoles = (enabled = true) =>
   useApiQuery<ApiRolesResponse>("roles", "/roles", enabled);
 

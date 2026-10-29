@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { parentFirstPassword } from "@/lib/parent-login";
 import {
   Dialog,
   DialogContent,
@@ -113,10 +114,9 @@ export function StudentFormDialog({
   const [newParentPhone, setNewParentPhone] = useState("");
   const [newParentEmail, setNewParentEmail] = useState("");
 
-  // Student + parent portal logins created together (e.g. for a brand-new family) share one
-  // password field — only the emails differ, since that's what actually distinguishes the accounts.
+  // A new parent with a mobile number gets a mobile-number login automatically (see
+  // parentFirstPassword); the password field below is only for the student's email login.
   const [createStudentLogin, setCreateStudentLogin] = useState(false);
-  const [createParentLogin, setCreateParentLogin] = useState(false);
   const [portalPassword, setPortalPassword] = useState("");
   const [showPortalPassword, setShowPortalPassword] = useState(false);
 
@@ -150,22 +150,15 @@ export function StudentFormDialog({
     const trimmedParentName = newParentName.trim();
     const trimmedParentPhone = newParentPhone.trim();
     const trimmedParentEmail = newParentEmail.trim();
-    const willCreateParentLogin = parentMode === "new" && trimmedParentName && createParentLogin;
-    if (parentMode === "new" && trimmedParentName) {
-      if (!trimmedParentPhone && !trimmedParentEmail) {
-        toast.error("Enter the parent's mobile number or email");
-        return;
-      }
-      if (createParentLogin && !trimmedParentEmail) {
-        toast.error("Email is required to create a parent portal login");
-        return;
-      }
+    if (parentMode === "new" && trimmedParentName && !trimmedParentPhone && !trimmedParentEmail) {
+      toast.error("Enter the parent's mobile number or email");
+      return;
     }
     if (createStudentLogin && !email) {
       toast.error("Add the student's email above to create a student portal login");
       return;
     }
-    if ((willCreateParentLogin || createStudentLogin) && portalPassword.length < 6) {
+    if (createStudentLogin && portalPassword.length < 6) {
       toast.error("Portal password must be at least 6 characters");
       return;
     }
@@ -184,16 +177,8 @@ export function StudentFormDialog({
           email: trimmedParentEmail || null,
         });
         resolvedParentId = createdParent.id;
-        if (createParentLogin) {
-          await api.post("/users", {
-            role: "PARENT",
-            linkedId: createdParent.id,
-            name: trimmedParentName,
-            email: trimmedParentEmail,
-            password: portalPassword,
-          });
-          queryClient.invalidateQueries({ queryKey: ["users"] });
-        }
+        // Creating the parent also made their mobile-number login (when a mobile was given).
+        queryClient.invalidateQueries({ queryKey: ["users"] });
         queryClient.invalidateQueries({ queryKey: ["parents"] });
       }
 
@@ -509,10 +494,14 @@ export function StudentFormDialog({
               />
               <p className="text-[11px] text-muted-foreground">Provide at least a mobile number or an email.</p>
 
-              <label className="flex items-center gap-2 pt-1 text-xs font-medium">
-                <Checkbox checked={createParentLogin} onCheckedChange={(v) => setCreateParentLogin(v === true)} />
-                Create Parent Portal login (uses the parent's email above)
-              </label>
+              {newParentName.trim() && parentFirstPassword(newParentName, newParentPhone) && (
+                <p className="rounded-lg bg-primary/5 px-2.5 py-2 text-[11px] text-foreground/80">
+                  Parent Portal login is created automatically — they sign in with this mobile number
+                  and the first password{" "}
+                  <span className="font-semibold">{parentFirstPassword(newParentName, newParentPhone)}</span>, then
+                  choose their own.
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -537,18 +526,8 @@ export function StudentFormDialog({
               <Checkbox checked={createStudentLogin} onCheckedChange={(v) => setCreateStudentLogin(v === true)} />
               Create Student Portal login (uses the student's email above)
             </label>
-            {parentMode === "new" && newParentName.trim() && (
-              <p className="text-[11px] text-muted-foreground">
-                Tip: tick the checkbox above the parent's email to set up their account at the same time — both will
-                share the password below, signing in with their own emails.
-              </p>
-            )}
-
-            {(createStudentLogin || (parentMode === "new" && newParentName.trim() && createParentLogin)) && (
+            {createStudentLogin && (
               <div className="space-y-2 border-t border-border pt-2">
-                <p className="text-[11px] text-muted-foreground">
-                  Shared by every portal login checked above — each still signs in with their own email.
-                </p>
                 <div className="relative">
                   <Input
                     type={showPortalPassword ? "text" : "password"}

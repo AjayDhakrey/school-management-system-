@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { Users, UserCheck, Link2, Phone, Mail, ChevronRight } from "lucide-react";
+import { api, ApiError } from "@/lib/api";
+import { mobileFromEmail, parentFirstPassword } from "@/lib/parent-login";
+import { Users, UserCheck, Link2, Phone, Mail, ChevronRight, KeyRound } from "lucide-react";
 import {
   PageHeader,
   SearchInput,
@@ -24,9 +28,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { useParents, useStudents, type ApiParent, type ApiStudent } from "@/hooks/useApi";
+import {
+  useParents,
+  useStudents,
+  useUsers,
+  type ApiParent,
+  type ApiStudent,
+  type ApiUser,
+} from "@/hooks/useApi";
 
 const PER_PAGE = 8;
+
+interface CreateResult {
+  created: { parent_id: string }[];
+  switched: { parent_id: string }[];
+  skipped: { parent_id: string; name: string; reason: string }[];
+  existing: number;
+}
 
 function linkedIds(p: ApiParent): string[] {
   try {
@@ -40,6 +58,10 @@ function linkedIds(p: ApiParent): string[] {
 export default function Page() {
   const { data: parents, isLoading } = useParents();
   const { data: students } = useStudents();
+  const { data: users } = useUsers();
+  const queryClient = useQueryClient();
+  const [creatingLogins, setCreatingLogins] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [active, setActive] = useState<ApiParent | null>(null);
@@ -63,6 +85,57 @@ export default function Page() {
   const activeCount = total; // no status field on real parent records
   const linkedStudents = parentRows.reduce((a, p) => a + linkedIds(p).length, 0);
 
+  const loginByParent = useMemo(() => {
+    const map = new Map<string, ApiUser>();
+    for (const u of users ?? []) if (u.linked_parent_id) map.set(u.linked_parent_id, u);
+    return map;
+  }, [users]);
+  const withoutMobileLogin = parentRows.filter((p) => {
+    const login = loginByParent.get(p.id);
+    return !login || !mobileFromEmail(login.email);
+  }).length;
+
+  // Parents sign in with their registered mobile; the first password is four name letters +
+  // four mobile digits (e.g. Raje9876), changed on first login.
+  async function createLogins() {
+    setCreatingLogins(true);
+    try {
+      const res = await api.post<CreateResult>("/parent-logins/create", {});
+      const made = res.created.length + res.switched.length;
+      if (made) toast.success(`${made} parent login${made === 1 ? "" : "s"} ready`);
+      if (res.skipped.length) {
+        const names = res.skipped
+          .slice(0, 3)
+          .map((s) => `${s.name} (${s.reason})`)
+          .join(", ");
+        toast.warning(
+          `${res.skipped.length} skipped: ${names}${res.skipped.length > 3 ? ", …" : ""}`,
+        );
+      }
+      if (!made && !res.skipped.length) toast.info("Every parent already has a mobile login");
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't create the logins");
+    } finally {
+      setCreatingLogins(false);
+    }
+  }
+
+  async function resetPassword(parent: ApiParent) {
+    setResetting(true);
+    try {
+      await api.post(`/parent-logins/${parent.id}/reset`, {});
+      toast.success(
+        `Password reset to ${parentFirstPassword(parent.name, parent.phone) ?? "the first password"}`,
+      );
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't reset the password");
+    } finally {
+      setResetting(false);
+    }
+  }
+
   const childrenOf = (p: ApiParent): ApiStudent[] => {
     const ids = linkedIds(p);
     return studentRows.filter((s) => ids.includes(s.id));
@@ -74,6 +147,20 @@ export default function Page() {
         title="Parents"
         description="Directory of parents and guardians."
         breadcrumb={["Dashboard", "Parents"]}
+        actions={
+          <Button
+            size="sm"
+            onClick={createLogins}
+            disabled={creatingLogins || withoutMobileLogin === 0}
+          >
+            <KeyRound className="h-4 w-4" />
+            {creatingLogins
+              ? "Creating…"
+              : withoutMobileLogin
+                ? `Create logins (${withoutMobileLogin})`
+                : "All logins created"}
+          </Button>
+        }
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -340,6 +427,59 @@ export default function Page() {
                         ))}
                       </ul>
                     </section>
+
+                    {/* Portal login */}
+                    {(() => {
+                      const login = loginByParent.get(active.id);
+                      const mobile = login ? mobileFromEmail(login.email) : null;
+                      const firstPassword = parentFirstPassword(active.name, active.phone);
+                      return (
+                        <section>
+                          <p className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Portal login
+                          </p>
+                          <div className="space-y-2 rounded-2xl border border-border bg-card p-3 text-sm">
+                            {mobile ? (
+                              <>
+                                <p>
+                                  Signs in with{" "}
+                                  <span className="font-semibold tabular-nums">{mobile}</span>
+                                </p>
+                                {login?.must_change_password ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    First password:{" "}
+                                    <span className="font-semibold text-foreground">
+                                      {firstPassword}
+                                    </span>{" "}
+                                    — not changed yet
+                                  </p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">
+                                    Has set their own password
+                                  </p>
+                                )}
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={resetting}
+                                  onClick={() => resetPassword(active)}
+                                >
+                                  {resetting ? "Resetting…" : "Reset to first password"}
+                                </Button>
+                              </>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                {login
+                                  ? "Still on an email login — use Create logins to move it to the mobile number."
+                                  : firstPassword
+                                    ? `No login yet — Create logins gives them mobile ${active.phone} with first password ${firstPassword}.`
+                                    : "No login yet — add a 10-digit mobile number first."}
+                              </p>
+                            )}
+                          </div>
+                        </section>
+                      );
+                    })()}
 
                     {/* Children */}
                     <section>

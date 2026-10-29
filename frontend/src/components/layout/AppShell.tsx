@@ -2,10 +2,16 @@ import { Outlet } from "react-router-dom";
 import { AppSidebar } from "./AppSidebar";
 import { Header } from "./Header";
 import { MobileBottomNav } from "./MobileBottomNav";
+import { ForcePasswordChange } from "@/components/auth/ForcePasswordChange";
+import { useAuth } from "@/lib/auth-context";
 
 export function AppShell() {
+  const { user } = useAuth();
+  // A date-of-birth starting password has to be replaced before the app opens.
+  if (user?.mustChangePassword) return <ForcePasswordChange />;
+
   return (
-    <div className="flex h-screen overflow-hidden bg-surface lg:border lg:border-border lg:shadow-[var(--shadow-shell)]">
+    <div className="app-backdrop flex h-screen overflow-hidden lg:border lg:border-border lg:shadow-[var(--shadow-shell)]">
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* The header scrolls with the page: the mobile hero slides away, while the desktop

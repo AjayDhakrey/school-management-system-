@@ -9,13 +9,33 @@ import {
   HelpCircle,
   MoreVertical,
   GraduationCap,
+  Briefcase,
+  BookOpen,
+  Bus,
+  IdCard,
+  Building2,
+  UserCog,
+  type LucideIcon,
 } from "lucide-react";
 import { CgMenuLeft } from "react-icons/cg";
 import { useApp } from "@/lib/app-context";
 import { useAuth, toDisplayRole } from "@/lib/auth-context";
 import { SidebarBrand, SidebarNav } from "./AppSidebar";
-import { useNotifications, useSchoolProfile, useStudents, type ApiStudent } from "@/hooks/useApi";
-import { PROFILE_PATH_FOR_ROLE, ROUTE_ROLES, SETTINGS_PATH_FOR_ROLE } from "@/lib/navigation";
+import {
+  useNotifications,
+  usePlatformPeopleSearch,
+  useSchoolProfile,
+  useSchoolAdmins,
+  useSchools,
+  useStaff,
+  useLibraryBooks,
+  useLibraryBorrowers,
+  useTransport,
+  useTransportDrivers,
+  useStudents,
+  useTeachers,
+} from "@/hooks/useApi";
+import { APP_SETTINGS_PATH, PROFILE_PATH_FOR_ROLE, ROUTE_ROLES } from "@/lib/navigation";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
@@ -28,9 +48,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AccountAvatar } from "@/components/shared/AccountAvatar";
 import { useMyPhotoUrl } from "@/hooks/useMyPhotoUrl";
+import { usePlatformNotifications } from "@/hooks/usePlatformNotifications";
 import { cn } from "@/lib/utils";
 
+const PERSON_KIND_LABEL = { STUDENT: "Student", TEACHER: "Teacher", STAFF: "Staff" } as const;
+
 type ApiNotification = NonNullable<ReturnType<typeof useNotifications>["data"]>[number];
+
+type SearchResult = {
+  key: string;
+  title: string;
+  subtitle: string;
+  icon: LucideIcon;
+  path: string;
+};
 
 type SearchBoxProps = {
   /** Id of the results popover, referenced by the input's aria-controls. */
@@ -43,15 +74,17 @@ type SearchBoxProps = {
   onQueryChange: (value: string) => void;
   open: boolean;
   setOpen: (open: boolean) => void;
-  /** Whether this role may look students up at all. */
+  /** Whether this role may search at all. */
   enabled: boolean;
   searching: boolean;
   hasQuery: boolean;
-  students: ApiStudent[];
-  onPick: (studentId: string) => void;
+  results: SearchResult[];
+  /** Shown instead of (or under) the results when part of the lookup failed. */
+  error?: string | null;
+  onPick: (result: SearchResult) => void;
 };
 
-/** Student quick-search, shared by the desktop bar and the mobile hero. */
+/** Header quick-search, shared by the desktop bar and the mobile hero. */
 function SearchBox({
   id,
   className,
@@ -65,7 +98,8 @@ function SearchBox({
   enabled,
   searching,
   hasQuery,
-  students,
+  results,
+  error,
   onPick,
 }: SearchBoxProps) {
   return (
@@ -86,15 +120,15 @@ function SearchBox({
         onBlur={() => setOpen(false)}
         onKeyDown={(e) => {
           if (e.key === "Escape") setOpen(false);
-          if (e.key === "Enter" && students[0]) {
+          if (e.key === "Enter" && results[0]) {
             e.preventDefault();
-            onPick(students[0].id);
+            onPick(results[0]);
           }
         }}
         placeholder={placeholder}
         className={cn("h-9 bg-muted/50 pl-9 text-sm", inputClassName)}
         role="combobox"
-        aria-label="Search students"
+        aria-label="Search"
         aria-expanded={open && hasQuery}
         aria-controls={id}
       />
@@ -104,33 +138,40 @@ function SearchBox({
           className="absolute top-full right-0 left-0 z-50 mt-2 overflow-hidden rounded-xl border border-border bg-popover text-foreground shadow-lg"
         >
           {searching ? (
-            <p className="px-4 py-3 text-sm text-muted-foreground">Searching students…</p>
-          ) : students.length === 0 ? (
-            <p className="px-4 py-3 text-sm text-muted-foreground">No students found.</p>
+            <p className="px-4 py-3 text-sm text-muted-foreground">Searching…</p>
+          ) : results.length === 0 ? (
+            <p
+              className={cn(
+                "px-4 py-3 text-sm",
+                error ? "text-destructive" : "text-muted-foreground",
+              )}
+            >
+              {error ?? "No matches found."}
+            </p>
           ) : (
             <div className="max-h-80 overflow-y-auto py-1">
-              {students.map((student) => (
+              {results.map((result) => (
                 <button
-                  key={student.id}
+                  key={result.key}
                   type="button"
                   className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
                   onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => onPick(student.id)}
+                  onClick={() => onPick(result)}
                 >
                   <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                    <GraduationCap className="h-4 w-4" />
+                    <result.icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{student.name}</span>
+                    <span className="block truncate text-sm font-medium">{result.title}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {student.admission_no ?? "No admission number"}
-                      {student.class_name
-                        ? ` · ${student.class_name}${student.section ? ` ${student.section}` : ""}`
-                        : ""}
+                      {result.subtitle}
                     </span>
                   </span>
                 </button>
               ))}
+              {error && (
+                <p className="border-t border-border px-4 py-2 text-xs text-destructive">{error}</p>
+              )}
             </div>
           )}
         </div>
@@ -139,12 +180,22 @@ function SearchBox({
   );
 }
 
+type MenuNotification = {
+  id: string;
+  title: string;
+  body: string | null;
+  created_at: string;
+  read: boolean;
+  /** Where picking the item goes; null keeps the user where they are. */
+  path: string | null;
+};
+
 type NotificationsMenuProps = {
-  notifications: ApiNotification[];
+  notifications: MenuNotification[];
   unread: number;
   triggerClassName: string;
-  canOpenCenter: boolean;
-  onNavigate: (path: string) => void;
+  centerPath: string;
+  onPick: (notification: MenuNotification) => void;
 };
 
 /** Bell with its recent-notification popover, shared by both headers. */
@@ -152,8 +203,8 @@ function NotificationsMenu({
   notifications,
   unread,
   triggerClassName,
-  canOpenCenter,
-  onNavigate,
+  centerPath,
+  onPick,
 }: NotificationsMenuProps) {
   return (
     <DropdownMenu>
@@ -174,11 +225,7 @@ function NotificationsMenu({
           {notifications.slice(0, 5).map((n) => (
             <DropdownMenuItem
               key={n.id}
-              // A notice notification opens the notice list; others the notification center.
-              onSelect={() => {
-                if (n.category === "Notices") onNavigate("/notices");
-                else if (canOpenCenter) onNavigate("/notifications");
-              }}
+              onSelect={() => onPick(n)}
               className={cn(
                 "block cursor-pointer rounded-none border-b border-border px-3 py-2.5 last:border-0",
                 !n.read && "bg-gold-soft/40",
@@ -191,9 +238,14 @@ function NotificationsMenu({
               </p>
             </DropdownMenuItem>
           ))}
+          {notifications.length === 0 && (
+            <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+              You're all caught up.
+            </p>
+          )}
         </div>
         <Link
-          to="/notifications"
+          to={centerPath}
           className="block px-3 py-2.5 text-center text-xs font-semibold text-primary hover:bg-accent"
         >
           View notification center
@@ -212,31 +264,270 @@ export function Header() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const schoolUser = Boolean(user && user.role !== "SUPER_ADMIN");
-  const { data: notifications = [] } = useNotifications(schoolUser);
+  const { data: schoolNotifications = [] } = useNotifications(schoolUser);
   const { data: school } = useSchoolProfile(schoolUser);
-  const unread = notifications.filter((n) => !n.read).length;
   const role = toDisplayRole(user);
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+  const platform = usePlatformNotifications(isSuperAdmin);
+  const canOpenNotificationCenter = (ROUTE_ROLES["/notifications"] ?? []).includes(role);
+  const notifications: MenuNotification[] = isSuperAdmin
+    ? platform.notifications
+    : schoolNotifications.map((n: ApiNotification) => ({
+        id: n.id,
+        title: n.title,
+        body: n.body,
+        created_at: n.created_at,
+        read: Boolean(n.read),
+        // A notice notification opens the notice list; others the notification center.
+        path:
+          n.category === "Notices"
+            ? "/notices"
+            : canOpenNotificationCenter
+              ? "/notifications"
+              : null,
+      }));
+  const unread = isSuperAdmin ? platform.unread : schoolNotifications.filter((n) => !n.read).length;
+  const notificationCenterPath = isSuperAdmin ? "/super-admin/notifications" : "/notifications";
+
+  function openNotification(n: MenuNotification) {
+    if (isSuperAdmin) platform.markRead(n.id);
+    if (n.path) navigate(n.path);
+  }
   const canSearchStudents = (ROUTE_ROLES["/students"] ?? []).includes(role);
-  const { data: studentMatches = [], isFetching: isSearching } = useStudents(
-    canSearchStudents && debouncedQuery.length > 0,
+  // Roles without the student pages still find students where they work with them:
+  // the Accountant in fee records, the Transport Manager in student transport.
+  const studentsViaFees =
+    !canSearchStudents && (ROUTE_ROLES["/fees/collection"] ?? []).includes(role);
+  const studentsViaTransport =
+    !canSearchStudents &&
+    !studentsViaFees &&
+    (ROUTE_ROLES["/transport/students"] ?? []).includes(role);
+  const { data: studentMatches = [], isFetching: isSearchingStudents } = useStudents(
+    (canSearchStudents || studentsViaFees || studentsViaTransport) && debouncedQuery.length > 0,
     debouncedQuery ? { q: debouncedQuery } : undefined,
   );
-  const canOpenNotificationCenter = (ROUTE_ROLES["/notifications"] ?? []).includes(role);
+  const isLibrarian = role === "Librarian";
+  const isTransportManager = role === "Transport Manager";
+  // Librarian: books (matched in the browser) and members who can borrow.
+  const { data: libraryBooks = [] } = useLibraryBooks(isLibrarian);
+  const { data: memberMatches = [], isFetching: isSearchingMembers } = useLibraryBorrowers(
+    debouncedQuery,
+    "",
+    isLibrarian && debouncedQuery.length > 0,
+  );
+  // Transport Manager: drivers and vehicles (matched in the browser) plus students above.
+  const { data: transportDrivers = [] } = useTransportDrivers(isTransportManager);
+  const { data: vehicles = [] } = useTransport(isTransportManager);
+  const canSearchTeachers = (ROUTE_ROLES["/teaching-staff"] ?? []).includes(role);
+  // Roles that run payroll but can't open the staff pages (the Accountant) still look up
+  // teachers and staff — each result opens that person's payslip instead.
+  const searchViaPayroll = !canSearchTeachers && (ROUTE_ROLES["/payroll"] ?? []).includes(role);
+  const { data: teacherMatches = [], isFetching: isSearchingTeachers } = useTeachers(
+    (canSearchTeachers || searchViaPayroll) && debouncedQuery.length > 0,
+    debouncedQuery ? { q: debouncedQuery } : undefined,
+  );
+  const canSearchStaff = (ROUTE_ROLES["/non-teaching-staff"] ?? []).includes(role);
+  const { data: staffMatches = [], isFetching: isSearchingStaff } = useStaff(
+    (canSearchStaff || searchViaPayroll) && debouncedQuery.length > 0,
+    debouncedQuery ? { q: debouncedQuery } : undefined,
+  );
+  // Super Admin has no school, so it searches students and staff across every school.
+  const {
+    data: peopleMatches = [],
+    isFetching: isSearchingPeople,
+    isError: peopleSearchFailed,
+  } = usePlatformPeopleSearch(debouncedQuery, isSuperAdmin);
+  // Schools are matched in the browser from the list the dashboard already loads.
+  const { data: schools = [] } = useSchools(isSuperAdmin);
+  const needle = debouncedQuery.toLowerCase();
+  const schoolMatches = needle
+    ? schools
+        .filter((s) =>
+          [s.name, s.short_name, s.id, s.email].some((v) => v?.toLowerCase().includes(needle)),
+        )
+        .slice(0, 5)
+    : [];
+  const { data: schoolAdmins = [] } = useSchoolAdmins(isSuperAdmin);
+  const adminMatches = needle
+    ? schoolAdmins
+        .filter((a) =>
+          [a.name, a.email, a.school_name].some((v) => v?.toLowerCase().includes(needle)),
+        )
+        .slice(0, 5)
+    : [];
+  const localMatchCount = schoolMatches.length + adminMatches.length;
+  const bookMatches = needle
+    ? libraryBooks
+        .filter((b) =>
+          [b.title, b.author, b.isbn, b.category].some((v) => v?.toLowerCase().includes(needle)),
+        )
+        .slice(0, 5)
+    : [];
+  const driverMatches = needle
+    ? transportDrivers
+        .filter((d) =>
+          [d.name, d.phone, d.license_no].some((v) => v?.toLowerCase().includes(needle)),
+        )
+        .slice(0, 5)
+    : [];
+  const vehicleMatches = needle
+    ? vehicles
+        .filter((v) => [v.number, v.route, v.driver].some((x) => x?.toLowerCase().includes(needle)))
+        .slice(0, 5)
+    : [];
+  const vehicleNumber = new Map(vehicles.map((v) => [v.id, v.number]));
+  const canSearch =
+    isSuperAdmin ||
+    canSearchStudents ||
+    canSearchTeachers ||
+    canSearchStaff ||
+    searchViaPayroll ||
+    studentsViaFees ||
+    studentsViaTransport ||
+    isLibrarian ||
+    isTransportManager;
+  // Students and parents have nothing to look up here, so they don't get the search bar.
+  const showSearch = role !== "Student" && role !== "Parent";
+  const isSearching = isSuperAdmin
+    ? isSearchingPeople && localMatchCount === 0
+    : (isSearchingStudents || isSearchingTeachers || isSearchingStaff || isSearchingMembers) &&
+      bookMatches.length + driverMatches.length + vehicleMatches.length === 0;
+  const searchError =
+    isSuperAdmin && peopleSearchFailed ? "Couldn't search students and staff." : null;
   const profilePath = PROFILE_PATH_FOR_ROLE[role] ?? "/settings";
-  const settingsPath = SETTINGS_PATH_FOR_ROLE[role] ?? "/settings";
+  const settingsPath = APP_SETTINGS_PATH;
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedQuery(query.trim()), 250);
     return () => window.clearTimeout(timeout);
   }, [query]);
 
-  const visibleStudents = studentMatches.slice(0, 6);
+  const searchResults: SearchResult[] = isSuperAdmin
+    ? [
+        ...schoolMatches.map((school) => ({
+          key: `SCHOOL-${school.id}`,
+          title: school.name,
+          subtitle: `School · ${school.id}`,
+          icon: Building2,
+          path: `/super-admin/schools/${school.id}`,
+        })),
+        ...adminMatches.map((admin) => ({
+          key: `ADMIN-${admin.id}`,
+          title: admin.name,
+          subtitle: `School Admin · ${admin.school_name} · ${admin.email}`,
+          icon: UserCog,
+          path: `/super-admin/schools/${admin.school_id}`,
+        })),
+        ...peopleMatches.map((person) => ({
+          key: `${person.kind}-${person.id}`,
+          title: person.name,
+          subtitle: [PERSON_KIND_LABEL[person.kind], person.school_name, person.detail]
+            .filter(Boolean)
+            .join(" · "),
+          icon: person.kind === "STUDENT" ? GraduationCap : Briefcase,
+          // Super Admin can't open school-level profiles, so land on the person's school.
+          path: `/super-admin/schools/${person.school_id}`,
+        })),
+      ]
+    : [
+        ...bookMatches.map((book) => ({
+          key: `BOOK-${book.id}`,
+          title: book.title,
+          subtitle: ["Book", book.author, book.status].filter(Boolean).join(" · "),
+          icon: BookOpen,
+          path: `/library?book=${encodeURIComponent(book.title)}`,
+        })),
+        ...memberMatches.slice(0, 6).map((member) => ({
+          key: `MEMBER-${member.borrower_type}-${member.id}`,
+          title: member.name,
+          subtitle: [
+            `Library member · ${member.borrower_type.charAt(0)}${member.borrower_type.slice(1).toLowerCase()}`,
+            member.number,
+            member.detail,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          icon: IdCard,
+          path: `/library?borrower=${encodeURIComponent(member.name)}`,
+        })),
+        ...vehicleMatches.map((vehicle) => ({
+          key: `VEHICLE-${vehicle.id}`,
+          title: vehicle.number ?? "Vehicle",
+          subtitle: ["Vehicle", vehicle.route, vehicle.driver && `Driver ${vehicle.driver}`]
+            .filter(Boolean)
+            .join(" · "),
+          icon: Bus,
+          path: `/transport?q=${encodeURIComponent(vehicle.number ?? "")}`,
+        })),
+        ...driverMatches.map((driver) => ({
+          key: `DRIVER-${driver.id}`,
+          title: driver.name,
+          subtitle: [
+            "Driver",
+            driver.assigned_vehicle_id
+              ? (vehicleNumber.get(driver.assigned_vehicle_id) ?? "Assigned")
+              : "Unassigned",
+            driver.phone,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          icon: IdCard,
+          path: "/transport/drivers",
+        })),
+        ...studentMatches.slice(0, 6).map((student) => ({
+          key: student.id,
+          title: student.name,
+          subtitle: `Student · ${
+            studentsViaTransport
+              ? student.vehicle_id
+                ? `On ${vehicleNumber.get(student.vehicle_id) ?? "a vehicle"}`
+                : "No transport"
+              : (student.admission_no ?? "No admission number")
+          }${
+            student.class_name
+              ? ` · ${student.class_name}${student.section ? ` ${student.section}` : ""}`
+              : ""
+          }`,
+          icon: GraduationCap,
+          path: canSearchStudents
+            ? `/students/${student.id}`
+            : studentsViaFees
+              ? `/fees/collection?q=${encodeURIComponent(student.name)}`
+              : `/transport/students?q=${encodeURIComponent(student.name)}`,
+        })),
+        ...teacherMatches.slice(0, 5).map((teacher) => ({
+          key: `TEACHER-${teacher.id}`,
+          title: teacher.name,
+          subtitle: [
+            "Teaching Staff",
+            teacher.designation ?? teacher.department,
+            teacher.employee_id,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          icon: UserCog,
+          path: searchViaPayroll
+            ? `/payroll?open=TEACHER:${teacher.id}`
+            : `/teaching-staff?open=${teacher.id}`,
+        })),
+        ...staffMatches.slice(0, 5).map((member) => ({
+          key: `STAFF-${member.id}`,
+          title: member.name,
+          subtitle: ["Non-Teaching Staff", member.designation, member.employee_id]
+            .filter(Boolean)
+            .join(" · "),
+          icon: Briefcase,
+          path: searchViaPayroll
+            ? `/payroll?open=STAFF:${member.id}`
+            : `/non-teaching-staff?open=${member.id}`,
+        })),
+      ];
 
-  function openStudent(studentId: string) {
+  function openResult(result: SearchResult) {
     setQuery("");
     setDebouncedQuery("");
     setSearchOpen(false);
-    navigate(`/students/${studentId}`);
+    navigate(result.path);
   }
 
   const handleSignOut = () => {
@@ -274,72 +565,97 @@ export function Header() {
           >
             <CgMenuLeft className="h-5 w-5" />
           </button>
-          <SearchBox
-            id="mobile-search-results"
-            className="flex-1"
-            placeholder="Search"
-            inputClassName="h-11 rounded-full border-transparent bg-white pl-10 text-sm text-foreground shadow-[0_10px_24px_-14px_rgb(12_40_95/0.6)] placeholder:text-muted-foreground/80"
-            iconClassName="left-3.5 text-foreground/60"
-            query={query}
-            onQueryChange={setQuery}
-            open={searchOpen}
-            setOpen={setSearchOpen}
-            enabled={canSearchStudents}
-            searching={isSearching}
-            hasQuery={debouncedQuery.length > 0}
-            students={visibleStudents}
-            onPick={openStudent}
-          />
+          {showSearch ? (
+            <SearchBox
+              id="mobile-search-results"
+              className="flex-1"
+              placeholder="Search"
+              inputClassName="h-11 rounded-full border-transparent bg-white pl-10 text-sm text-foreground shadow-[0_10px_24px_-14px_rgb(12_40_95/0.6)] placeholder:text-muted-foreground/80"
+              iconClassName="left-3.5 text-foreground/60"
+              query={query}
+              onQueryChange={setQuery}
+              open={searchOpen}
+              setOpen={setSearchOpen}
+              enabled={canSearch}
+              searching={isSearching}
+              hasQuery={debouncedQuery.length > 0}
+              results={searchResults}
+              error={searchError}
+              onPick={openResult}
+            />
+          ) : (
+            <p className="min-w-0 flex-1 truncate font-display text-base font-bold">
+              {school?.name ?? "EduNex"}
+            </p>
+          )}
           <NotificationsMenu
             notifications={notifications}
             unread={unread}
-            canOpenCenter={canOpenNotificationCenter}
-            onNavigate={navigate}
+            centerPath={notificationCenterPath}
+            onPick={openNotification}
             triggerClassName="relative grid h-11 w-11 shrink-0 place-items-center rounded-[15px] bg-white/20 text-white backdrop-blur-sm transition-colors hover:bg-white/30 active:bg-white/35"
           />
         </div>
       </header>
 
-      <header className="sticky top-0 z-30 hidden grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-b border-border bg-surface/90 px-3 py-2.5 backdrop-blur sm:px-5 lg:grid">
+      <header className="sticky top-0 z-30 hidden grid-cols-[auto_minmax(0,1fr)_auto] glass-bar items-center gap-2 border-b border-white/60 px-3 py-2.5 sm:px-5 lg:grid dark:border-border/60">
         <div className="flex items-center gap-2">
           <div className="min-w-0">
-            <p className="truncate font-display text-sm font-bold">
-              {school?.name ?? "EduNex"}
-            </p>
+            <p className="truncate font-display text-sm font-bold">{school?.name ?? "EduNex"}</p>
             {school?.session && (
               <p className="truncate text-[11px] text-muted-foreground">Session {school.session}</p>
             )}
           </div>
         </div>
 
-        <SearchBox
-          id="header-search-results"
-          className="justify-self-stretch md:w-80 md:justify-self-center"
-          placeholder="Search students, staff, invoices…"
-          query={query}
-          onQueryChange={setQuery}
-          open={searchOpen}
-          setOpen={setSearchOpen}
-          enabled={canSearchStudents}
-          searching={isSearching}
-          hasQuery={debouncedQuery.length > 0}
-          students={visibleStudents}
-          onPick={openStudent}
-        />
+        {showSearch ? (
+          <SearchBox
+            id="header-search-results"
+            className="justify-self-stretch md:w-80 md:justify-self-center"
+            placeholder={
+              isSuperAdmin
+                ? "Search schools, students, staff…"
+                : isLibrarian
+                  ? "Search books, members…"
+                  : isTransportManager
+                    ? "Search vehicles, drivers, students…"
+                    : searchViaPayroll
+                      ? "Search students, teachers, staff…"
+                      : "Search students, staff…"
+            }
+            query={query}
+            onQueryChange={setQuery}
+            open={searchOpen}
+            setOpen={setSearchOpen}
+            enabled={canSearch}
+            searching={isSearching}
+            hasQuery={debouncedQuery.length > 0}
+            results={searchResults}
+            error={searchError}
+            onPick={openResult}
+          />
+        ) : (
+          // Keeps the three-column header layout so the bell and account stay on the right.
+          <span aria-hidden />
+        )}
 
         <div className="flex items-center gap-1.5">
           <NotificationsMenu
             notifications={notifications}
             unread={unread}
-            canOpenCenter={canOpenNotificationCenter}
-            onNavigate={navigate}
+            centerPath={notificationCenterPath}
+            onPick={openNotification}
             triggerClassName="relative grid h-9 w-9 place-items-center rounded-xl border border-border text-muted-foreground transition-colors hover:text-foreground"
           />
 
           {/* Desktop only: on phones the account lives in the sidebar sheet and the bottom nav. */}
           <DropdownMenu>
             <DropdownMenuTrigger className="hidden items-center gap-2 rounded-xl border border-border p-1 lg:flex">
-              <AccountAvatar name={user?.name ?? "?"} photoUrl={photoUrl} className="h-7 w-7 text-[10px]" />
+              <AccountAvatar
+                name={user?.name ?? "?"}
+                photoUrl={photoUrl}
+                className="h-7 w-7 text-[10px]"
+              />
               <span className="text-left">
                 <span className="block text-xs leading-tight font-semibold">{user?.name}</span>
                 <span className="block text-[10px] leading-tight text-muted-foreground">
@@ -398,7 +714,11 @@ export function Header() {
           </div> */}
           <div className="mt-5 p-5 pt-4">
             <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-2 shadow-sm">
-              <AccountAvatar name={user?.name ?? "?"} photoUrl={photoUrl} className="h-9 w-9 text-[11px]" />
+              <AccountAvatar
+                name={user?.name ?? "?"}
+                photoUrl={photoUrl}
+                className="h-9 w-9 text-[11px]"
+              />
               <Link
                 to={profilePath}
                 onClick={() => setSidebarOpen(false)}
@@ -424,6 +744,12 @@ export function Header() {
                       <User className="mr-2 h-4 w-4" /> My Profile
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to={settingsPath} onClick={() => setSidebarOpen(false)}>
+                      <Settings className="mr-2 h-4 w-4" /> Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" /> Sign out
                   </DropdownMenuItem>

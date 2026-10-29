@@ -7,7 +7,7 @@ import type { AuthUser, BackendRole, StaffDepartment } from "./auth-context";
  */
 const ROLE_VIEW_PERMISSIONS: Record<BackendRole, string[]> = {
   SUPER_ADMIN: ["schools"],
-  SCHOOL_ADMIN: ["students", "teachers", "staff", "parents", "classes", "admissions", "homework", "fees", "results", "notices"],
+  SCHOOL_ADMIN: ["students", "teachers", "staff", "parents", "classes", "admissions", "homework", "fees", "results", "notices", "timetable"],
   TEACHER: ["students", "classes", "subjects", "homework", "results", "notices", "timetable"],
   STAFF: [],
   PARENT: ["students", "results", "homework", "fees", "notices", "timetable"],

@@ -46,7 +46,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
-import { cn } from "@/lib/utils";
+import { cn, formatName } from "@/lib/utils";
 import {
   FileText,
   Eye,
@@ -319,9 +319,9 @@ export default function Page() {
                     <tr key={a.id} className="border-b border-border last:border-0 hover:bg-muted/40">
                       <td className="px-4 py-3">
                         <div className="flex min-w-0 items-center gap-2.5">
-                          <AccountAvatar name={a.applicant} photoUrl={a.photo_url} className="h-9 w-9" />
+                          <AccountAvatar name={formatName(a.applicant)} photoUrl={a.photo_url} className="h-9 w-9" />
                           <div className="min-w-0">
-                            <p className="truncate font-medium">{a.applicant}</p>
+                            <p className="truncate font-medium">{formatName(a.applicant)}</p>
                             {a.stage === "CONVERTED" && a.admission_no && (
                               <p className="truncate text-[11px] text-success">Admission No. {a.admission_no}</p>
                             )}
@@ -332,7 +332,7 @@ export default function Page() {
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                         {a.class_applied ?? "—"}{a.section_applied ? `-${a.section_applied}` : ""}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{a.parent_name ?? "—"}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{formatName(a.parent_name) || "—"}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{a.applied_on ?? "—"}</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={STAGE_LABEL[a.stage]} />
@@ -353,9 +353,9 @@ export default function Page() {
                 <div key={a.id} className="panel p-3.5">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <AccountAvatar name={a.applicant} photoUrl={a.photo_url} className="h-10 w-10" />
+                      <AccountAvatar name={formatName(a.applicant)} photoUrl={a.photo_url} className="h-10 w-10" />
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{a.applicant}</p>
+                        <p className="truncate text-sm font-semibold">{formatName(a.applicant)}</p>
                         <p className="truncate font-mono text-[11px] text-muted-foreground">{a.application_no ?? "—"}</p>
                       </div>
                     </div>
@@ -375,7 +375,7 @@ export default function Page() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-muted-foreground">Parent / Guardian</p>
-                      <p className="truncate font-medium">{a.parent_name ?? "—"}</p>
+                      <p className="truncate font-medium">{formatName(a.parent_name) || "—"}</p>
                     </div>
                     <div className="min-w-0">
                       <p className="text-muted-foreground">Applied On</p>
@@ -542,7 +542,7 @@ function NewAdmissionDialog({
     setSubmitting(true);
     try {
       const resp = await api.post<{ id: string; applicationNo: string }>("/admissions", {
-        applicant: form.applicant.trim(),
+        applicant: formatName(form.applicant),
         dob: form.dob || null,
         gender: form.gender || null,
         address: form.address.trim() || null,
@@ -551,7 +551,7 @@ function NewAdmissionDialog({
         classIdApplied: null,
         academicYearId: classRow.academic_year_id ?? null,
         academicYear: form.academicYear.trim() || null,
-        parentName: form.parentName.trim() || null,
+        parentName: formatName(form.parentName) || null,
         parentRelation: form.parentRelation || null,
         contactPhone: form.contactPhone.trim() || null,
         contactEmail: form.contactEmail.trim() || null,
@@ -840,7 +840,7 @@ function AdmissionReviewPanel({
     <div className="flex h-full flex-col">
       <SheetHeader>
         <SheetTitle className="flex items-center gap-2">
-          {detail.applicant}
+          {formatName(detail.applicant)}
           <StatusBadge status={STAGE_LABEL[detail.stage]} />
         </SheetTitle>
         <SheetDescription>
@@ -919,7 +919,7 @@ function AdmissionReviewPanel({
           <DialogHeader>
             <DialogTitle>{transitionTarget?.title}</DialogTitle>
             <DialogDescription>
-              Move {detail.applicant}&rsquo;s application to {transitionTarget ? STAGE_LABEL[transitionTarget.toStage] : ""}.
+              Move {formatName(detail.applicant)}&rsquo;s application to {transitionTarget ? STAGE_LABEL[transitionTarget.toStage] : ""}.
             </DialogDescription>
           </DialogHeader>
           <RemarksForm
@@ -937,7 +937,7 @@ function AdmissionReviewPanel({
           <AlertDialogHeader>
             <AlertDialogTitle>Convert to Student?</AlertDialogTitle>
             <AlertDialogDescription>
-              This creates a real, enrolled student record for {detail.applicant} with a new admission number, and links their verified
+              This creates a real, enrolled student record for {formatName(detail.applicant)} with a new admission number, and links their verified
               details and parent/guardian. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -956,7 +956,7 @@ function AdmissionReviewPanel({
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this application?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently deletes {detail.applicant}&rsquo;s application, documents, notes and history. This cannot be undone.
+              This permanently deletes {formatName(detail.applicant)}&rsquo;s application, documents, notes and history. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1168,7 +1168,7 @@ function OverviewTab({
     setSaving(true);
     try {
       await api.patch(`/admissions/${admission.id}`, {
-        applicant: form.applicant.trim(),
+        applicant: formatName(form.applicant),
         dob: form.dob || null,
         gender: form.gender || null,
         address: form.address.trim() || null,
@@ -1177,7 +1177,7 @@ function OverviewTab({
         classIdApplied: placed?.id ?? null,
         academicYearId: (placed ?? classRow).academic_year_id ?? null,
         academicYear: form.academicYear.trim() || null,
-        parentName: form.parentName.trim() || null,
+        parentName: formatName(form.parentName) || null,
         parentRelation: form.parentRelation || null,
         contactPhone: form.contactPhone.trim() || null,
         contactEmail: form.contactEmail.trim() || null,
@@ -1281,7 +1281,7 @@ function OverviewTab({
       <div>
         <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Applicant</p>
         <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/20 p-3 text-sm">
-          <ReadField label="Name" value={admission.applicant} />
+          <ReadField label="Name" value={formatName(admission.applicant)} />
           <ReadField label="Date of Birth" value={admission.dob} />
           <ReadField label="Gender" value={admission.gender} />
           <ReadField label="Class Applied" value={admission.class_applied ? `${admission.class_applied}${admission.section_applied ? `-${admission.section_applied}` : ""}` : null} />
@@ -1292,7 +1292,7 @@ function OverviewTab({
       <div>
         <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Parent / Guardian</p>
         <div className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-muted/20 p-3 text-sm">
-          <ReadField label="Name" value={admission.parent_name} />
+          <ReadField label="Name" value={formatName(admission.parent_name)} />
           <ReadField label="Relation" value={admission.parent_relation} />
           <ReadField label="Phone" value={admission.contact_phone} />
           <ReadField label="Email" value={admission.contact_email} />

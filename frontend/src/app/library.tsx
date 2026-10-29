@@ -8,6 +8,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
@@ -89,6 +90,7 @@ import {
   type LibraryBorrowerType,
   type LibraryCopyStatus,
 } from "@/hooks/useApi";
+import { useUrlPrefill } from "@/hooks/useUrlPrefill";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -561,6 +563,15 @@ function LibrarianView() {
   const copies = useMemo(() => copiesData ?? [], [copiesData]);
   const loans = useMemo(() => loansData ?? [], [loansData]);
   const [tab, setTab] = useState("catalogue");
+  // Header search links: ?book=<title> opens the catalogue, ?borrower=<name> circulation.
+  // The tabs themselves read and clear the value once they're showing.
+  const [linkParams] = useSearchParams();
+  const linkedBook = linkParams.get("book");
+  const linkedBorrower = linkParams.get("borrower");
+  useEffect(() => {
+    if (linkedBook !== null) setTab("catalogue");
+    else if (linkedBorrower !== null) setTab("circulation");
+  }, [linkedBook, linkedBorrower]);
 
   const count = (s: LibraryCopyStatus) => copies.filter((c) => c.status === s).length;
   const overdue = loans.filter((l) => !l.returned_on && l.overdue_days > 0).length;
@@ -683,6 +694,10 @@ function CatalogueTab({
   const [category, setCategory] = useState("all");
   const [availabilityFilter, setAvailabilityFilter] = useState("all");
   const [page, setPage] = useState(1);
+  useUrlPrefill("book", (value) => {
+    setSearch(value);
+    setPage(1);
+  });
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<ApiLibraryBook | null>(null);
   const [detailsId, setDetailsId] = useState<string | null>(null);
@@ -1564,6 +1579,11 @@ function CirculationTab({
   const [search, setSearch] = useState("");
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [page, setPage] = useState(1);
+  useUrlPrefill("borrower", (value) => {
+    setSearch(value);
+    setBorrowerQuery(value);
+    setPage(1);
+  });
   const [returning, setReturning] = useState<ApiLibraryLoan | null>(null);
   const open = useMemo(() => {
     const q = search.trim().toLowerCase();

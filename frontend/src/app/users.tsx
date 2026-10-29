@@ -73,6 +73,8 @@ import {
   type ApiUser,
 } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { parentFirstPassword } from "@/lib/parent-login";
+import { cleanPhone } from "@/lib/phone";
 
 // Staff logins are split by department, so the filter lists each kind on its own.
 const STAFF_KIND: Record<string, string> = {
@@ -171,7 +173,7 @@ export default function Page() {
       const linked = new Set(rows.filter((u) => u.linked_parent_id).map((u) => u.linked_parent_id));
       return (parents ?? [])
         .filter((p) => !linked.has(p.id))
-        .map((p) => ({ id: p.id, label: p.name }));
+        .map((p) => ({ id: p.id, label: `${p.name} · ${p.phone ?? "no mobile"}` }));
     }
     if (createRole === "STUDENT") {
       const linked = new Set(
@@ -207,6 +209,10 @@ export default function Page() {
   }
 
   async function handleCreate() {
+    if (createRole === "PARENT") {
+      await handleCreateParent();
+      return;
+    }
     if (!createName || !createEmail) {
       toast.error("Please fill in name and email");
       return;
@@ -232,6 +238,32 @@ export default function Page() {
       resetCreateForm();
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setTempPassword({ email, password: result.tempPassword });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "Failed to create login";
+      toast.error(message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  // Parents sign in with their registered mobile number; the first password follows a rule.
+  async function handleCreateParent() {
+    const parent = (parents ?? []).find((p) => p.id === createLinkedId);
+    if (!parent) {
+      toast.error("Please select a parent to link this login to");
+      return;
+    }
+    setCreating(true);
+    try {
+      await api.post("/users", { role: "PARENT", linkedId: parent.id });
+      toast.success("Login created");
+      setCreateOpen(false);
+      resetCreateForm();
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      setTempPassword({
+        email: `the parent — they sign in with mobile number ${cleanPhone(parent.phone)}`,
+        password: parentFirstPassword(parent.name, parent.phone) ?? "",
+      });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "Failed to create login";
       toast.error(message);
@@ -364,22 +396,32 @@ export default function Page() {
                   </div>
                 )}
 
-                <div className="grid gap-1.5">
-                  <Label>Full name</Label>
-                  <Input
-                    value={createName}
-                    onChange={(e) => setCreateName(e.target.value)}
-                    placeholder="Jane Doe"
-                  />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label>Email</Label>
-                  <Input
-                    value={createEmail}
-                    onChange={(e) => setCreateEmail(e.target.value)}
-                    placeholder="jane@everbright.edu"
-                  />
-                </div>
+                {createRole === "PARENT" ? (
+                  <p className="rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                    Parents sign in with their registered mobile number. The first password is the
+                    first four letters of their name (first one capital) + the first four digits of
+                    the mobile, e.g. Raje9876 — they must change it on first login.
+                  </p>
+                ) : (
+                  <>
+                    <div className="grid gap-1.5">
+                      <Label>Full name</Label>
+                      <Input
+                        value={createName}
+                        onChange={(e) => setCreateName(e.target.value)}
+                        placeholder="Jane Doe"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label>Email</Label>
+                      <Input
+                        value={createEmail}
+                        onChange={(e) => setCreateEmail(e.target.value)}
+                        placeholder="jane@everbright.edu"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>

@@ -37,6 +37,7 @@ import {
   BadgeIndianRupee,
   Wrench,
   type LucideIcon,
+  KeyRound,
 } from "lucide-react";
 import type { Role } from "./app-context";
 
@@ -145,6 +146,13 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Classes", to: "/teacher/classes", icon: Layers, roles: ["Teacher"] },
       { label: "Students", to: "/teacher/students", icon: GraduationCap, roles: ["Teacher"] },
+      {
+        label: "Student Logins",
+        to: "/student-logins",
+        icon: KeyRound,
+        // Class teachers create their class's Student-ID logins; the admin can do any class.
+        roles: ["Teacher", "School Admin"],
+      },
       { label: "Subjects", to: "/teacher/subjects", icon: BookOpen, roles: ["Teacher"] },
     ],
   },
@@ -505,7 +513,8 @@ export const NAV: NavGroup[] = [
         label: "Notifications",
         to: "/notifications",
         icon: Bell,
-        roles: ["Student", "Teacher", "Parent"],
+        // Every school user has their own notifications (the header bell links here).
+        roles: ALL_SCHOOL,
       },
     ],
   },
@@ -732,6 +741,7 @@ export const SCHOOL_ADMIN_NAV: NavGroup[] = [
     label: "System",
     items: [
       { label: "User Management", to: "/users", icon: Users, roles: ["School Admin"] },
+      { label: "Student Logins", to: "/student-logins", icon: KeyRound, roles: ["School Admin"] },
       { label: "Roles & Permissions", to: "/roles", icon: ShieldCheck, roles: ["School Admin"] },
     ],
   },
@@ -804,17 +814,14 @@ export const PROFILE_PATH_FOR_ROLE: Partial<Record<Role, string>> = {
   Student: "/profile",
   Teacher: "/teacher/profile",
   Parent: "/parent/children/profile",
-  "Super Admin": "/super-admin/settings",
+  // Admins have no linked person record, so they share a simple account profile.
+  "Super Admin": "/my-profile",
+  "School Admin": "/my-profile",
   Staff: "/staff/profile",
   Accountant: "/staff/profile",
   Librarian: "/staff/profile",
   "Transport Manager": "/staff/profile",
 };
 
-export const SETTINGS_PATH_FOR_ROLE: Partial<Record<Role, string>> = {
-  Teacher: "/teacher/profile",
-  Student: "/profile",
-  Parent: "/parent/children/profile",
-  "Super Admin": "/super-admin/settings",
-  Librarian: "/staff/profile",
-};
+/** App preferences (theme, text size, password) — the same page for every role. */
+export const APP_SETTINGS_PATH = "/app-settings";

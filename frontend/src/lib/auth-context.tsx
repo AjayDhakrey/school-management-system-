@@ -3,6 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "./api";
 import type { Role } from "./app-context";
 import { supabase } from "./supabase";
+import { formatName } from "./utils";
+import { loginEmailFor, studentIdFromEmail } from "./student-login";
 
 export type BackendRole =
   "SUPER_ADMIN" | "SCHOOL_ADMIN" | "TEACHER" | "STAFF" | "PARENT" | "STUDENT";
@@ -19,6 +21,8 @@ export interface AuthUser {
   linkedParentId: string | null;
   linkedStudentId: string | null;
   linkedStaffId: string | null;
+  /** First login with a Student ID or parent mobile (or after a reset): a new password is required. */
+  mustChangePassword: boolean;
 }
 
 const STAFF_DEPARTMENT_LABEL: Record<Exclude<StaffDepartment, null>, Role> = {
@@ -61,6 +65,8 @@ interface AuthState {
   loading: boolean;
   login: (email: string, password: string) => Promise<AuthUser>;
   logout: () => void;
+  /** Re-reads the signed-in profile, e.g. after the forced password change. */
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -71,21 +77,21 @@ function mapProfile(profile: Record<string, unknown>): AuthUser {
     role: profile["role"] as BackendRole,
     schoolId: (profile["school_id"] as string | null) ?? null,
     department: (profile["department"] as StaffDepartment) ?? null,
-    name: String(profile["name"] ?? ""),
+    name: formatName(String(profile["name"] ?? "")),
     email: String(profile["email"] ?? ""),
     linkedTeacherId: (profile["linked_teacher_id"] as string | null) ?? null,
     linkedParentId: (profile["linked_parent_id"] as string | null) ?? null,
     linkedStudentId: (profile["linked_student_id"] as string | null) ?? null,
     linkedStaffId: (profile["linked_staff_id"] as string | null) ?? null,
+    mustChangePassword: profile["must_change_password"] === true,
   };
 }
 
 async function loadProfile(userId: string): Promise<AuthUser> {
   const { data, error } = await supabase
     .from("user_profiles")
-    .select(
-      "id, role, school_id, department, name, email, linked_teacher_id, linked_parent_id, linked_student_id, linked_staff_id, status",
-    )
+    // "*" rather than a column list: older databases without must_change_password still load.
+    .select("*")
     .eq("id", userId)
     .single();
 
@@ -93,6 +99,15 @@ async function loadProfile(userId: string): Promise<AuthUser> {
   if (data.status === "SUSPENDED") {
     await supabase.auth.signOut();
     throw new ApiError(403, "This account has been suspended");
+  }
+  // Students open their portal with their Student ID only; an account still on an email
+  // login waits until the class teacher switches it (Student Logins → Create logins).
+  if (data.role === "STUDENT" && !studentIdFromEmail(String(data.email ?? ""))) {
+    await supabase.auth.signOut();
+    throw new ApiError(
+      403,
+      "Students sign in with their Student ID, not an email. Ask your class teacher for your Student ID.",
+    );
   }
   return mapProfile(data);
 }
@@ -134,9 +149,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [queryClient]);
 
-  const login = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error || !data.user) throw new ApiError(401, error?.message ?? "Unable to sign in", error);
+  const login = async (identifier: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginEmailFor(identifier),
+      password,
+    });
+    if (error || !data.user) {
+      // Auth's message talks about "email"; say something that also fits a Student ID or mobile.
+      const message = /invalid login credentials/i.test(error?.message ?? "")
+        ? "Wrong email / Student ID / mobile number or password"
+        : (error?.message ?? "Unable to sign in");
+      throw new ApiError(401, message, error);
+    }
     const profile = await loadProfile(data.user.id);
     queryClient.clear();
     setUser(profile);
@@ -149,7 +173,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void supabase.auth.signOut();
   };
 
-  const value = useMemo<AuthState>(() => ({ user, loading, login, logout }), [user, loading]);
+  const refreshUser = async () => {
+    const { data } = await supabase.auth.getUser();
+    if (data.user) setUser(await loadProfile(data.user.id));
+  };
+
+  const value = useMemo<AuthState>(
+    () => ({ user, loading, login, logout, refreshUser }),
+    // login/logout/refreshUser only close over stable setters and the query client.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, loading],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

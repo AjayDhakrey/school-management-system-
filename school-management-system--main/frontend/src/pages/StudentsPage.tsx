@@ -1,0 +1,944 @@
+import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { Users, UserCheck, UserX, Percent, MoreHorizontal, Plus, Eye, EyeOff, Pencil, Trash2, ListFilter, Home, BedDouble } from "lucide-react";
+import {
+  PageHeader,
+  SearchInput,
+  FilterSelect,
+  EmptyState,
+  TableSkeleton,
+  Pager,
+  Initials,
+  usePaged,
+} from "@/components/shared/ui-kit";
+import { InfoCard } from "@/components/shared/InfoCard";
+import { StatusBadge } from "@/components/shared/StatusBadge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { parentFirstPassword } from "@/lib/parent-login";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  useFees,
+  useStudents,
+  useParents,
+  useClasses,
+  useTransport,
+  type ApiFee,
+  type ApiStudent,
+} from "@/hooks/useApi";
+import { feeStatusOf } from "@/lib/fees";
+import { billNewStudent } from "@/lib/auto-billing";
+import { api, ApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { PhoneInput } from "@/components/shared/PhoneInput";
+
+const PER_PAGE = 8;
+const NONE = "__none__";
+const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+export function StudentFormDialog({
+  initial,
+  onDone,
+  onClose,
+}: {
+  initial?: ApiStudent;
+  onDone: () => void;
+  onClose: () => void;
+}) {
+  const isEdit = Boolean(initial);
+  const { data: classes } = useClasses();
+  const { data: parents } = useParents();
+  const { data: vehicles } = useTransport();
+  const queryClient = useQueryClient();
+  const [submitting, setSubmitting] = useState(false);
+  const [classId, setClassId] = useState(initial?.class_id ?? NONE);
+  const [status, setStatus] = useState(initial?.status ?? "Active");
+  const [vehicleId, setVehicleId] = useState(initial?.vehicle_id ?? NONE);
+  const [bloodGroup, setBloodGroup] = useState(initial?.blood_group ?? NONE);
+  const [isHosteller, setIsHosteller] = useState(Boolean(initial?.is_hosteller));
+  // New admissions are billed straight away from their class's fee structure.
+  const [autoBill, setAutoBill] = useState(true);
+  const [hostelRoom, setHostelRoom] = useState(initial?.hostel_room ?? "");
+  const [roll, setRoll] = useState(initial?.roll != null ? String(initial.roll) : "");
+  const [rollTouched, setRollTouched] = useState(isEdit);
+
+  // Roll numbers are unique within a class — look at the chosen class to suggest the next
+  // free number and flag a clash before the form is submitted.
+  const { data: classmates } = useStudents(classId !== NONE, classId !== NONE ? { classId } : undefined);
+  const otherClassmates = useMemo(
+    () => (classId !== NONE ? (classmates ?? []) : []).filter((s) => s.id !== initial?.id),
+    [classmates, classId, initial?.id],
+  );
+  const nextRoll = otherClassmates.reduce((max, s) => Math.max(max, s.roll ?? 0), 0) + 1;
+  const rollClash = roll ? otherClassmates.find((s) => s.roll === Number(roll)) : undefined;
+
+  useEffect(() => {
+    if (!rollTouched && classId !== NONE && classmates) setRoll(String(nextRoll));
+  }, [rollTouched, classId, classmates, nextRoll]);
+
+  // Most students get a brand-new parent record; only siblings of an already-enrolled
+  // student need the "existing parent" list, so that's opt-in rather than the default.
+  const [parentMode, setParentMode] = useState<"new" | "existing">(initial?.parent_id ? "existing" : "new");
+  const [existingParentId, setExistingParentId] = useState(initial?.parent_id ?? NONE);
+  const [newParentName, setNewParentName] = useState("");
+  const [newParentPhone, setNewParentPhone] = useState("");
+  const [newParentEmail, setNewParentEmail] = useState("");
+
+  // A new parent with a mobile number gets a mobile-number login automatically (see
+  // parentFirstPassword); the password field below is only for the student's email login.
+  const [createStudentLogin, setCreateStudentLogin] = useState(false);
+  const [portalPassword, setPortalPassword] = useState("");
+  const [showPortalPassword, setShowPortalPassword] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const form = new FormData(e.currentTarget);
+    const name = String(form.get("name") ?? "").trim();
+    const admissionNo = String(form.get("admissionNo") ?? "").trim();
+    const rollRaw = roll.trim();
+    const admittedOn = String(form.get("admittedOn") ?? "").trim();
+    const dob = String(form.get("dob") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim();
+    const phone = String(form.get("phone") ?? "").trim();
+    const address = String(form.get("address") ?? "").trim();
+    const pickupPoint = String(form.get("pickupPoint") ?? "").trim();
+    const dropPoint = String(form.get("dropPoint") ?? "").trim();
+
+    if (!name) {
+      toast.error("Name is required");
+      return;
+    }
+    if (rollRaw && (!Number.isInteger(Number(rollRaw)) || Number(rollRaw) < 1)) {
+      toast.error("Roll number must be a positive whole number");
+      return;
+    }
+    if (rollClash) {
+      toast.error(`Roll number ${rollRaw} is already assigned to ${rollClash.name} in this class`);
+      return;
+    }
+
+    const trimmedParentName = newParentName.trim();
+    const trimmedParentPhone = newParentPhone.trim();
+    const trimmedParentEmail = newParentEmail.trim();
+    if (parentMode === "new" && trimmedParentName && !trimmedParentPhone && !trimmedParentEmail) {
+      toast.error("Enter the parent's mobile number or email");
+      return;
+    }
+    if (createStudentLogin && !email) {
+      toast.error("Add the student's email above to create a student portal login");
+      return;
+    }
+    if (createStudentLogin && portalPassword.length < 6) {
+      toast.error("Portal password must be at least 6 characters");
+      return;
+    }
+
+    const selectedClass = classId !== NONE ? classes?.find((c) => c.id === classId) : undefined;
+
+    setSubmitting(true);
+    try {
+      let resolvedParentId: string | null =
+        parentMode === "existing" ? (existingParentId !== NONE ? existingParentId : null) : null;
+
+      if (parentMode === "new" && trimmedParentName) {
+        const createdParent = await api.post<{ id: string }>("/parents", {
+          name: trimmedParentName,
+          phone: trimmedParentPhone || null,
+          email: trimmedParentEmail || null,
+        });
+        resolvedParentId = createdParent.id;
+        // Creating the parent also made their mobile-number login (when a mobile was given).
+        queryClient.invalidateQueries({ queryKey: ["users"] });
+        queryClient.invalidateQueries({ queryKey: ["parents"] });
+      }
+
+      const body = {
+        name,
+        admissionNo: admissionNo || null,
+        classId: classId !== NONE ? classId : null,
+        className: selectedClass ? selectedClass.name : null,
+        section: selectedClass ? selectedClass.section : null,
+        roll: rollRaw ? Number(rollRaw) : null,
+        parentId: resolvedParentId,
+        admittedOn: admittedOn || null,
+        dob: dob || null,
+        email: email || null,
+        phone: phone || null,
+        bloodGroup: bloodGroup !== NONE ? bloodGroup : null,
+        address: address || null,
+        // Only sent once someone is (or was) a hosteller, so saving keeps working on a database
+        // that hasn't run migration 60 yet.
+        ...(isHosteller || initial?.is_hosteller
+          ? { isHosteller, hostelRoom: isHosteller ? hostelRoom.trim() || null : null }
+          : {}),
+        ...(isEdit
+          ? {
+              status,
+              vehicleId: vehicleId !== NONE ? vehicleId : null,
+              pickupPoint: pickupPoint || null,
+              dropPoint: dropPoint || null,
+            }
+          : {}),
+      };
+
+      let studentId: string;
+      if (isEdit) {
+        await api.patch(`/students/${initial!.id}`, body);
+        studentId = initial!.id;
+      } else {
+        const createdStudent = await api.post<{ id: string }>("/students", body);
+        studentId = createdStudent.id;
+
+        if (autoBill && selectedClass) {
+          try {
+            const { count, total, reason } = await billNewStudent({
+              studentId,
+              classId: selectedClass.id,
+              academicYearId: selectedClass.academic_year_id,
+              admittedOn: admittedOn || null,
+              isHosteller,
+              hasTransport: false,
+            });
+            if (count) {
+              toast.success(
+                `Billed ${count} fee${count === 1 ? "" : "s"} (₹${total.toLocaleString()}) from the ${selectedClass.name} fee structure`,
+              );
+              queryClient.invalidateQueries({ queryKey: ["fees"] });
+            } else {
+              toast.info(`No fees billed — ${reason ?? "nothing is due yet"}`);
+            }
+          } catch (err) {
+            toast.warning(
+              `Student added, but fees couldn't be billed: ${err instanceof ApiError ? err.message : "unknown error"}. Use Generate Fees on the Fee Structure page.`,
+            );
+          }
+        }
+      }
+
+      if (createStudentLogin) {
+        await api.post("/users", {
+          role: "STUDENT",
+          linkedId: studentId,
+          name,
+          email,
+          password: portalPassword,
+        });
+        queryClient.invalidateQueries({ queryKey: ["users"] });
+      }
+
+      toast.success(isEdit ? "Student updated successfully" : "Student added successfully");
+      onDone();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : `Failed to ${isEdit ? "update" : "add"} student`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle>{isEdit ? `Edit ${initial!.name}` : "Add Student"}</DialogTitle>
+      </DialogHeader>
+      <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-1.5">
+          <Label htmlFor="name">Full Name</Label>
+          <Input id="name" name="name" required defaultValue={initial?.name} placeholder="e.g. Aarav Mehta" />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="admissionNo">Admission No.</Label>
+          <Input
+            id="admissionNo"
+            name="admissionNo"
+            defaultValue={initial?.admission_no ?? ""}
+            placeholder="ADM/2026/001"
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Class</Label>
+          <Select value={classId} onValueChange={setClassId}>
+            <SelectTrigger className="bg-surface">
+              <SelectValue placeholder="Select class" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>Not assigned</SelectItem>
+              {(classes ?? []).map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}-{c.section}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="roll">Roll No.</Label>
+          <Input
+            id="roll"
+            name="roll"
+            type="number"
+            min={1}
+            step={1}
+            value={roll}
+            onChange={(e) => {
+              setRoll(e.target.value);
+              setRollTouched(true);
+            }}
+            placeholder={classId !== NONE ? String(nextRoll) : "Select a class first"}
+            aria-invalid={Boolean(rollClash)}
+          />
+          {rollClash ? (
+            <p className="text-xs text-destructive">
+              Already assigned to {rollClash.name}.{" "}
+              <button type="button" className="font-medium underline" onClick={() => setRoll(String(nextRoll))}>
+                Use {nextRoll}
+              </button>
+            </p>
+          ) : classId !== NONE && classmates && roll !== String(nextRoll) ? (
+            <p className="text-xs text-muted-foreground">Next free roll no.: {nextRoll}</p>
+          ) : null}
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="admittedOn">Admission Date</Label>
+          <Input
+            id="admittedOn"
+            name="admittedOn"
+            type="date"
+            // Only block past dates for a brand-new admission — editing an existing student must
+            // keep allowing their real (already-past) admission date, or the form can't be saved.
+            min={isEdit ? undefined : new Date().toISOString().slice(0, 10)}
+            defaultValue={initial?.admitted_on ?? (isEdit ? "" : new Date().toISOString().slice(0, 10))}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="dob">Date of Birth</Label>
+          <Input id="dob" name="dob" type="date" defaultValue={initial?.dob ?? ""} />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" defaultValue={initial?.email ?? ""} placeholder="student@example.com" />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="phone">Phone</Label>
+          <PhoneInput id="phone" name="phone" defaultValue={initial?.phone ?? ""} />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="bloodGroup">Blood Group</Label>
+          <Select value={bloodGroup} onValueChange={setBloodGroup}>
+            <SelectTrigger id="bloodGroup" className="bg-surface">
+              <SelectValue placeholder="Select blood group" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={NONE}>Not specified</SelectItem>
+              {BLOOD_GROUPS.map((bg) => (
+                <SelectItem key={bg} value={bg}>
+                  {bg}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5 sm:col-span-2">
+          <Label htmlFor="address">Address</Label>
+          <Input id="address" name="address" defaultValue={initial?.address ?? ""} placeholder="123 Maple Street, Springfield" />
+        </div>
+        <div className="grid gap-1.5 sm:col-span-2">
+          <Label>Accommodation</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {(
+              [
+                { value: false, title: "Day Scholar", note: "Goes home daily", icon: Home },
+                { value: true, title: "Hosteller", note: "Stays in school hostel", icon: BedDouble },
+              ] as const
+            ).map((option) => {
+              const on = isHosteller === option.value;
+              const Icon = option.icon;
+              return (
+                <button
+                  key={option.title}
+                  type="button"
+                  onClick={() => setIsHosteller(option.value)}
+                  aria-pressed={on}
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors",
+                    on ? "border-primary bg-primary/5 ring-2 ring-primary/15" : "border-border bg-surface hover:bg-muted/50",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "grid h-8 w-8 shrink-0 place-items-center rounded-lg",
+                      on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{option.title}</span>
+                    <span className="block truncate text-[11px] text-muted-foreground">{option.note}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {isHosteller && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="hostelRoom" className="text-xs text-muted-foreground">
+                Hostel room / block
+              </Label>
+              <Input
+                id="hostelRoom"
+                value={hostelRoom}
+                onChange={(e) => setHostelRoom(e.target.value)}
+                placeholder="e.g. Boys Block B · Room 12"
+                maxLength={60}
+              />
+              <p className="text-[11px] text-muted-foreground">Hostel fees are billed only to hostellers.</p>
+            </div>
+          )}
+        </div>
+        <div className="grid gap-1.5 sm:col-span-2">
+          <div className="flex items-center justify-between">
+            <Label>Parent / Guardian</Label>
+            <div className="flex gap-1 rounded-lg bg-muted p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setParentMode("new")}
+                className={cn(
+                  "rounded-md px-2.5 py-1 font-medium transition-colors",
+                  parentMode === "new" ? "bg-background shadow-sm" : "text-muted-foreground",
+                )}
+              >
+                New Parent
+              </button>
+              <button
+                type="button"
+                onClick={() => setParentMode("existing")}
+                className={cn(
+                  "rounded-md px-2.5 py-1 font-medium transition-colors",
+                  parentMode === "existing" ? "bg-background shadow-sm" : "text-muted-foreground",
+                )}
+              >
+                Existing Parent (Sibling)
+              </button>
+            </div>
+          </div>
+
+          {parentMode === "existing" ? (
+            <Select value={existingParentId} onValueChange={setExistingParentId}>
+              <SelectTrigger className="bg-surface">
+                <SelectValue placeholder="Select parent" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE}>Not linked</SelectItem>
+                {(parents ?? []).map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name} · {p.phone ?? "no phone"} · {p.email ?? "no email"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+              <p className="text-xs text-muted-foreground">
+                Creates a new parent record for this student. Leave the name blank to skip linking a parent for now.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input
+                  value={newParentName}
+                  onChange={(e) => setNewParentName(e.target.value)}
+                  placeholder="Parent full name"
+                  className="bg-surface"
+                />
+                <PhoneInput
+                  value={newParentPhone}
+                  onChange={(e) => setNewParentPhone(e.target.value)}
+                  placeholder="Parent's 10-digit mobile number"
+                  className="bg-surface"
+                />
+              </div>
+              <Input
+                type="email"
+                value={newParentEmail}
+                onChange={(e) => setNewParentEmail(e.target.value)}
+                placeholder="Email address"
+                className="bg-surface"
+              />
+              <p className="text-[11px] text-muted-foreground">Provide at least a mobile number or an email.</p>
+
+              {newParentName.trim() && parentFirstPassword(newParentName, newParentPhone) && (
+                <p className="rounded-lg bg-primary/5 px-2.5 py-2 text-[11px] text-foreground/80">
+                  Parent Portal login is created automatically — they sign in with this mobile number
+                  and the first password{" "}
+                  <span className="font-semibold">{parentFirstPassword(newParentName, newParentPhone)}</span>, then
+                  choose their own.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {!isEdit && (
+          <label className="flex items-start gap-2.5 rounded-xl border border-primary/25 bg-primary/5 p-3 sm:col-span-2">
+            <Checkbox className="mt-0.5" checked={autoBill} onCheckedChange={(v) => setAutoBill(v === true)} />
+            <span className="text-xs">
+              <span className="block font-semibold">Bill fees from the class fee structure</span>
+              <span className="text-muted-foreground">
+                One-time & yearly fees, the current term and every month from the admission month to now
+                {isHosteller ? " (hostel fees included)" : ""}.
+              </span>
+            </span>
+          </label>
+        )}
+
+        <div className="grid gap-1.5 sm:col-span-2">
+          <Label>Portal Access</Label>
+          <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+            <label className="flex items-center gap-2 text-xs font-medium">
+              <Checkbox checked={createStudentLogin} onCheckedChange={(v) => setCreateStudentLogin(v === true)} />
+              Create Student Portal login (uses the student's email above)
+            </label>
+            {createStudentLogin && (
+              <div className="space-y-2 border-t border-border pt-2">
+                <div className="relative">
+                  <Input
+                    type={showPortalPassword ? "text" : "password"}
+                    value={portalPassword}
+                    onChange={(e) => setPortalPassword(e.target.value)}
+                    placeholder="Set a password (min. 6 characters)"
+                    className="bg-surface pr-9"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPortalPassword((s) => !s)}
+                    className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
+                  >
+                    {showPortalPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        {isEdit && (
+          <div className="grid gap-1.5">
+            <Label>Status</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="bg-surface">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {isEdit && (
+          <>
+            <div className="grid gap-1.5">
+              <Label>Bus Route</Label>
+              <Select value={vehicleId} onValueChange={setVehicleId}>
+                <SelectTrigger className="bg-surface">
+                  <SelectValue placeholder="Select route" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Not assigned</SelectItem>
+                  {(vehicles ?? []).map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.route ?? v.number ?? v.id} {v.number ? `(${v.number})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {vehicleId === NONE
+                  ? "No transport — transport fees won't be billed."
+                  : "Transport fees will be billed to this student."}
+              </p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="pickupPoint">Pickup Point</Label>
+              <Input id="pickupPoint" name="pickupPoint" defaultValue={initial?.pickup_point ?? ""} placeholder="e.g. Maple Junction" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="dropPoint">Drop Point</Label>
+              <Input id="dropPoint" name="dropPoint" defaultValue={initial?.drop_point ?? ""} placeholder="e.g. Maple Junction" />
+            </div>
+          </>
+        )}
+        <DialogFooter className="sm:col-span-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={submitting}>
+            {submitting ? (isEdit ? "Saving…" : "Adding…") : isEdit ? "Save Changes" : "Add Student"}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  );
+}
+
+export default function StudentsPage() {
+  const [search, setSearch] = useState("");
+  const [classFilter, setClassFilter] = useState("");
+  const [sectionFilter, setSectionFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const searchTerm = search.trim();
+  const isSearching = searchTerm.length > 0;
+  const { data: students, isLoading } = useStudents(true, {
+    ...(isSearching ? { q: searchTerm } : {}),
+    ...(!isSearching && classFilter ? { className: classFilter } : {}),
+    ...(!isSearching && sectionFilter ? { section: sectionFilter } : {}),
+    ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+  });
+  const { data: classes } = useClasses();
+  const { data: parents } = useParents();
+  const queryClient = useQueryClient();
+  const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<ApiStudent | null>(null);
+  const [page, setPage] = useState(1);
+
+  const hasSelection = Boolean(classFilter) && Boolean(sectionFilter);
+
+  function handleClassChange(value: string) {
+    setClassFilter(value);
+    setSectionFilter("");
+  }
+
+  async function invalidate() {
+    await queryClient.invalidateQueries({ queryKey: ["students"] });
+  }
+
+  // Fee status comes from each student's real bills, not the stored (never-updated) column.
+  const { data: fees } = useFees();
+  const feesByStudent = useMemo(() => {
+    const map = new Map<string, ApiFee[]>();
+    for (const f of fees ?? []) map.set(f.student_id, [...(map.get(f.student_id) ?? []), f]);
+    return map;
+  }, [fees]);
+  const parentsById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of parents ?? []) map.set(p.id, p.name);
+    return map;
+  }, [parents]);
+
+  const classOptions = useMemo(
+    () => Array.from(new Set((classes ?? []).map((c) => c.name))),
+    [classes],
+  );
+  const sectionOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (classes ?? [])
+            .filter((c) => !classFilter || c.name === classFilter)
+            .map((c) => c.section)
+            .filter((c): c is string => Boolean(c)),
+        ),
+      ),
+    [classes, classFilter],
+  );
+
+  const filtered = useMemo(() => {
+    if (!hasSelection && !isSearching) return [];
+    return students ?? [];
+  }, [students, hasSelection, isSearching]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, classFilter, sectionFilter, statusFilter]);
+
+  const { rows, pageCount } = usePaged(filtered, page, PER_PAGE);
+
+  const total = students?.length ?? 0;
+  const active = (students ?? []).filter((s) => s.status === "Active").length;
+  const inactive = total - active;
+  const avgAttendance = total ? Math.round((students ?? []).reduce((a, s) => a + (s.attendance ?? 0), 0) / total) : 0;
+
+  async function handleDelete(s: ApiStudent) {
+    try {
+      const result = await api.delete<{ archived: boolean }>(`/students/${s.id}`);
+      await invalidate();
+      toast.success(result.archived ? `${s.name} archived` : `${s.name} deleted permanently`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to delete student");
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Students"
+        description="Manage enrolled students, profiles and records."
+        breadcrumb={["Dashboard", "Students"]}
+        actions={
+          <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="h-4 w-4" />
+                Add Student
+              </Button>
+            </DialogTrigger>
+            <StudentFormDialog onDone={async () => { await invalidate(); setAddOpen(false); }} onClose={() => setAddOpen(false)} />
+          </Dialog>
+        }
+      />
+
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+        <InfoCard label="Total Students" value={total} icon={Users} tone="navy" />
+        <InfoCard label="Active" value={active} icon={UserCheck} tone="success" />
+        <InfoCard label="Inactive" value={inactive} icon={UserX} tone="danger" />
+        <InfoCard label="Avg Attendance" value={`${avgAttendance}%`} icon={Percent} tone="gold" />
+      </div>
+
+      <div className="panel">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+            <Select value={classFilter} onValueChange={handleClassChange}>
+              <SelectTrigger className="h-9 w-full bg-surface text-sm sm:w-[160px]">
+                <SelectValue placeholder="Select Class" />
+              </SelectTrigger>
+              <SelectContent>
+                {classOptions.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={sectionFilter} onValueChange={setSectionFilter} disabled={!classFilter}>
+              <SelectTrigger className="h-9 w-full bg-surface text-sm sm:w-[160px]">
+                <SelectValue placeholder="Select Section" />
+              </SelectTrigger>
+              <SelectContent>
+                {sectionOptions.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search any student by name…"
+            />
+            {(hasSelection || isSearching) && (
+              <FilterSelect
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={["Active", "Inactive"]}
+                placeholder="Status"
+              />
+            )}
+          </div>
+        </div>
+
+        {!hasSelection && !isSearching ? (
+          <EmptyState
+            icon={ListFilter}
+            title="Search or select a class and section"
+            description="Search by student name across the school, or choose a class and section to browse its students."
+          />
+        ) : isLoading ? (
+          <TableSkeleton rows={8} cols={6} />
+        ) : rows.length === 0 ? (
+          <EmptyState title="No students found" description="Try adjusting your search or filters." />
+        ) : (
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Admission No.</TableHead>
+                    <TableHead>Roll No.</TableHead>
+                    <TableHead>Class</TableHead>
+                    <TableHead>Section</TableHead>
+                    <TableHead>Parent</TableHead>
+                    <TableHead>Fee Status</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((s) => (
+                    <TableRow key={s.id}>
+                      <TableCell>
+                        <div className="flex min-w-0 items-center gap-2.5">
+                          <Initials name={s.name} />
+                          <Link
+                            to={`/students/${s.id}`}
+                            className="truncate font-medium hover:underline"
+                          >
+                            {s.name}
+                          </Link>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{s.admission_no}</TableCell>
+                      <TableCell>{s.roll ?? "—"}</TableCell>
+                      <TableCell>{s.class_name}</TableCell>
+                      <TableCell>{s.section}</TableCell>
+                      <TableCell className="truncate">{s.parent_id ? parentsById.get(s.parent_id) : "—"}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={feeStatusOf(feesByStudent.get(s.id) ?? [])} />
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={s.status ?? "Active"} />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <RowActions student={s} onEdit={() => setEditing(s)} onDelete={() => handleDelete(s)} />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="grid gap-3 p-4 md:hidden">
+              {rows.map((s) => (
+                <div key={s.id} className="panel p-3.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <Initials name={s.name} />
+                      <div className="min-w-0">
+                        <Link
+                          to={`/students/${s.id}`}
+                          className="block truncate text-sm font-semibold hover:underline"
+                        >
+                          {s.name}
+                        </Link>
+                        <p className="text-xs text-muted-foreground">
+                          {s.admission_no}
+                          {s.roll ? ` · Roll ${s.roll}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                    <RowActions student={s} onEdit={() => setEditing(s)} onDelete={() => handleDelete(s)} />
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                    <p>Class: <span className="text-foreground">{s.class_name} {s.section}</span></p>
+                    <p>Parent: <span className="text-foreground">{s.parent_id ? parentsById.get(s.parent_id) : "—"}</span></p>
+                  </div>
+                  <div className="mt-3">
+                    <StatusBadge status={s.status ?? "Active"} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <Pager page={Math.min(page, pageCount)} pageCount={pageCount} onPage={setPage} total={filtered.length} />
+          </>
+        )}
+      </div>
+
+      <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        {editing && (
+          <StudentFormDialog
+            initial={editing}
+            onDone={async () => { await invalidate(); setEditing(null); }}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </Dialog>
+    </div>
+  );
+}
+
+function RowActions({
+  student,
+  onEdit,
+  onDelete,
+}: {
+  student: ApiStudent;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link to={`/students/${student.id}`}>
+              <Eye className="mr-2 h-4 w-4" /> View Profile
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onEdit}>
+            <Pencil className="mr-2 h-4 w-4" /> Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onSelect={(e) => {
+              e.preventDefault();
+              setConfirmOpen(true);
+            }}
+          >
+            <Trash2 className="mr-2 h-4 w-4" /> Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {student.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes {student.name} and everything linked to them — fees and
+              payments, attendance, results, homework, leave and their student portal login. This
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onDelete();
+                setConfirmOpen(false);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}

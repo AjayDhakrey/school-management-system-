@@ -1,0 +1,9 @@
+#!/bin/sh
+# Push completed commits on main to the configured origin.
+branch=$(git symbolic-ref --quiet --short HEAD) || exit 0
+[ "$branch" = main ] || exit 0
+
+if ! git push origin main; then
+  printf '%s\n' 'Automatic push failed. Your commit is saved locally; run git push origin main after resolving the error.' >&2
+  exit 1
+fi

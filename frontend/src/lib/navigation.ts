@@ -564,8 +564,11 @@ export const NAV: NavGroup[] = [
         label: "School Settings",
         to: "/settings",
         icon: Settings,
-        // School settings are for the school's admins — teachers get their own profile instead.
-        roles: ALL_SCHOOL.filter((r) => r !== "Student" && r !== "Parent" && r !== "Teacher"),
+        // School settings are for the school's admins — teachers and librarians get their own
+        // profile instead.
+        roles: ALL_SCHOOL.filter(
+          (r) => r !== "Student" && r !== "Parent" && r !== "Teacher" && r !== "Librarian",
+        ),
         hideFromSidebar: ["Transport Manager"],
       },
     ],
@@ -813,4 +816,5 @@ export const SETTINGS_PATH_FOR_ROLE: Partial<Record<Role, string>> = {
   Student: "/profile",
   Parent: "/parent/children/profile",
   "Super Admin": "/super-admin/settings",
+  Librarian: "/staff/profile",
 };

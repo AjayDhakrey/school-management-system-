@@ -10,13 +10,14 @@ import { ChildSwitcher } from "@/components/parent/ChildSwitcher";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useExamsFor, isUpcomingExam, isCompletedExam } from "@/hooks/useApi";
 import { useParentChild } from "@/lib/parent-child-context";
+import { withClassPrefix } from "@/lib/utils";
 
 export default function ParentExamsPage() {
   const { selectedChild, isLoading: childrenLoading } = useParentChild();
   const { data: exams, isLoading } = useExamsFor(selectedChild?.id ?? undefined);
 
   const classLabel = selectedChild?.class_name
-    ? `Class ${selectedChild.class_name}${selectedChild.section ? `-${selectedChild.section}` : ""}`
+    ? `${withClassPrefix(selectedChild.class_name)}${selectedChild.section ? `-${selectedChild.section}` : ""}`
     : "—";
 
   const rows = (exams ?? []).slice().sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));

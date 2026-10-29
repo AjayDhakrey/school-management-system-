@@ -46,7 +46,7 @@ export default function TeacherClassesPage() {
       ) : (
         <ul className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((c) => {
-            const name = /^class\s*\d/i.test(c.name.trim()) ? c.name.trim() : `Class ${c.name}`;
+            const name = /^class\b/i.test(c.name.trim()) ? c.name.trim() : `Class ${c.name}`;
             return (
               <li key={c.id}>
                 <Link

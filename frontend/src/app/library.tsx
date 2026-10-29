@@ -75,6 +75,7 @@ import {
   useHasPermission,
   useLibraryBooks,
   useLibraryBorrowers,
+  useLibraryStudentClasses,
   useLibraryCirculation,
   useLibraryCopies,
   useLibraryRecords,
@@ -1453,10 +1454,37 @@ function CirculationTab({
   const [borrowerType, setBorrowerType] = useState<LibraryBorrowerType>("STUDENT");
   const [borrowerQuery, setBorrowerQuery] = useState("");
   const debouncedBorrower = useDebounced(borrowerQuery);
+  // Students can be narrowed by class and section; picking a class lists it without a name.
+  const [classFilter, setClassFilter] = useState("all");
+  const [sectionFilter, setSectionFilter] = useState("all");
+  const isStudent = borrowerType === "STUDENT";
+  const { data: studentClasses } = useLibraryStudentClasses(isStudent);
+  const classOptions = useMemo(
+    () =>
+      [...new Set((studentClasses ?? []).map((c) => c.class_name))].sort((a, b) =>
+        a.localeCompare(b, undefined, { numeric: true }),
+      ),
+    [studentClasses],
+  );
+  const sectionOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          (studentClasses ?? [])
+            .filter((c) => c.class_name === classFilter && c.section)
+            .map((c) => c.section as string),
+        ),
+      ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    [studentClasses, classFilter],
+  );
+  const activeClass = isStudent && classFilter !== "all" ? classFilter : "";
+  const activeSection = activeClass && sectionFilter !== "all" ? sectionFilter : "";
+  const showBorrowerResults = debouncedBorrower.trim().length >= 2 || !!activeClass;
   const { data: borrowerResults, isFetching: searchingBorrowers } = useLibraryBorrowers(
     debouncedBorrower,
     borrowerType,
-    debouncedBorrower.trim().length >= 2,
+    showBorrowerResults,
+    { className: activeClass, section: activeSection },
   );
   const [borrower, setBorrower] = useState<ApiLibraryBorrower | null>(null);
   // Copy
@@ -1607,7 +1635,7 @@ function CirculationTab({
               </div>
             ) : (
               <>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Select
                     value={borrowerType}
                     onValueChange={(v) => setBorrowerType(v as LibraryBorrowerType)}
@@ -1623,16 +1651,54 @@ function CirculationTab({
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input
-                    className="h-9"
-                    placeholder={
-                      borrowerType === "STUDENT" ? "Name or admission no." : "Name or employee ID"
-                    }
-                    value={borrowerQuery}
-                    onChange={(e) => setBorrowerQuery(e.target.value)}
-                  />
+                  {isStudent && (
+                    <>
+                      <Select
+                        value={classFilter}
+                        onValueChange={(v) => {
+                          setClassFilter(v);
+                          setSectionFilter("all");
+                        }}
+                      >
+                        <SelectTrigger className="h-9 w-36">
+                          <SelectValue placeholder="All classes" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="all">All classes</SelectItem>
+                          {classOptions.map((c) => (
+                            <SelectItem key={c} value={c}>
+                              {c}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={sectionFilter}
+                        disabled={classFilter === "all" || sectionOptions.length === 0}
+                        onValueChange={setSectionFilter}
+                      >
+                        <SelectTrigger className="h-9 w-36">
+                          <SelectValue placeholder="All sections" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-60">
+                          <SelectItem value="all">All sections</SelectItem>
+                          {sectionOptions.map((sec) => (
+                            <SelectItem key={sec} value={sec}>
+                              Section {sec}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
                 </div>
-                {debouncedBorrower.trim().length >= 2 && (
+                <Input
+                  className="h-9"
+                  placeholder={isStudent ? "Name or admission no." : "Name or employee ID"}
+                  value={borrowerQuery}
+                  onChange={(e) => setBorrowerQuery(e.target.value)}
+                />
+                {showBorrowerResults && (
                   <div className="max-h-52 overflow-y-auto rounded-xl border border-border">
                     {searchingBorrowers && !borrowerResults ? (
                       <p className="p-3 text-xs text-muted-foreground">Searching…</p>

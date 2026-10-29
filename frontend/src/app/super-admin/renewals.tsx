@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSchools, type ApiSchool } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { niceDate } from "@/lib/utils";
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -129,7 +130,7 @@ export default function RenewalsPage() {
                         </div>
                       </TableCell>
                       <TableCell>{s.plan}</TableCell>
-                      <TableCell className="text-muted-foreground">{s.subscription_expires_at ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{niceDate(s.subscription_expires_at)}</TableCell>
                       <TableCell>
                         <StatusBadge status={d !== null && d < 0 ? "OVERDUE" : d !== null && d <= 30 ? "PENDING" : "TRIAL"} />
                         <span className="ml-2 text-xs text-muted-foreground">{d !== null ? `${d}d` : "—"}</span>

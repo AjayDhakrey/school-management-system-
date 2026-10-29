@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn, withClassPrefix } from "@/lib/utils";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { FileText, Printer, Plus } from "lucide-react";
@@ -344,7 +344,7 @@ export default function CertificatesPage() {
                         <p className="truncate text-[11px] text-muted-foreground">
                           {label} ·{" "}
                           {st?.class_name
-                            ? `Class ${st.class_name}${st.section ? `-${st.section}` : ""} · `
+                            ? `${withClassPrefix(st.class_name)}${st.section ? `-${st.section}` : ""} · `
                             : ""}
                           {new Date(`${c.issued_on}T00:00:00Z`).toLocaleDateString("en-IN", {
                             day: "numeric",

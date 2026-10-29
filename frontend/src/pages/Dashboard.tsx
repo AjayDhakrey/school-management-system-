@@ -59,7 +59,7 @@ import payrollIcon from "@/icons/Add-staff-icon.png";
 import addNoticeIcon from "@/icons/add-notice-icon.png";
 import driversIcon from "@/icons/drivers.png";
 import maintenanceIcon from "@/icons/maintenance.png";
-import { cn } from "@/lib/utils";
+import { cn, niceDate } from "@/lib/utils";
 import { QUICK_ACTION_ASSETS } from "@/lib/siteData";
 import { useAuth, toDisplayRole } from "@/lib/auth-context";
 import { canView } from "@/lib/permissions";
@@ -1008,7 +1008,7 @@ function SuperAdminDashboard() {
                     <StatusBadge status={s.payment_status ?? "PENDING"} />
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {s.subscription_expires_at ?? "—"}
+                    {niceDate(s.subscription_expires_at)}
                   </TableCell>
                   <TableCell className="text-right">
                     <StatusBadge status={s.status} />
@@ -1025,6 +1025,8 @@ function SuperAdminDashboard() {
 
 function SchoolDashboard() {
   const { user } = useAuth();
+  // Mirrors the month SchoolCalendar is showing (it opens on the current month).
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
   const displayRole = toDisplayRole(user);
   const quickActions = actions.filter(
     (a) => !a.to || (ROUTE_ROLES[a.to] ?? []).includes(displayRole),
@@ -1249,9 +1251,9 @@ function SchoolDashboard() {
         <SectionCard
           className="order-3 lg:order-none lg:col-start-1 lg:row-start-1"
           title="Academic Calendar"
-          subtitle="August 2026"
+          subtitle={calendarMonth.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}
         >
-          <SchoolCalendar />
+          <SchoolCalendar onMonthChange={setCalendarMonth} />
         </SectionCard>
 
         <SectionCard

@@ -1445,8 +1445,11 @@ async function read(parts: string[], search: URLSearchParams): Promise<unknown> 
         return rpc("library_find_borrowers", {
           p_query: param("q") ?? "",
           p_type: param("type"),
+          p_class: param("class"),
+          p_section: param("section"),
         });
       }
+      if (second === "student-classes") return rpc("library_student_classes");
       break;
     }
 

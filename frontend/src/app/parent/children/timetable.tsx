@@ -29,7 +29,7 @@ import {
   PeriodCard,
   MetaItem,
 } from "@/components/timetable/TimetableShared";
-import { cn } from "@/lib/utils";
+import { cn, withClassPrefix } from "@/lib/utils";
 
 export default function ParentTimetablePage() {
   const { selectedChild, selectedChildId, isLoading: childrenLoading } = useParentChild();
@@ -132,7 +132,7 @@ export default function ParentTimetablePage() {
               ? `${(byDay.get(activeDay) ?? []).length} periods · ${weekDay(activeDay).holiday ? "Holiday" : activeDay === todayDay ? "Today" : "Working Day"}`
               : `All ${DAYS.length} days overview for ${
                   selectedChild?.class_name
-                    ? `Class ${selectedChild.class_name}${selectedChild.section ? `-${selectedChild.section}` : ""}`
+                    ? `${withClassPrefix(selectedChild.class_name)}${selectedChild.section ? `-${selectedChild.section}` : ""}`
                     : "Class"
                 }`
           }

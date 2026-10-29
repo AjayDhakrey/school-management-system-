@@ -28,15 +28,7 @@ import {
 } from "@/components/ui/select";
 import { useSchool, usePlans } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-
-/** "17 Oct 2026" from an ISO date/time. */
-function niceDate(iso: string | null | undefined) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
+import { niceDate } from "@/lib/utils";
 
 /** One billing period after `from` (a month, or a year for yearly plans). */
 function periodEnd(from: Date, cycle: string | null | undefined) {

@@ -22,11 +22,14 @@ const MONTHS = [
 export function SchoolCalendar({
   className,
   onSelect,
+  onMonthChange,
   compact = true,
   events = [],
 }: {
   className?: string;
   onSelect?: (iso: string) => void;
+  /** Called with the first day of the newly displayed month when the user pages months. */
+  onMonthChange?: (month: Date) => void;
   compact?: boolean;
   events?: ApiSchoolEvent[];
 }) {
@@ -47,7 +50,9 @@ export function SchoolCalendar({
 
   const shift = (d: number) => {
     const m = cursor.m + d;
-    setCursor({ y: cursor.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 });
+    const next = { y: cursor.y + Math.floor(m / 12), m: ((m % 12) + 12) % 12 };
+    setCursor(next);
+    onMonthChange?.(new Date(next.y, next.m, 1));
   };
 
   return (

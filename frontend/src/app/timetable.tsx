@@ -35,7 +35,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+import { cn, withClassPrefix } from "@/lib/utils";
 import { isPeriodLive, useSchoolTimings } from "@/lib/school-timings";
 import { printTimetables, type TimetablePage } from "@/lib/timetable-print";
 import { useSchoolBranding } from "@/hooks/use-school-branding";
@@ -567,7 +567,7 @@ function classPage(
   teacherName: (id: string | null) => string,
 ): TimetablePage {
   return {
-    title: `Class ${label}`,
+    title: withClassPrefix(label),
     subtitle: "Class timetable",
     cell: (day, period) => {
       const slot = classSlots.find((s) => s.day === day && s.period === period);
@@ -889,7 +889,7 @@ function AdminTeacherTimetable({ printRef }: { printRef: PrintRef }) {
             return {
               subject: slot.subject,
               lines: [
-                slot.class_id ? `Class ${classNameById.get(slot.class_id) ?? ""}` : "",
+                slot.class_id ? withClassPrefix(classNameById.get(slot.class_id) ?? "") : "",
                 slot.room ?? "",
               ],
             };

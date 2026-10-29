@@ -880,23 +880,31 @@ function AdminPayroll() {
 
 function EmployeeSalary() {
   const { user } = useAuth();
-  const { data: items } = usePayroll();
+  const { data: allItems } = usePayroll();
   const { data: structures } = useSalaryStructures();
-  const latest = items?.[0];
+  // Payroll staff (e.g. accountants) can read everyone's rows, so keep only the signed-in
+  // employee's own payroll and salary structure.
+  const myType = user?.role === "TEACHER" ? "TEACHER" : "STAFF";
+  const myId = myType === "TEACHER" ? user?.linkedTeacherId : user?.linkedStaffId;
+  const items = useMemo(
+    () =>
+      (allItems ?? [])
+        .filter((i) => i.employee_type === myType && i.employee_id === myId)
+        .sort((a, b) => b.payroll_month.localeCompare(a.payroll_month)),
+    [allItems, myType, myId],
+  );
+  const latest = items[0];
   const fallback = payroll[0]!;
 
   const structure = (structures ?? []).find(
-    (s) =>
-      s.active &&
-      ((user?.role === "TEACHER" && s.employee_type === "TEACHER") ||
-        (user?.role === "STAFF" && s.employee_type === "STAFF")),
+    (s) => s.active && s.employee_type === myType && s.employee_id === myId,
   );
 
   const gross =
     latest?.gross_salary ??
-    (structure ? structure.basic_salary + structure.hra + structure.special_allowance : fallback.gross);
+    (structure ? structure.basic_salary + structure.hra + structure.special_allowance : 0);
   const fixedDeductions =
-    structure?.fixed_deductions ?? latest?.fixed_deductions ?? fallback.deductions;
+    structure?.fixed_deductions ?? latest?.fixed_deductions ?? 0;
   const leaveDeduction =
     latest && latest.paid_days === 0 && latest.leave_deduction >= latest.gross_salary
       ? 0
@@ -916,6 +924,8 @@ function EmployeeSalary() {
 
   const row: SalaryRow = {
     ...fallback,
+    // Never show the demo employee code or figures as the signed-in user's own.
+    id: "—",
     name: user?.name || fallback.name,
     role: user?.role === "TEACHER" ? "Teacher" : "School Staff",
     department: user?.role === "TEACHER" ? "Teaching" : "Non-Teaching",
@@ -937,7 +947,8 @@ function EmployeeSalary() {
     hra: structure?.hra,
     allowance: structure?.special_allowance,
   };
-  const history = (items ?? []).map((item) => ({
+  const history = items.map((item) => ({
+    id: item.id,
     month: new Intl.DateTimeFormat("en-IN", { month: "long", year: "numeric" }).format(
       new Date(`${item.payroll_month}T00:00:00`),
     ),
@@ -1015,8 +1026,11 @@ function EmployeeSalary() {
             bodyClassName="p-0"
           >
             <div className="divide-y">
+              {history.length === 0 && (
+                <p className="p-4 text-sm text-muted-foreground">No salary payments yet.</p>
+              )}
               {history.map((item) => (
-                <div key={item.month} className="flex items-center gap-3 p-4">
+                <div key={item.id} className="flex items-center gap-3 p-4">
                   <span className="grid h-9 w-9 place-items-center rounded-xl bg-success-soft text-success">
                     <CheckCircle2 className="h-4 w-4" />
                   </span>

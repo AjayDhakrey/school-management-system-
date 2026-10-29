@@ -3,7 +3,7 @@ import { Initials } from "@/components/shared/ui-kit";
 import { EmptyState } from "@/components/shared/ui-kit";
 import { Users } from "lucide-react";
 import { useParentChild } from "@/lib/parent-child-context";
-import { cn } from "@/lib/utils";
+import { cn, withClassPrefix } from "@/lib/utils";
 
 /** Rendered at the top of every Parent page. No-op UI for a single-child parent. */
 export function ChildSwitcher({ className }: { className?: string }) {
@@ -31,7 +31,7 @@ export function ChildSwitcher({ className }: { className?: string }) {
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{c.name}</p>
           <p className="truncate text-xs text-muted-foreground">
-            {c.class_name ? `Class ${c.class_name}${c.section ? `-${c.section}` : ""}` : "—"}
+            {c.class_name ? `${withClassPrefix(c.class_name)}${c.section ? `-${c.section}` : ""}` : "—"}
           </p>
         </div>
       </div>
@@ -73,7 +73,7 @@ export function ChildSwitcher({ className }: { className?: string }) {
         <SelectContent>
           {children.map((c) => (
             <SelectItem key={c.id} value={c.id}>
-              {c.name} {c.class_name ? `— Class ${c.class_name}${c.section ? `-${c.section}` : ""}` : ""}
+              {c.name} {c.class_name ? `— ${withClassPrefix(c.class_name)}${c.section ? `-${c.section}` : ""}` : ""}
             </SelectItem>
           ))}
         </SelectContent>

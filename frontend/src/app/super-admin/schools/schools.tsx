@@ -30,6 +30,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSchools, usePlans } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { niceDate } from "@/lib/utils";
 import { PhoneInput } from "@/components/shared/PhoneInput";
 
 function AddSchoolForm({ onDone }: { onDone: () => void }) {
@@ -234,7 +235,7 @@ export default function SchoolsPage() {
                     <TableCell>
                       <StatusBadge status={s.status} />
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{s.subscription_expires_at ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{niceDate(s.subscription_expires_at)}</TableCell>
                     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                       <Button variant="outline" size="sm" asChild>
                         <Link to={`/super-admin/schools/${s.id}`}>Manage</Link>

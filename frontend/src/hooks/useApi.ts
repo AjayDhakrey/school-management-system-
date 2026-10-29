@@ -1204,10 +1204,26 @@ export const useLibraryCirculation = (enabled = true) =>
   useApiQuery<ApiLibraryLoan[]>("library-circulation", "/library/circulation", enabled);
 export const useLibrarySettings = (enabled = true) =>
   useApiQuery<ApiLibrarySettings>("library-settings", "/library/settings", enabled);
-export const useLibraryBorrowers = (query: string, type: string, enabled = true) =>
-  useApiQuery<ApiLibraryBorrower[]>(
+export const useLibraryBorrowers = (
+  query: string,
+  type: string,
+  enabled = true,
+  filters?: { className?: string; section?: string },
+) => {
+  const params = new URLSearchParams({ q: query });
+  if (type) params.set("type", type);
+  if (filters?.className) params.set("class", filters.className);
+  if (filters?.section) params.set("section", filters.section);
+  return useApiQuery<ApiLibraryBorrower[]>(
     "library-borrowers",
-    `/library/borrowers?q=${encodeURIComponent(query)}${type ? `&type=${type}` : ""}`,
+    `/library/borrowers?${params.toString()}`,
+    enabled,
+  );
+};
+export const useLibraryStudentClasses = (enabled = true) =>
+  useApiQuery<{ class_name: string; section: string | null }[]>(
+    "library-student-classes",
+    "/library/student-classes",
     enabled,
   );
 export const useTransport = (enabled = true) =>

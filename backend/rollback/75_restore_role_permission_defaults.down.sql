@@ -1,0 +1,6 @@
+-- Undo 75_restore_role_permission_defaults.sql.
+-- The defaults it restores are the ones migrations 22, 34, 55, 56 and 57 already define, so a
+-- rollback normally needs nothing. Only if you must return to the exact pre-75 state (an empty
+-- defaults table, which leaves roles without overrides with no permissions) run:
+--
+--   delete from public.role_permission_defaults;

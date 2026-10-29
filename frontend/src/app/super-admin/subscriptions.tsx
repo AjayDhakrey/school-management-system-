@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSchools } from "@/hooks/useApi";
+import { niceDate } from "@/lib/utils";
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -89,7 +90,7 @@ export default function SubscriptionsPage() {
                         <StatusBadge status={s.payment_status ?? "PENDING"} />
                       </TableCell>
                       <TableCell className={d !== null && d <= 30 ? "font-medium text-warning" : "text-muted-foreground"}>
-                        {s.subscription_expires_at ?? "—"}
+                        {niceDate(s.subscription_expires_at)}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" asChild>

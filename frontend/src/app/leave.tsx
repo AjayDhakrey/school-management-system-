@@ -380,9 +380,181 @@ function leaveRange(from: string | null | undefined, to: string | null | undefin
   return `${range} · ${days} day${days === 1 ? "" : "s"}`;
 }
 
+function StaffOwnLeaveView() {
+  const queryClient = useQueryClient();
+  const { data: requests, isLoading } = useLeaveRequests("STAFF");
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [leaveType, setLeaveType] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const rows = requests ?? [];
+  const pending = rows.filter((r) => r.status === "Pending").length;
+  const approved = rows.filter((r) => r.status === "Approved").length;
+  const rejected = rows.filter((r) => r.status === "Rejected").length;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await api.post("/leave", {
+        fromDate,
+        toDate,
+        reason: leaveType ? `${leaveType}: ${reason}` : reason,
+      });
+      await queryClient.invalidateQueries({ queryKey: ["leave-STAFF"] });
+      toast.success("Leave request submitted");
+      setApplyOpen(false);
+      setLeaveType("");
+      setFromDate("");
+      setToDate("");
+      setReason("");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to submit leave request");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Staff Leave"
+        description="Your personal leave requests and leave history."
+        breadcrumb={["Dashboard", "Staff Leave"]}
+        actions={
+          <Button size="sm" className="h-9" onClick={() => setApplyOpen(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> Apply for Leave
+          </Button>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <InfoCard label="Total Requests" value={rows.length} icon={ClipboardList} tone="navy" />
+        <InfoCard label="Pending" value={pending} icon={Clock3} tone="warning" />
+        <InfoCard label="Approved" value={approved} icon={CheckCircle2} tone="success" />
+        <InfoCard label="Rejected" value={rejected} icon={XCircle} tone="danger" />
+      </div>
+
+      <SectionCard className="mt-4" title="Leave History" subtitle="All your leave requests">
+        {isLoading ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">Loading…</p>
+        ) : rows.length === 0 ? (
+          <EmptyState title="No leave requests yet" icon={ClipboardList} />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Dates</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => {
+                  const { type, text } = splitReason(r.reason);
+                  return (
+                    <TableRow key={r.id}>
+                      <TableCell className="font-medium">{type}</TableCell>
+                      <TableCell>{leaveRange(r.from_date, r.to_date)}</TableCell>
+                      <TableCell className="max-w-[280px] truncate text-muted-foreground">
+                        {text}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <StatusBadge status={r.status} />
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </SectionCard>
+
+      <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Apply for Leave</DialogTitle>
+            <DialogDescription>Submit a leave request for administrative approval.</DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label>Leave Type</Label>
+              <Select value={leaveType} onValueChange={setLeaveType}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Casual Leave">Casual Leave</SelectItem>
+                  <SelectItem value="Sick Leave">Sick Leave</SelectItem>
+                  <SelectItem value="Emergency Leave">Emergency Leave</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="staff-from">From</Label>
+                <Input
+                  id="staff-from"
+                  type="date"
+                  className="mt-1"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="staff-to">To</Label>
+                <Input
+                  id="staff-to"
+                  type="date"
+                  className="mt-1"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="staff-reason">Reason</Label>
+              <Textarea
+                id="staff-reason"
+                className="mt-1"
+                rows={3}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Brief reason for your leave request…"
+                required
+              />
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setApplyOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Submitting…" : "Submit"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function Page({ type: leaveType }: { type: LeaveType }) {
   const { user } = useAuth();
   if (user?.role === "TEACHER" && leaveType === "TEACHER") return <TeacherOwnLeaveView />;
+  if (user?.role === "STAFF" && leaveType === "STAFF") return <StaffOwnLeaveView />;
   return <LeaveManagementView type={leaveType} />;
 }
 

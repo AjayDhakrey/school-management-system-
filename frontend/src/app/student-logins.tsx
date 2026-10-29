@@ -79,7 +79,7 @@ function statusOf(s: ApiStudentLogin): Status {
 }
 const STATUS_UI: Record<Status, { label: string; tone: string }> = {
   active: { label: "Active", tone: "bg-success-soft text-success" },
-  "first-login": { label: "Waiting for first login", tone: "bg-info-soft text-info" },
+  "first-login": { label: "Using first password", tone: "bg-info-soft text-info" },
   email: { label: "Email login — will switch to ID", tone: "bg-warning-soft text-warning" },
   ready: { label: "No login yet", tone: "bg-warning-soft text-warning" },
   "no-dob": { label: "Date of birth missing", tone: "bg-destructive-soft text-destructive" },
@@ -243,7 +243,7 @@ function ClassLogins({ cls }: { cls: ApiClass }) {
       sheet.getCell(1, 1).value = `Student logins — Class ${label}`;
       sheet.getCell(1, 1).font = { bold: true, size: 14 };
       sheet.getRow(2).values = [
-        "Sign in with the Student ID. First password = date of birth (DDMMYYYY); a new one is set at first login.",
+        "Sign in with the Student ID. First password = date of birth (DDMMYYYY); it can be changed any time in Settings.",
       ];
       sheet.getCell(2, 1).font = { italic: true, size: 9, color: { argb: "FF6B7280" } };
       const header = sheet.getRow(3);
@@ -308,7 +308,7 @@ function ClassLogins({ cls }: { cls: ApiClass }) {
         <InfoCard label="Students" value={counts.total} icon={Users} tone="navy" />
         <InfoCard label="Logins active" value={counts.active} icon={CheckCircle2} tone="success" />
         <InfoCard
-          label="Waiting for first login"
+          label="Using first password"
           value={counts.firstLogin}
           icon={Hourglass}
           tone="info"

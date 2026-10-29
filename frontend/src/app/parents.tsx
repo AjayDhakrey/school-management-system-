@@ -96,7 +96,7 @@ export default function Page() {
   }).length;
 
   // Parents sign in with their registered mobile; the first password is four name letters +
-  // four mobile digits (e.g. Raje9876), changed on first login.
+  // four mobile digits (e.g. Raje9876), which they can change any time in Settings.
   async function createLogins() {
     setCreatingLogins(true);
     try {

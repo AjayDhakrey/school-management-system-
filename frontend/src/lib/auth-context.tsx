@@ -21,7 +21,7 @@ export interface AuthUser {
   linkedParentId: string | null;
   linkedStudentId: string | null;
   linkedStaffId: string | null;
-  /** First login with a Student ID or parent mobile (or after a reset): a new password is required. */
+  /** Student ID or parent mobile login still on its starting password (optional to change). */
   mustChangePassword: boolean;
 }
 

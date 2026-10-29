@@ -400,7 +400,7 @@ export default function Page() {
                   <p className="rounded-xl bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                     Parents sign in with their registered mobile number. The first password is the
                     first four letters of their name (first one capital) + the first four digits of
-                    the mobile, e.g. Raje9876 — they must change it on first login.
+                    the mobile, e.g. Raje9876 — they can change it any time in Settings.
                   </p>
                 ) : (
                   <>
